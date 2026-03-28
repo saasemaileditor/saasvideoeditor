@@ -13,6 +13,7 @@
     "@hello-pangea/dnd": "^18.0.1",
     "@remotion/player": "^4.0.441",
     "@tailwindcss/vite": "^4.2.2",
+    "@tsparticles/react": "^3.0.0",
     "axios": "^1.14.0",
     "fabric": "^7.2.0",
     "framer-motion": "^12.38.0",
@@ -21,6 +22,7 @@
     "react-router-dom": "^7.13.2",
     "remotion": "^4.0.441",
     "tailwindcss": "^4.2.2",
+    "tsparticles": "^3.9.1",
     "zustand": "^5.0.12"
   },
   "devDependencies": {
