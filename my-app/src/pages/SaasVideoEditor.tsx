@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Canvas } from '@react-three/fiber';
 import { Text, TransformControls } from '@react-three/drei';
+import { useEditorStore } from '../store/useEditorStore';
 import {
     Undo2, Redo2, Play, Pause, Download,
     Layers, Video, Sparkles, LayoutTemplate,
@@ -180,19 +181,12 @@ const SaasVideoEditor = () => {
     const [panelLayout, setPanelLayout] = useState<'list' | 'grid' | 'small-grid'>('list');
     const [isLayoutDropdownOpen, setIsLayoutDropdownOpen] = useState(false);
 
-    // Canvas States
-    type CanvasElement = {
-        id: string;
-        type: 'text';
-        position: [number, number, number];
-        text: string;
-    };
-    const [canvasElements, setCanvasElements] = useState<CanvasElement[]>([]);
+    // Canvas States (global store)
+    const { elements, selectedId, addElement, updateElement, setSelectedId } = useEditorStore();
     const [isDragOver, setIsDragOver] = useState(false);
     const [isDraggingElement, setIsDraggingElement] = useState(false);
     const [savedActiveTab, setSavedActiveTab] = useState<string | null>(null);
     const canvasRef = useRef<HTMLDivElement>(null);
-    const [selectedId, setSelectedId] = useState<string | null>(null);
 
 
 
@@ -777,12 +771,14 @@ const SaasVideoEditor = () => {
                                 // Convert pixel coordinates to centered 3D coordinates
                                 const x = e.clientX - rect.left - rect.width / 2;
                                 const y = -(e.clientY - rect.top - rect.height / 2);
-                                setCanvasElements(prev => [...prev, {
+                                addElement({
                                     id: Date.now().toString(),
                                     type: 'text',
                                     position: [x / 100, y / 100, 0],
-                                    text: 'Edit this text'
-                                }]);
+                                    rotation: [0, 0, 0],
+                                    scale: [1, 1, 1],
+                                    content: 'Edit this text'
+                                });
                                 if (autoclosePanel) {
                                     setActiveTab(null);
                                 } else {
@@ -817,7 +813,7 @@ const SaasVideoEditor = () => {
                         >
                             <ambientLight intensity={0.5} />
                             <directionalLight position={[10, 10, 10]} />
-                            {canvasElements.map(el => {
+                            {elements.map(el => {
                                 const isSelected = el.id === selectedId;
                                 const textMesh = (
                                     <Text
@@ -830,7 +826,7 @@ const SaasVideoEditor = () => {
                                         maxWidth={3}
                                         onClick={() => setSelectedId(el.id)}
                                     >
-                                        {el.text}
+                                        {el.content ?? ''}
                                     </Text>
                                 );
 
@@ -844,14 +840,13 @@ const SaasVideoEditor = () => {
                                             showZ={false}
                                             onChange={(e) => {
                                                 if (e?.target) {
-                                                    const ctrl = e.target as unknown as { worldPosition: { x: number; y: number; z: number } };
-                                                    const pos = ctrl.worldPosition;
-                                                    if (pos) {
-                                                        setCanvasElements(prev => prev.map(item =>
-                                                            item.id === el.id
-                                                                ? { ...item, position: [pos.x, pos.y, pos.z] as [number, number, number] }
-                                                                : item
-                                                        ));
+                                                    const obj = (e.target as unknown as { object: { position: { x: number; y: number; z: number }; rotation: { x: number; y: number; z: number }; scale: { x: number; y: number; z: number } } }).object;
+                                                    if (obj) {
+                                                        updateElement(el.id, {
+                                                            position: [obj.position.x, obj.position.y, obj.position.z],
+                                                            rotation: [obj.rotation.x, obj.rotation.y, obj.rotation.z],
+                                                            scale:    [obj.scale.x,    obj.scale.y,    obj.scale.z],
+                                                        });
                                                     }
                                                 }
                                             }}
