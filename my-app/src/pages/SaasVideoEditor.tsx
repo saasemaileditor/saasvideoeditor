@@ -1,8 +1,11 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Canvas } from '@react-three/fiber';
-import { Text, TransformControls } from '@react-three/drei';
-import { useEditorStore } from '../store/useEditorStore';
+import { Text } from '@react-three/drei';
+import { CanvaBoundingBox } from '../components/CanvaBoundingBox';
+import { useEditorStore, useTemporalStore } from '../store/useEditorStore';
+// @ts-ignore — tinykeys package.json exports lack a "types" condition
+import { tinykeys } from 'tinykeys';
 import {
     Undo2, Redo2, Play, Pause, Download,
     Layers, Video, Sparkles, LayoutTemplate,
@@ -160,8 +163,8 @@ const AnimationCard = ({ preset, isDark, isSelected, onSelect, layout }: {
             </div>
             {/* Label */}
             <span className={`text-xs font-semibold ${isSelected
-                    ? 'text-[#7c3aed]'
-                    : isDark ? 'text-gray-300' : 'text-gray-700'
+                ? 'text-[#7c3aed]'
+                : isDark ? 'text-gray-300' : 'text-gray-700'
                 }`}>
                 {preset.label}
             </span>
@@ -182,7 +185,9 @@ const SaasVideoEditor = () => {
     const [isLayoutDropdownOpen, setIsLayoutDropdownOpen] = useState(false);
 
     // Canvas States (global store)
-    const { elements, selectedId, addElement, updateElement, setSelectedId } = useEditorStore();
+    const { elements, selectedId, addElement, updateElement, removeElement, setSelectedId } = useEditorStore();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { undo, redo, futureStates, pastStates } = useTemporalStore((s: any) => s);
     const [isDragOver, setIsDragOver] = useState(false);
     const [isDraggingElement, setIsDraggingElement] = useState(false);
     const [savedActiveTab, setSavedActiveTab] = useState<string | null>(null);
@@ -198,6 +203,35 @@ const SaasVideoEditor = () => {
         document.addEventListener('dragend', handleDragEnd);
         return () => document.removeEventListener('dragend', handleDragEnd);
     }, []);
+
+    // Keyboard shortcuts (undo, redo, delete, escape)
+    useEffect(() => {
+        const handleDelete = (e: KeyboardEvent) => {
+            const target = e.target as HTMLElement;
+            const tag = target.tagName;
+
+            // Prevent deletion if the user is typing inside an input, textarea, or contentEditable div
+            if (tag === 'INPUT' || tag === 'TEXTAREA' || target.isContentEditable) {
+                return;
+            }
+
+            if (selectedId) {
+                removeElement(selectedId);
+                setSelectedId(null);
+            }
+        };
+
+        const unsub = tinykeys(window, {
+            '$mod+z': (e: KeyboardEvent) => { e.preventDefault(); undo(); },
+            '$mod+Shift+z': (e: KeyboardEvent) => { e.preventDefault(); redo(); },
+            '$mod+y': (e: KeyboardEvent) => { e.preventDefault(); redo(); },
+            'Delete': handleDelete,
+            'Backspace': handleDelete, // Adds macOS native delete support
+            'Escape': () => setSelectedId(null),
+        });
+
+        return () => unsub();
+    }, [undo, redo, selectedId, setSelectedId, removeElement]);
 
     // Settings States
     const [theme, setTheme] = useState<'light' | 'dark' | 'system'>('light');
@@ -302,10 +336,18 @@ const SaasVideoEditor = () => {
                 <div className="flex items-center gap-4">
                     <span className={`font-bold text-[18px] ${isDark ? 'text-white' : 'text-gray-900'}`}>Cliply</span>
                     <div className={`flex items-center gap-1 border-l pl-4 ${isDark ? 'border-[#2a2d45]' : 'border-gray-200'}`}>
-                        <button className={`p-1.5 rounded-lg transition-colors cursor-pointer ${isDark ? 'text-gray-400 hover:text-white hover:bg-gray-800' : 'text-gray-500 hover:text-gray-900 hover:bg-gray-100'}`}>
+                        <button
+                            onClick={() => undo()}
+                            disabled={pastStates.length === 0}
+                            className={`p-1.5 rounded-lg transition-colors cursor-pointer ${pastStates.length === 0 ? 'opacity-40 cursor-not-allowed' : ''} ${isDark ? 'text-gray-400 hover:text-white hover:bg-gray-800' : 'text-gray-500 hover:text-gray-900 hover:bg-gray-100'}`}
+                        >
                             <Undo2 size={18} />
                         </button>
-                        <button className={`p-1.5 rounded-lg transition-colors cursor-pointer ${isDark ? 'text-gray-400 hover:text-white hover:bg-gray-800' : 'text-gray-500 hover:text-gray-900 hover:bg-gray-100'}`}>
+                        <button
+                            onClick={() => redo()}
+                            disabled={futureStates.length === 0}
+                            className={`p-1.5 rounded-lg transition-colors cursor-pointer ${futureStates.length === 0 ? 'opacity-40 cursor-not-allowed' : ''} ${isDark ? 'text-gray-400 hover:text-white hover:bg-gray-800' : 'text-gray-500 hover:text-gray-900 hover:bg-gray-100'}`}
+                        >
                             <Redo2 size={18} />
                         </button>
                     </div>
@@ -377,10 +419,10 @@ const SaasVideoEditor = () => {
                                                 key={opt.id}
                                                 onClick={() => setTheme(opt.id as any)}
                                                 className={`flex-1 flex flex-col items-center justify-center p-3 rounded-lg border transition-all cursor-pointer ${isSelected
-                                                        ? 'border-[#7c3aed] bg-[#ede9fe] text-[#7c3aed]'
-                                                        : isDark
-                                                            ? 'border-[#2a2d45] bg-transparent text-gray-400 hover:bg-[#252840] hover:text-gray-200'
-                                                            : 'border-gray-200 bg-white text-gray-500 hover:bg-gray-50 hover:text-gray-700'
+                                                    ? 'border-[#7c3aed] bg-[#ede9fe] text-[#7c3aed]'
+                                                    : isDark
+                                                        ? 'border-[#2a2d45] bg-transparent text-gray-400 hover:bg-[#252840] hover:text-gray-200'
+                                                        : 'border-gray-200 bg-white text-gray-500 hover:bg-gray-50 hover:text-gray-700'
                                                     }`}
                                             >
                                                 <opt.icon size={18} className="mb-2" />
@@ -439,12 +481,12 @@ const SaasVideoEditor = () => {
                                         if (!isActive) setIsPanelExpanded(defaultPanelExpanded);
                                     }}
                                     className={`w-10 h-10 flex items-center justify-center rounded-xl transition-colors cursor-pointer ${isActive
-                                            ? isDark
-                                                ? 'bg-[#4c1d95] text-[#a78bfa]'
-                                                : 'bg-[#ede9fe] text-[#7c3aed]'
-                                            : isDark
-                                                ? 'bg-transparent text-gray-400 hover:text-white hover:bg-[#252840]'
-                                                : 'bg-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-100'
+                                        ? isDark
+                                            ? 'bg-[#4c1d95] text-[#a78bfa]'
+                                            : 'bg-[#ede9fe] text-[#7c3aed]'
+                                        : isDark
+                                            ? 'bg-transparent text-gray-400 hover:text-white hover:bg-[#252840]'
+                                            : 'bg-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-100'
                                         }`}
                                     title={tab.label}
                                 >
@@ -549,8 +591,8 @@ const SaasVideoEditor = () => {
 
                                                     {/* The Front Card */}
                                                     <div className={`relative w-full h-full flex flex-col items-center justify-center gap-2.5 border rounded-xl z-10 transition-all duration-300 transform group-hover:-translate-y-1 group-hover:-translate-x-1 ${isDark
-                                                            ? 'bg-[#161625] border-[#2a2d45] group-hover:border-[#7c3aed] group-hover:bg-[#2d1f5e]'
-                                                            : 'bg-white border-gray-200 shadow-sm group-hover:border-[#7c3aed] group-hover:bg-[#ede9fe] group-hover:shadow-md'
+                                                        ? 'bg-[#161625] border-[#2a2d45] group-hover:border-[#7c3aed] group-hover:bg-[#2d1f5e]'
+                                                        : 'bg-white border-gray-200 shadow-sm group-hover:border-[#7c3aed] group-hover:bg-[#ede9fe] group-hover:shadow-md'
                                                         }`}>
                                                         <Type size={24} className={`transition-colors ${isDark ? 'text-gray-300 group-hover:text-white' : 'text-gray-600 group-hover:text-[#7c3aed]'}`} />
                                                         <span className={`text-xs font-semibold transition-colors ${isDark ? 'text-gray-300 group-hover:text-white' : 'text-gray-600 group-hover:text-[#7c3aed]'}`}>Text</span>
@@ -587,8 +629,8 @@ const SaasVideoEditor = () => {
 
                                                     {/* The Front Card */}
                                                     <div className={`relative w-full h-full flex flex-col items-center justify-center gap-2.5 border rounded-xl z-10 transition-all duration-300 transform group-hover:-translate-y-1 group-hover:-translate-x-1 ${isDark
-                                                            ? 'bg-[#161625] border-[#2a2d45] group-hover:border-[#7c3aed] group-hover:bg-[#2d1f5e]'
-                                                            : 'bg-white border-gray-200 shadow-sm group-hover:border-[#7c3aed] group-hover:bg-[#ede9fe] group-hover:shadow-md'
+                                                        ? 'bg-[#161625] border-[#2a2d45] group-hover:border-[#7c3aed] group-hover:bg-[#2d1f5e]'
+                                                        : 'bg-white border-gray-200 shadow-sm group-hover:border-[#7c3aed] group-hover:bg-[#ede9fe] group-hover:shadow-md'
                                                         }`}>
                                                         <Smartphone size={24} className={`transition-colors ${isDark ? 'text-gray-300 group-hover:text-white' : 'text-gray-600 group-hover:text-[#7c3aed]'}`} />
                                                         <span className={`text-xs font-semibold transition-colors ${isDark ? 'text-gray-300 group-hover:text-white' : 'text-gray-600 group-hover:text-[#7c3aed]'}`}>Device</span>
@@ -622,8 +664,8 @@ const SaasVideoEditor = () => {
 
                                                     {/* The Front Card */}
                                                     <div className={`relative w-full h-full flex flex-col items-center justify-center gap-2.5 border rounded-xl z-10 transition-all duration-300 transform group-hover:-translate-y-1 group-hover:-translate-x-1 ${isDark
-                                                            ? 'bg-[#161625] border-[#2a2d45] group-hover:border-[#7c3aed] group-hover:bg-[#2d1f5e]'
-                                                            : 'bg-white border-gray-200 shadow-sm group-hover:border-[#7c3aed] group-hover:bg-[#ede9fe] group-hover:shadow-md'
+                                                        ? 'bg-[#161625] border-[#2a2d45] group-hover:border-[#7c3aed] group-hover:bg-[#2d1f5e]'
+                                                        : 'bg-white border-gray-200 shadow-sm group-hover:border-[#7c3aed] group-hover:bg-[#ede9fe] group-hover:shadow-md'
                                                         }`}>
                                                         <Hash size={24} className={`transition-colors ${isDark ? 'text-gray-300 group-hover:text-white' : 'text-gray-600 group-hover:text-[#7c3aed]'}`} />
                                                     </div>
@@ -789,12 +831,12 @@ const SaasVideoEditor = () => {
                             setIsDraggingElement(false);
                         }}
                         className={`flex-1 min-w-0 min-h-0 overflow-hidden z-10 rounded-xl relative transition-all duration-200 border ${isDragOver
-                                ? isDark
-                                    ? 'bg-[#2d1f5e]/40 border-[#7c3aed] shadow-[inset_0_0_20px_rgba(124,58,237,0.3)]'
-                                    : 'bg-[#f3e8ff] border-[#7c3aed] shadow-[inset_0_0_20px_rgba(124,58,237,0.3)]'
-                                : isDark
-                                    ? 'bg-[#161625] border-[#2a2d45] shadow-sm'
-                                    : 'bg-white border-gray-200 shadow-sm'
+                            ? isDark
+                                ? 'bg-[#2d1f5e]/40 border-[#7c3aed] shadow-[inset_0_0_20px_rgba(124,58,237,0.3)]'
+                                : 'bg-[#f3e8ff] border-[#7c3aed] shadow-[inset_0_0_20px_rgba(124,58,237,0.3)]'
+                            : isDark
+                                ? 'bg-[#161625] border-[#2a2d45] shadow-sm'
+                                : 'bg-white border-gray-200 shadow-sm'
                             }`}
                     >
                         {isDragOver && (
@@ -815,48 +857,35 @@ const SaasVideoEditor = () => {
                             <directionalLight position={[10, 10, 10]} />
                             {elements.map(el => {
                                 const isSelected = el.id === selectedId;
-                                const textMesh = (
-                                    <Text
-                                        key={el.id}
-                                        position={el.position}
-                                        fontSize={0.24}
-                                        color={isDark ? '#ffffff' : '#000000'}
-                                        anchorX="left"
-                                        anchorY="top"
-                                        maxWidth={3}
-                                        onClick={() => setSelectedId(el.id)}
-                                    >
-                                        {el.content ?? ''}
-                                    </Text>
-                                );
 
-                                if (isSelected) {
-                                    return (
-                                        <TransformControls
-                                            key={`tc-${el.id}`}
+                                return (
+                                    <group key={el.id}>
+                                        {/* The actual text element */}
+                                        <Text
                                             position={el.position}
-                                            showX
-                                            showY
-                                            showZ={false}
-                                            onChange={(e) => {
-                                                if (e?.target) {
-                                                    const obj = (e.target as unknown as { object: { position: { x: number; y: number; z: number }; rotation: { x: number; y: number; z: number }; scale: { x: number; y: number; z: number } } }).object;
-                                                    if (obj) {
-                                                        updateElement(el.id, {
-                                                            position: [obj.position.x, obj.position.y, obj.position.z],
-                                                            rotation: [obj.rotation.x, obj.rotation.y, obj.rotation.z],
-                                                            scale:    [obj.scale.x,    obj.scale.y,    obj.scale.z],
-                                                        });
-                                                    }
-                                                }
+                                            scale={el.scale}
+                                            fontSize={0.24}
+                                            color={isDark ? '#ffffff' : '#000000'}
+                                            anchorX="left"
+                                            anchorY="top"
+                                            maxWidth={3}
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                setSelectedId(el.id);
                                             }}
                                         >
-                                            {textMesh}
-                                        </TransformControls>
-                                    );
-                                }
+                                            {el.content ?? ''}
+                                        </Text>
 
-                                return textMesh;
+                                        {/* Canva-style 2-D bounding box shown only when selected */}
+                                        {isSelected && (
+                                            <CanvaBoundingBox
+                                                el={el}
+                                                updateElement={updateElement}
+                                            />
+                                        )}
+                                    </group>
+                                );
                             })}
                         </Canvas>
                     </div>
@@ -904,8 +933,8 @@ const SaasVideoEditor = () => {
                                                         key={opt.id}
                                                         onClick={() => { setPanelLayout(opt.id as any); setIsLayoutDropdownOpen(false); }}
                                                         className={`flex items-center gap-2 px-2 py-1.5 rounded-md text-xs font-medium cursor-pointer transition-colors ${panelLayout === opt.id
-                                                                ? isDark ? 'bg-[#4c1d95] text-[#a78bfa]' : 'bg-[#ede9fe] text-[#7c3aed]'
-                                                                : isDark ? 'text-gray-300 hover:bg-[#252840]' : 'text-gray-600 hover:bg-gray-50'
+                                                            ? isDark ? 'bg-[#4c1d95] text-[#a78bfa]' : 'bg-[#ede9fe] text-[#7c3aed]'
+                                                            : isDark ? 'text-gray-300 hover:bg-[#252840]' : 'text-gray-600 hover:bg-gray-50'
                                                             }`}
                                                     >
                                                         <opt.icon size={14} />
@@ -966,10 +995,10 @@ const SaasVideoEditor = () => {
                         <button
                             onClick={() => setIsRightPanelAnimationOpen(prev => !prev)}
                             className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg border transition-colors cursor-pointer group ${isRightPanelAnimationOpen
-                                    ? 'border-[#7c3aed] bg-[#7c3aed] text-white shadow-sm'
-                                    : isDark
-                                        ? 'border-[#2a2d45] hover:border-[#7c3aed] text-gray-300 bg-[#161625]'
-                                        : 'border-gray-200 hover:border-[#7c3aed] hover:bg-[#ede9fe] text-gray-700'
+                                ? 'border-[#7c3aed] bg-[#7c3aed] text-white shadow-sm'
+                                : isDark
+                                    ? 'border-[#2a2d45] hover:border-[#7c3aed] text-gray-300 bg-[#161625]'
+                                    : 'border-gray-200 hover:border-[#7c3aed] hover:bg-[#ede9fe] text-gray-700'
                                 }`}
                         >
                             <div className="flex items-center gap-2">
@@ -1008,10 +1037,10 @@ const SaasVideoEditor = () => {
                                         key={sceneNum}
                                         onClick={() => setActiveScene(sceneNum)}
                                         className={`px-3 py-1 rounded-full text-xs font-semibold cursor-pointer transition-colors ${isActive
-                                                ? 'bg-[#7c3aed] text-white'
-                                                : isDark
-                                                    ? 'border border-gray-700 text-gray-400 hover:bg-gray-800'
-                                                    : 'border border-gray-300 text-gray-600 hover:bg-gray-100'
+                                            ? 'bg-[#7c3aed] text-white'
+                                            : isDark
+                                                ? 'border border-gray-700 text-gray-400 hover:bg-gray-800'
+                                                : 'border border-gray-300 text-gray-600 hover:bg-gray-100'
                                             }`}
                                     >
                                         Scene {sceneNum}
