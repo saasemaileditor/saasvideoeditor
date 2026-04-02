@@ -1,8 +1,14 @@
-import { useRef, useCallback } from 'react';
+import { useRef, useCallback, useEffect } from 'react';
 import { useThree } from '@react-three/fiber';
 import { Line } from '@react-three/drei';
 import * as THREE from 'three';
 import type { CanvasElement } from '../store/useEditorStore';
+import { useEditorStore } from '../store/useEditorStore';
+
+/** Grab the zundo temporal API without causing re-renders. */
+function getTemporalStore() {
+    return (useEditorStore as any).temporal.getState();
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Helpers
@@ -37,9 +43,11 @@ interface CornerHandleProps {
     localOffset: [number, number]; // position relative to element centre
     el: CanvasElement;
     updateElement: (id: string, data: Partial<CanvasElement>) => void;
+    /** Shared ref owned by CanvaBoundingBox – true while this handle is being dragged. */
+    cornerDragActiveRef: React.MutableRefObject<boolean>;
 }
 
-function CornerHandle({ localOffset, el, updateElement }: CornerHandleProps) {
+function CornerHandle({ localOffset, el, updateElement, cornerDragActiveRef }: CornerHandleProps) {
     const { camera, gl } = useThree();
     const dragRef = useRef<{
         active: boolean;
@@ -51,6 +59,10 @@ function CornerHandle({ localOffset, el, updateElement }: CornerHandleProps) {
         (e: { nativeEvent: PointerEvent; stopPropagation: () => void }) => {
             e.stopPropagation();
             (e.nativeEvent.target as Element).setPointerCapture(e.nativeEvent.pointerId);
+
+            // Pause history so every move pixel doesn't create a snapshot
+            getTemporalStore().pause();
+            cornerDragActiveRef.current = true;
 
             const [wx, wy] = clientToWorld(
                 e.nativeEvent.clientX,
@@ -68,7 +80,7 @@ function CornerHandle({ localOffset, el, updateElement }: CornerHandleProps) {
                 startScale: [...el.scale] as [number, number, number],
             };
         },
-        [camera, gl, el]
+        [camera, gl, el, cornerDragActiveRef]
     );
 
     const onPointerMove = useCallback(
@@ -97,9 +109,12 @@ function CornerHandle({ localOffset, el, updateElement }: CornerHandleProps) {
         (e: { nativeEvent: PointerEvent }) => {
             if (!dragRef.current) return;
             dragRef.current.active = false;
+            cornerDragActiveRef.current = false;
             (e.nativeEvent.target as Element).releasePointerCapture(e.nativeEvent.pointerId);
+            // Resume history – zundo records ONE snapshot for the whole scale drag
+            getTemporalStore().resume();
         },
-        []
+        [cornerDragActiveRef]
     );
 
     return (
@@ -163,11 +178,9 @@ export function CanvaBoundingBox({ el, updateElement }: CanvaBoundingBoxProps) {
     const [cx, cy, cz] = el.position;
     const [sx, sy] = el.scale; // scale applied to the element itself
 
-    // Approximate the visual size of the element in world units.
-    // For a text element with fontSize=0.24 and maxWidth=3 we use sensible defaults;
-    // everything is scaled by el.scale so these are the "base" dimensions before scale.
-    const BASE_W = 3;   // world units (matches maxWidth in <Text>)
-    const BASE_H = 0.4; // rough single-line height estimate
+    // Use the element's declared bounding size (world units before scale) if present.
+    // Fall back to text defaults [3, 0.4] so existing text elements are unaffected.
+    const [BASE_W, BASE_H] = el.boundingSize ?? [3, 0.4];
 
     const w = BASE_W * sx;
     const h = BASE_H * sy;
@@ -181,10 +194,38 @@ export function CanvaBoundingBox({ el, updateElement }: CanvaBoundingBoxProps) {
         startPos: [number, number, number];
     } | null>(null);
 
+    // Shared flag so the window safety-valve below can see whether ANY corner handle
+    // is currently being dragged (CornerHandle owns its own dragRef internally).
+    const cornerDragActiveRef = useRef<boolean>(false);
+
+    // ── Safety valve: resume history if OS swallows the pointerup ────────────
+    // Alt-Tab, system dialogs, or screen-lock can kill the pointer capture so
+    // onPointerUp never fires, leaving zundo permanently paused.
+    useEffect(() => {
+        const handleWindowPointerUp = () => {
+            const moveActive = moveDragRef.current?.active ?? false;
+            const cornerActive = cornerDragActiveRef.current;
+
+            if (moveActive || cornerActive) {
+                // Reset both drag states
+                if (moveDragRef.current) moveDragRef.current.active = false;
+                cornerDragActiveRef.current = false;
+                // Un-pause history so Ctrl+Z works correctly after the interrupted drag
+                getTemporalStore().resume();
+            }
+        };
+
+        window.addEventListener('pointerup', handleWindowPointerUp);
+        return () => window.removeEventListener('pointerup', handleWindowPointerUp);
+    }, []); // refs are stable—no deps needed
+
     const onMovePointerDown = useCallback(
         (e: { nativeEvent: PointerEvent; stopPropagation: () => void }) => {
             e.stopPropagation();
             (e.nativeEvent.target as Element).setPointerCapture(e.nativeEvent.pointerId);
+
+            // Pause history so every move pixel doesn't create a snapshot
+            getTemporalStore().pause();
 
             const [wx, wy] = clientToWorld(
                 e.nativeEvent.clientX,
@@ -226,6 +267,8 @@ export function CanvaBoundingBox({ el, updateElement }: CanvaBoundingBoxProps) {
             if (!moveDragRef.current) return;
             moveDragRef.current.active = false;
             (e.nativeEvent.target as Element).releasePointerCapture(e.nativeEvent.pointerId);
+            // Resume history – zundo records ONE snapshot for the whole move drag
+            getTemporalStore().resume();
         },
         []
     );
@@ -250,6 +293,7 @@ export function CanvaBoundingBox({ el, updateElement }: CanvaBoundingBoxProps) {
                     localOffset={[ox, oy]}
                     el={el}
                     updateElement={updateElement}
+                    cornerDragActiveRef={cornerDragActiveRef}
                 />
             ))}
 

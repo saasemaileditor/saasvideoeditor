@@ -4,11 +4,17 @@ import { useStore } from 'zustand';
 
 export type CanvasElement = {
     id: string;
-    type: 'text' | 'device' | 'card' | '3d';
+    type: 'text' | 'device' | 'card' | '3d' | 'chart' | 'counter' | 'button' | 'icon' | 'shape';
     position: [number, number, number];
     rotation: [number, number, number];
     scale: [number, number, number];
     content?: string; // Holds the text string, or a URL for an image/video
+    /**
+     * Base bounding size in world units *before* scale is applied — [width, height].
+     * Used by CanvaBoundingBox to draw a correctly-sized selection outline.
+     * Omit for text elements; the bounding box falls back to [3, 0.4].
+     */
+    boundingSize?: [number, number];
 };
 
 interface EditorState {
