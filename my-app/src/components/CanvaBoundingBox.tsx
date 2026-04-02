@@ -3,12 +3,7 @@ import { useThree } from '@react-three/fiber';
 import { Line } from '@react-three/drei';
 import * as THREE from 'three';
 import type { CanvasElement } from '../store/useEditorStore';
-import { useEditorStore } from '../store/useEditorStore';
-
-/** Grab the zundo temporal API without causing re-renders. */
-function getTemporalStore() {
-    return (useEditorStore as any).temporal.getState();
-}
+import { getHistoryControls, useUIStore } from '../store/useEditorStore';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Helpers
@@ -60,8 +55,7 @@ function CornerHandle({ localOffset, el, updateElement, cornerDragActiveRef }: C
             e.stopPropagation();
             (e.nativeEvent.target as Element).setPointerCapture(e.nativeEvent.pointerId);
 
-            // Pause history so every move pixel doesn't create a snapshot
-            getTemporalStore().pause();
+            // Mark corner drag active — the safety valve watches this flag
             cornerDragActiveRef.current = true;
 
             const [wx, wy] = clientToWorld(
@@ -111,8 +105,8 @@ function CornerHandle({ localOffset, el, updateElement, cornerDragActiveRef }: C
             dragRef.current.active = false;
             cornerDragActiveRef.current = false;
             (e.nativeEvent.target as Element).releasePointerCapture(e.nativeEvent.pointerId);
-            // Resume history – zundo records ONE snapshot for the whole scale drag
-            getTemporalStore().resume();
+            // Save ONE history checkpoint for the entire scale gesture
+            getHistoryControls().archive();
         },
         [cornerDragActiveRef]
     );
@@ -170,10 +164,18 @@ export interface CanvaBoundingBoxProps {
  *   • 4 white corner scale handles
  *   • An invisible drag-surface covering the whole element for move interactions
  *
- * It works with an orthographic camera (zoom=100) and does NOT use TransformControls.
+ * Drag batching: each move/scale gesture calls getHistoryControls().archive()
+ * ONCE on pointer-up, recording a single JSON-Patch diff for the whole gesture.
+ * This replaces the old zundo pause()/resume() approach.
  */
 export function CanvaBoundingBox({ el, updateElement }: CanvaBoundingBoxProps) {
     const { camera, gl } = useThree();
+    const { setSelectedId } = useUIStore();
+
+    const onElementClick = useCallback((e: any) => {
+        e.stopPropagation();
+        setSelectedId(el.id);
+    }, [el.id, setSelectedId]);
 
     const [cx, cy, cz] = el.position;
     const [sx, sy] = el.scale; // scale applied to the element itself
@@ -198,9 +200,9 @@ export function CanvaBoundingBox({ el, updateElement }: CanvaBoundingBoxProps) {
     // is currently being dragged (CornerHandle owns its own dragRef internally).
     const cornerDragActiveRef = useRef<boolean>(false);
 
-    // ── Safety valve: resume history if OS swallows the pointerup ────────────
+    // ── Safety valve: archive history if OS swallows the pointerup ───────────
     // Alt-Tab, system dialogs, or screen-lock can kill the pointer capture so
-    // onPointerUp never fires, leaving zundo permanently paused.
+    // onPointerUp never fires, leaving the drag uncommitted.
     useEffect(() => {
         const handleWindowPointerUp = () => {
             const moveActive = moveDragRef.current?.active ?? false;
@@ -210,8 +212,8 @@ export function CanvaBoundingBox({ el, updateElement }: CanvaBoundingBoxProps) {
                 // Reset both drag states
                 if (moveDragRef.current) moveDragRef.current.active = false;
                 cornerDragActiveRef.current = false;
-                // Un-pause history so Ctrl+Z works correctly after the interrupted drag
-                getTemporalStore().resume();
+                // Still archive so the interrupted drag is recoverable
+                getHistoryControls().archive();
             }
         };
 
@@ -223,9 +225,6 @@ export function CanvaBoundingBox({ el, updateElement }: CanvaBoundingBoxProps) {
         (e: { nativeEvent: PointerEvent; stopPropagation: () => void }) => {
             e.stopPropagation();
             (e.nativeEvent.target as Element).setPointerCapture(e.nativeEvent.pointerId);
-
-            // Pause history so every move pixel doesn't create a snapshot
-            getTemporalStore().pause();
 
             const [wx, wy] = clientToWorld(
                 e.nativeEvent.clientX,
@@ -267,8 +266,8 @@ export function CanvaBoundingBox({ el, updateElement }: CanvaBoundingBoxProps) {
             if (!moveDragRef.current) return;
             moveDragRef.current.active = false;
             (e.nativeEvent.target as Element).releasePointerCapture(e.nativeEvent.pointerId);
-            // Resume history – zundo records ONE snapshot for the whole move drag
-            getTemporalStore().resume();
+            // Save ONE history checkpoint for the entire move gesture
+            getHistoryControls().archive();
         },
         []
     );
@@ -282,7 +281,7 @@ export function CanvaBoundingBox({ el, updateElement }: CanvaBoundingBoxProps) {
     ];
 
     return (
-        <group position={[cx, cy, cz]}>
+        <group position={[cx, cy, cz]} onClick={onElementClick}>
             {/* ── 1. Purple border outline ── */}
             <SelectionBorder w={w} h={h} />
 

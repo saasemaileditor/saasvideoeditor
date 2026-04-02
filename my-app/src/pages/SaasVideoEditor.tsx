@@ -3,9 +3,8 @@ import { motion, AnimatePresence } from 'motion/react';
 import { Canvas } from '@react-three/fiber';
 import { Text } from '@react-three/drei';
 import { CanvaBoundingBox } from '../components/CanvaBoundingBox';
-import { useEditorStore, useTemporalStore } from '../store/useEditorStore';
-// @ts-ignore — tinykeys package.json exports lack a "types" condition
-import { tinykeys } from 'tinykeys';
+import { useEditorStore, useUIStore, getHistoryControls } from '../store/useEditorStore';
+
 import {
     DndContext,
     DragOverlay,
@@ -300,9 +299,30 @@ const SaasVideoEditor = () => {
     const [isLayoutDropdownOpen, setIsLayoutDropdownOpen] = useState(false);
 
     // Canvas States (global store)
-    const { elements, selectedId, addElement, updateElement, removeElement, setSelectedId } = useEditorStore();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { undo, redo, futureStates, pastStates } = useTemporalStore((s: any) => s);
+    const { elements, elementIds, addElement, updateElement, removeElement } = useEditorStore();
+    const { selectedId, setSelectedId } = useUIStore();
+
+    useEffect(() => {
+        // If selected element is deleted, clear selection
+        if (selectedId && !elements.has(selectedId)) {
+            setSelectedId(null);
+        }
+    }, [elements, selectedId, setSelectedId]);
+
+    // Undo/redo state — subscribe to store so buttons re-render on history change
+    const [canUndo, setCanUndo] = useState(false);
+    const [canRedo, setCanRedo] = useState(false);
+    useEffect(() => {
+        const controls = getHistoryControls();
+        // Sync immediately, then on every store change
+        const sync = () => {
+            setCanUndo(controls.canBack());
+            setCanRedo(controls.canForward());
+        };
+        sync();
+        const unsub = useEditorStore.subscribe(sync);
+        return unsub;
+    }, []);
     const [activeDragItem, setActiveDragItem] = useState<string | null>(null);
     const [savedActiveTab, setSavedActiveTab] = useState<string | null>(null);
     const canvasRef = useRef<HTMLDivElement>(null);
@@ -321,45 +341,44 @@ const SaasVideoEditor = () => {
             return target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable;
         };
 
-        const handleDelete = (e: KeyboardEvent) => {
-            if (isTyping(e)) return;
+        const handleKeyDown = (e: KeyboardEvent) => {
+            // Let the browser handle text editing natively if we're in an input
+            if (isTyping(e)) {
+                if (e.key === 'Escape') {
+                    (e.target as HTMLElement).blur();
+                    setSelectedId(null);
+                }
+                return;
+            }
 
-            if (selectedId) {
+            // Undo: Ctrl+Z
+            if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z' && !e.shiftKey) {
+                e.preventDefault();
+                getHistoryControls().back();
+            }
+            
+            // Redo: Ctrl+Shift+Z or Ctrl+Y
+            if (((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'z') || ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y')) {
+                e.preventDefault();
+                getHistoryControls().forward();
+            }
+            
+            // Delete: Delete or Backspace
+            if ((e.key === 'Delete' || e.key === 'Backspace') && selectedId) {
                 e.preventDefault();
                 removeElement(selectedId);
+                getHistoryControls().archive(); // Archive the deletion
+            }
+
+            // Escape: unselect
+            if (e.key === 'Escape') {
                 setSelectedId(null);
             }
         };
 
-        const handleUndo = (e: KeyboardEvent) => {
-            if (isTyping(e)) return; // Let the browser handle text undo
-            e.preventDefault();
-            undo();
-        };
-
-        const handleRedo = (e: KeyboardEvent) => {
-            if (isTyping(e)) return; // Let the browser handle text redo
-            e.preventDefault();
-            redo();
-        };
-
-        const unsub = tinykeys(window, {
-            '$mod+z': handleUndo,
-            '$mod+Shift+z': handleRedo,
-            '$mod+y': handleRedo,
-            'Delete': handleDelete,
-            'Backspace': handleDelete,
-            'Escape': (e: KeyboardEvent) => {
-                // Also blur the active element if they press escape while typing
-                if (isTyping(e)) {
-                    (e.target as HTMLElement).blur();
-                }
-                setSelectedId(null);
-            },
-        });
-
-        return () => unsub();
-    }, [undo, redo, selectedId, setSelectedId, removeElement]);
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [selectedId, setSelectedId, removeElement]);
 
     // Settings States
     const [theme, setTheme] = useState<'light' | 'dark' | 'system'>('light');
@@ -521,6 +540,9 @@ const SaasVideoEditor = () => {
             ...(BOUNDING_SIZES[type] ? { boundingSize: BOUNDING_SIZES[type] } : {}),
         });
 
+        // Archive ONE history checkpoint for the entire drop operation
+        getHistoryControls().archive();
+
         // Panel stays closed after drop (original behavior)
     }, [addElement, savedActiveTab]);
 
@@ -536,16 +558,16 @@ const SaasVideoEditor = () => {
                         <span className={`font-bold text-[18px] ${isDark ? 'text-white' : 'text-gray-900'}`}>Cliply</span>
                         <div className={`flex items-center gap-1 border-l pl-4 ${isDark ? 'border-[#2a2d45]' : 'border-gray-200'}`}>
                             <button
-                                onClick={() => undo()}
-                                disabled={pastStates.length === 0}
-                                className={`p-1.5 rounded-lg transition-colors cursor-pointer ${pastStates.length === 0 ? 'opacity-40 cursor-not-allowed' : ''} ${isDark ? 'text-gray-400 hover:text-white hover:bg-gray-800' : 'text-gray-500 hover:text-gray-900 hover:bg-gray-100'}`}
+                                onClick={() => getHistoryControls().back()}
+                                disabled={!canUndo}
+                                className={`p-1.5 rounded-lg transition-colors cursor-pointer ${!canUndo ? 'opacity-40 cursor-not-allowed' : ''} ${isDark ? 'text-gray-400 hover:text-white hover:bg-gray-800' : 'text-gray-500 hover:text-gray-900 hover:bg-gray-100'}`}
                             >
                                 <Undo2 size={18} />
                             </button>
                             <button
-                                onClick={() => redo()}
-                                disabled={futureStates.length === 0}
-                                className={`p-1.5 rounded-lg transition-colors cursor-pointer ${futureStates.length === 0 ? 'opacity-40 cursor-not-allowed' : ''} ${isDark ? 'text-gray-400 hover:text-white hover:bg-gray-800' : 'text-gray-500 hover:text-gray-900 hover:bg-gray-100'}`}
+                                onClick={() => getHistoryControls().forward()}
+                                disabled={!canRedo}
+                                className={`p-1.5 rounded-lg transition-colors cursor-pointer ${!canRedo ? 'opacity-40 cursor-not-allowed' : ''} ${isDark ? 'text-gray-400 hover:text-white hover:bg-gray-800' : 'text-gray-500 hover:text-gray-900 hover:bg-gray-100'}`}
                             >
                                 <Redo2 size={18} />
                             </button>
@@ -574,7 +596,10 @@ const SaasVideoEditor = () => {
                             <Play size={16} />
                             Preview
                         </button>
-                        <button className="flex items-center gap-2 px-4 py-1.5 bg-[#7c3aed] hover:bg-[#6d28d9] text-white text-sm font-medium rounded-lg transition-colors shadow-sm cursor-pointer border-none">
+                        <button
+                            onClick={() => window.open('/export', '_blank')}
+                            className="flex items-center gap-2 px-4 py-1.5 bg-[#7c3aed] hover:bg-[#6d28d9] text-white text-sm font-medium rounded-lg transition-colors shadow-sm cursor-pointer border-none"
+                        >
                             <Download size={16} />
                             Export MP4
                         </button>
@@ -782,7 +807,9 @@ const SaasVideoEditor = () => {
                             >
                                 <ambientLight intensity={0.5} />
                                 <directionalLight position={[10, 10, 10]} />
-                                {elements.map(el => {
+                                {elementIds.map(id => {
+                                    const el = elements.get(id);
+                                    if (!el) return null;
                                     const isSelected = el.id === selectedId;
 
                                     return (
