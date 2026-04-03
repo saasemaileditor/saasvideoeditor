@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { Canvas } from '@react-three/fiber';
 import { Text } from '@react-three/drei';
 import { CanvaBoundingBox } from '../components/CanvaBoundingBox';
+import { VirtualizedGrid } from '../components/VirtualizedGrid';
 import { useEditorStore, useUIStore, getHistoryControls } from '../store/useEditorStore';
 
 import {
@@ -293,7 +294,6 @@ const CanvasDropZone = ({ canvasRef, isDark, setSelectedId, children }: {
 
 // Extracted text component so it can use a stable per-element hook without closures
 const SceneElement = memo(({ el, isDark, isSelected, updateElement, setSelectedId }: any) => {
-    // Stable per-element handler
     const handleClick = useCallback((e: any) => {
         e.stopPropagation();
         setSelectedId(el.id);
@@ -305,17 +305,16 @@ const SceneElement = memo(({ el, isDark, isSelected, updateElement, setSelectedI
             <Text
                 position={el.position}
                 scale={el.scale}
-                fontSize={0.24}
+                fontSize={0.5}  // Larger for visibility
                 color={isDark ? '#ffffff' : '#000000'}
-                anchorX="left"
-                anchorY="top"
-                maxWidth={3}
+                anchorX="center"  // Centered
+                anchorY="middle"  // Centered
+                maxWidth={5}
                 onClick={handleClick}
             >
                 {el.content ?? ''}
             </Text>
 
-            {/* Canva-style 2-D bounding box shown only when selected */}
             {isSelected && (
                 <CanvaBoundingBox
                     el={el}
@@ -332,6 +331,7 @@ const SaasVideoEditor = () => {
     const [isPanelExpanded, setIsPanelExpanded] = useState(true);
     const [panelLayout, setPanelLayout] = useState<'list' | 'grid' | 'small-grid'>('list');
     const [isLayoutDropdownOpen, setIsLayoutDropdownOpen] = useState(false);
+    const [searchQuery, setSearchQuery] = useState('');
 
     // Canvas States (global store)
     const { elements, elementIds, addElement, updateElement, removeElement } = useEditorStore();
@@ -344,6 +344,7 @@ const SaasVideoEditor = () => {
             if (!exists) setSelectedId(null);
         }
     }, [selectedId, setSelectedId]);
+
 
     // Undo/redo state — subscribe to store so buttons re-render on history change
     const [canUndo, setCanUndo] = useState(false);
@@ -533,38 +534,48 @@ const SaasVideoEditor = () => {
 
     const handleDragEnd = useCallback((event: DragEndEvent) => {
         const { active, over } = event;
+        
         setActiveDragItem(null);
 
-        // Cancel case: dropped outside the canvas — restore the panel that was open
         if (over?.id !== 'canvas-dropzone') {
             setActiveTab(savedActiveTab);
             return;
         }
 
-        const type = active.data.current?.type as string | undefined;
+        // Extract type from ID (reliable method)
+        const activeId = active.id?.toString() || '';
+        const type = activeId.startsWith('sidebar-') 
+            ? activeId.replace('sidebar-', '') 
+            : active.data?.current?.type;
+        
         if (!type || !canvasRef.current) return;
 
         const canvasRect = canvasRef.current.getBoundingClientRect();
 
-        // Use the ACTUAL pointer position (tracked via window pointermove) rather than
-        // active.rect.current.translated which references the original sidebar card DOM node
-        // and can be far off-screen when the overlay has drifted a long distance from it.
-        const { x: clientX, y: clientY } = pointerRef.current;
+        // FIX: Use the drag overlay's final position instead of pointerRef
+        // The overlay follows the cursor, so its rect is accurate
+        const overlayRect = active.rect.current.translated;
+        
+        if (!overlayRect) return;
 
-        // Pixel offset of the pointer inside the canvas element
+        // Calculate drop position as center of the drag overlay
+        const clientX = overlayRect.left + overlayRect.width / 2;
+        const clientY = overlayRect.top + overlayRect.height / 2;
+
         const dropX = clientX - canvasRect.left;
         const dropY = clientY - canvasRect.top;
 
-        // Convert to NDC (-1 → +1)
+        // Convert to normalized device coordinates (-1 to +1)
         const ndcX = (dropX / canvasRect.width) * 2 - 1;
         const ndcY = -((dropY / canvasRect.height) * 2 - 1);
 
-        // Map NDC to orthographic world space (camera.zoom = 100)
-        const worldX = (ndcX * canvasRect.width) / (2 * 100);
-        const worldY = (ndcY * canvasRect.height) / (2 * 100);
+        // For orthographic camera with zoom=100
+        const visibleWidth = canvasRect.width / 100;
+        const visibleHeight = canvasRect.height / 100;
 
-        // Per-type bounding sizes (world units before scale).
-        // 'text' omits boundingSize so CanvaBoundingBox falls back to its [3, 0.4] default.
+        const worldX = ndcX * (visibleWidth / 2);
+        const worldY = ndcY * (visibleHeight / 2);
+
         const BOUNDING_SIZES: Record<string, [number, number]> = {
             device: [1.8, 3.6],
             card: [2.4, 1.4],
@@ -581,11 +592,8 @@ const SaasVideoEditor = () => {
             ...(BOUNDING_SIZES[type] ? { boundingSize: BOUNDING_SIZES[type] } : {}),
         });
 
-        // Archive ONE history checkpoint for the entire drop operation
         getHistoryControls().archive();
         window.dispatchEvent(new CustomEvent('history-updated'));
-
-        // Panel stays closed after drop (original behavior)
     }, [addElement, savedActiveTab]);
 
     return (
@@ -798,6 +806,8 @@ const SaasVideoEditor = () => {
                                                 <input
                                                     type="text"
                                                     placeholder="Search elements..."
+                                                    value={searchQuery}
+                                                    onChange={(e) => setSearchQuery(e.target.value)}
                                                     className={`flex-1 bg-transparent border-none outline-none text-sm font-medium w-full ${isDark ? 'text-white placeholder-gray-500' : 'text-gray-800 placeholder-gray-400'
                                                         }`}
                                                 />
@@ -811,17 +821,25 @@ const SaasVideoEditor = () => {
                                                 <span className={`text-sm font-semibold px-1 ${isDark ? 'text-white' : 'text-gray-800'}`}>
                                                     Browse categories
                                                 </span>
-                                                <div className={`grid gap-4 pt-2 ${isPanelExpanded ? 'grid-cols-4' : 'grid-cols-2'}`}>
-                                                    {ELEMENT_CATALOGUE.map((el) => (
-                                                        <DraggableCard
-                                                            key={el.id}
-                                                            elementId={el.id}
-                                                            icon={el.icon}
-                                                            label={el.label}
-                                                            isDark={isDark}
-                                                        />
-                                                    ))}
-
+                                                <div className="pt-2">
+                                                    <VirtualizedGrid
+                                                        items={ELEMENT_CATALOGUE.filter((el) =>
+                                                            el.label.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                                                            el.id.toLowerCase().includes(searchQuery.toLowerCase())
+                                                        )}
+                                                        columnCount={isPanelExpanded ? 4 : 2}
+                                                        width={isPanelExpanded ? 456 : 256}
+                                                        height={500}
+                                                        getItemId={(el) => el.id}
+                                                        renderItem={(el) => (
+                                                            <DraggableCard
+                                                                elementId={el.id}
+                                                                icon={el.icon}
+                                                                label={el.label}
+                                                                isDark={isDark}
+                                                            />
+                                                        )}
+                                                    />
                                                 </div>
                                             </div>
                                         ) : (
@@ -849,8 +867,10 @@ const SaasVideoEditor = () => {
                             >
                                 <ambientLight intensity={0.5} />
                                 <directionalLight position={[10, 10, 10]} />
+
                                 {elementIds.map(id => {
                                     const el = elements.get(id);
+
                                     if (!el) return null;
                                     const isSelected = el.id === selectedId;
 

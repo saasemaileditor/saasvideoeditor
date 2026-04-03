@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { travel } from 'zustand-travel';
 import type { ManualTravelsControls } from 'zustand-travel';
+import { rawReturn } from 'mutative';
 
 // ─── Element type ────────────────────────────────────────────────────────────
 
@@ -56,8 +57,13 @@ export const useEditorStore = create<EditorState>()(
             // Adds a new item to the canvas and selects it
             addElement: (element) =>
                 set((state) => {
-                    state.elements.set(element.id, element);
-                    state.elementIds = [...state.elementIds, element.id];
+                    const newElements = new Map(state.elements);
+                    newElements.set(element.id, element);
+                    const newElementIds = [...state.elementIds, element.id];
+                    return rawReturn({
+                        elements: newElements,
+                        elementIds: newElementIds,
+                    });
                 }),
 
             // Updates an item's fields (position/rotation/scale/etc.)
