@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback, memo } from 'react';
+import { useInfiniteQuery } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'motion/react';
 import { Canvas } from '@react-three/fiber';
 import { Text } from '@react-three/drei';
@@ -186,17 +187,52 @@ const AnimationCard = ({ preset, isDark, isSelected, onSelect, layout }: {
     );
 };
 
-/* ─── Element catalogue (id ↔ icon ↔ label) ─── */
-const ELEMENT_CATALOGUE: { id: string; icon: LucideIcon; label: string }[] = [
-    { id: 'text', icon: Type, label: 'Text' },
-    { id: 'device', icon: Smartphone, label: 'Device' },
-    { id: 'counter', icon: Hash, label: 'Counter' },
-    { id: '3d', icon: Box, label: '3D' },
-    { id: 'chart', icon: PieChart, label: 'Charts' },
-    { id: 'card', icon: AppWindow, label: 'Cards' },
-    { id: 'button', icon: MousePointer2, label: 'Buttons' },
-    { id: 'icon', icon: Smile, label: 'Icons' },
-    { id: 'shape', icon: Triangle, label: 'Shapes' },
+// Generate 100k test items as mock DB
+const MOCK_ELEMENTS = Array.from({ length: 100000 }, (_, i) => ({
+    id: `element-${i}`,
+    icon: [Type, Smartphone, Hash, Box, PieChart, AppWindow, MousePointer2, Smile, Triangle][i % 9],
+    label: `Item ${i}`,
+}));
+
+export const useInfiniteElements = (searchQuery: string) => {
+    return useInfiniteQuery({
+        queryKey: ['elements', searchQuery],
+        queryFn: async ({ pageParam = 0 }) => {
+            // Mock network delay
+            await new Promise((resolve) => setTimeout(resolve, 300));
+
+            // Server-side filtering mock
+            const filteredElements = searchQuery
+                ? MOCK_ELEMENTS.filter((el) =>
+                      el.label.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                      el.id.toLowerCase().includes(searchQuery.toLowerCase())
+                  )
+                : MOCK_ELEMENTS;
+
+            const pageSize = 20;
+            const start = pageParam * pageSize;
+            const end = start + pageSize;
+            const data = filteredElements.slice(start, end);
+
+            return {
+                data,
+                nextPage: end < filteredElements.length ? pageParam + 1 : undefined,
+            };
+        },
+        initialPageParam: 0,
+        getNextPageParam: (lastPage) => lastPage.nextPage,
+    });
+};
+
+const TEMPLATES: { id: string; icon: LucideIcon; label: string }[] = [
+    { id: 'template-marketing', icon: AppWindow, label: 'Marketing Promo' },
+    { id: 'template-tutorial', icon: Video, label: 'Tutorial' },
+    { id: 'template-gaming', icon: Box, label: 'Gaming Intro' },
+    { id: 'template-vlog', icon: Smartphone, label: 'Vlog Setup' },
+    { id: 'template-corporate', icon: LayoutTemplate, label: 'Corporate' },
+    { id: 'template-social', icon: Smile, label: 'Social Media' },
+    { id: 'template-education', icon: PieChart, label: 'Education' },
+    { id: 'template-abstract', icon: Triangle, label: 'Abstract' },
 ];
 
 /* ─── Draggable sidebar card (uses @dnd-kit useDraggable) ─── */
@@ -332,6 +368,11 @@ const SaasVideoEditor = () => {
     const [panelLayout, setPanelLayout] = useState<'list' | 'grid' | 'small-grid'>('list');
     const [isLayoutDropdownOpen, setIsLayoutDropdownOpen] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
+    const [animationSearchQuery, setAnimationSearchQuery] = useState('');
+
+    // Infinite Query Hook for Elements
+    const { data: elementsData, fetchNextPage, hasNextPage, isFetchingNextPage } = useInfiniteElements(searchQuery);
+    const flatElements = elementsData?.pages.flatMap((page) => page.data) ?? [];
 
     // Canvas States (global store)
     const { elements, elementIds, addElement, updateElement, removeElement } = useEditorStore();
@@ -815,21 +856,47 @@ const SaasVideoEditor = () => {
                                         </div>
                                     )}
 
-                                    <div className="flex-1 overflow-y-auto p-3 pt-0">
+                                    <div className="flex-1 min-h-0 flex flex-col p-3 pt-0">
                                         {activeTab === 'Elements' ? (
-                                            <div className="flex flex-col gap-3 mt-1">
+                                            <div className="flex flex-col gap-3 mt-1 flex-1 min-h-0">
                                                 <span className={`text-sm font-semibold px-1 ${isDark ? 'text-white' : 'text-gray-800'}`}>
                                                     Browse categories
                                                 </span>
-                                                <div className="pt-2">
+                                                <div className="pt-2 flex-1 min-h-0">
                                                     <VirtualizedGrid
-                                                        items={ELEMENT_CATALOGUE.filter((el) =>
-                                                            el.label.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                                                            el.id.toLowerCase().includes(searchQuery.toLowerCase())
-                                                        )}
+                                                        items={flatElements}
                                                         columnCount={isPanelExpanded ? 4 : 2}
                                                         width={isPanelExpanded ? 456 : 256}
-                                                        height={500}
+                                                        height="100%"
+                                                        getItemId={(el) => el.id}
+                                                        onScrollEnd={() => {
+                                                            if (hasNextPage && !isFetchingNextPage) {
+                                                                fetchNextPage();
+                                                            }
+                                                        }}
+                                                        isFetchingNextPage={isFetchingNextPage}
+                                                        renderItem={(el) => (
+                                                            <DraggableCard
+                                                                elementId={el.id}
+                                                                icon={el.icon}
+                                                                label={el.label}
+                                                                isDark={isDark}
+                                                            />
+                                                        )}
+                                                    />
+                                                </div>
+                                            </div>
+                                        ) : activeTab === 'Templates' ? (
+                                            <div className="flex flex-col gap-3 mt-1 flex-1 min-h-0">
+                                                <span className={`text-sm font-semibold px-1 ${isDark ? 'text-white' : 'text-gray-800'}`}>
+                                                    Browse templates
+                                                </span>
+                                                <div className="pt-2 flex-1 min-h-0">
+                                                    <VirtualizedGrid
+                                                        items={TEMPLATES}
+                                                        columnCount={isPanelExpanded ? 4 : 2}
+                                                        width={isPanelExpanded ? 456 : 256}
+                                                        height="100%"
                                                         getItemId={(el) => el.id}
                                                         renderItem={(el) => (
                                                             <DraggableCard
@@ -902,7 +969,7 @@ const SaasVideoEditor = () => {
                                 } ${isDark ? 'bg-[#1e2235] border border-[#2a2d45]' : 'bg-white border border-gray-100'}`}
                             style={{ width: isRightPanelExpanded ? '480px' : '280px' }}
                         >
-                            <div className={`flex items-center justify-between px-4 py-3 border-b flex-shrink-0 ${isDark ? 'border-[#2a2d45]' : 'border-gray-100'}`}>
+                            <div className="flex items-center justify-between px-4 py-3 flex-shrink-0">
                                 <span className={`font-bold text-[16px] ${isDark ? 'text-white' : 'text-gray-800'}`}>
                                     Animations
                                 </span>
@@ -959,27 +1026,47 @@ const SaasVideoEditor = () => {
                                     </button>
                                 </div>
                             </div>
-                            <div className="flex-1 overflow-y-auto p-3">
-                                <div className="flex flex-col">
+                            <div className="px-4 pb-3 flex-shrink-0 border-b border-transparent">
+                                <div className={`flex items-center gap-2 px-3 py-2.5 rounded-lg border transition-all ${isDark ? 'bg-[#161625] border-[#2a2d45] focus-within:border-[#7c3aed] focus-within:ring-1 focus-within:ring-[#7c3aed]/50' : 'bg-gray-50 border-gray-200 focus-within:border-[#7c3aed] focus-within:ring-1 focus-within:ring-[#7c3aed]/50'
+                                    }`}>
+                                    <Search size={16} className={isDark ? 'text-gray-400' : 'text-gray-500'} />
+                                    <input
+                                        type="text"
+                                        placeholder="Search animations..."
+                                        value={animationSearchQuery}
+                                        onChange={(e) => setAnimationSearchQuery(e.target.value)}
+                                        className={`flex-1 bg-transparent border-none outline-none text-sm font-medium w-full ${isDark ? 'text-white placeholder-gray-500' : 'text-gray-800 placeholder-gray-400'
+                                            }`}
+                                    />
+                                </div>
+                            </div>
+                            <div className="flex-1 min-h-0 flex flex-col p-3">
+                                <div className="flex flex-col flex-1 min-h-0">
                                     <p className={`text-[11px] px-1 mb-2 ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
                                         Hover or click to preview. Click to apply.
                                     </p>
 
-                                    <div className={
-                                        panelLayout === 'list' ? "flex flex-col gap-2" :
-                                            panelLayout === 'grid' ? "grid grid-cols-2 gap-2" :
-                                                "grid grid-cols-3 gap-2"
-                                    }>
-                                        {ANIMATION_PRESETS.map(preset => (
-                                            <AnimationCard
-                                                key={preset.id}
-                                                preset={preset}
-                                                isDark={isDark}
-                                                isSelected={false}
-                                                onSelect={() => { }}
-                                                layout={panelLayout}
-                                            />
-                                        ))}
+                                    <div className="pt-2 flex-1 min-h-0">
+                                        <VirtualizedGrid
+                                            items={ANIMATION_PRESETS.filter((preset) =>
+                                                preset.label.toLowerCase().includes(animationSearchQuery.toLowerCase())
+                                            )}
+                                            columnCount={panelLayout === 'list' ? 1 : panelLayout === 'grid' ? 2 : 3}
+                                            width={isRightPanelExpanded ? 456 : 256}
+                                            height="100%"
+                                            itemHeight={panelLayout === 'list' ? 60 : panelLayout === 'grid' ? 100 : 80}
+                                            itemWidth="100%"
+                                            getItemId={(preset) => preset.id}
+                                            renderItem={(preset) => (
+                                                <AnimationCard
+                                                    preset={preset}
+                                                    isDark={isDark}
+                                                    isSelected={false}
+                                                    onSelect={() => { }}
+                                                    layout={panelLayout}
+                                                />
+                                            )}
+                                        />
                                     </div>
                                 </div>
                             </div>
@@ -1137,10 +1224,19 @@ const SaasVideoEditor = () => {
             {/* Drag overlay — renders the floating card while dragging */}
             <DragOverlay dropAnimation={null}>
                 {activeDragItem != null && (() => {
-                    const entry = ELEMENT_CATALOGUE.find(
+                    // Check ELEMENT_CATALOGUE first
+                    const elementEntry = ELEMENT_CATALOGUE.find(
                         (el) => `sidebar-${el.id}` === activeDragItem
                     );
-                    return entry ? <DragOverlayCard icon={entry.icon} label={entry.label} /> : null;
+                    if (elementEntry) return <DragOverlayCard icon={elementEntry.icon} label={elementEntry.label} />;
+                    
+                    // Check TEMPLATES
+                    const templateEntry = TEMPLATES.find(
+                        (t) => `sidebar-${t.id}` === activeDragItem
+                    );
+                    if (templateEntry) return <DragOverlayCard icon={templateEntry.icon} label={templateEntry.label} />;
+                    
+                    return null;
                 })()}
             </DragOverlay>
         </DndContext>

@@ -5,9 +5,13 @@ export interface VirtualizedGridProps<T> {
   items: T[];
   columnCount: number;
   width: number;
-  height: number;
+  height: number | string;
+  itemHeight?: number;
+  itemWidth?: number | string;
   renderItem: (item: T, index: number) => React.ReactNode;
   getItemId: (item: T) => string;
+  onScrollEnd?: () => void;
+  isFetchingNextPage?: boolean;
 }
 
 export function VirtualizedGrid<T>({
@@ -15,8 +19,12 @@ export function VirtualizedGrid<T>({
   columnCount,
   width,
   height,
+  itemHeight,
+  itemWidth,
   renderItem,
   getItemId,
+  onScrollEnd,
+  isFetchingNextPage,
 }: VirtualizedGridProps<T>) {
   const parentRef = useRef<HTMLDivElement>(null);
 
@@ -26,10 +34,15 @@ export function VirtualizedGrid<T>({
   // 110px width × 140px height (expanded - 4 cols)
   // 130px width × 140px height (collapsed - 2 cols)
   // Gap: 16px
-  const itemHeight = 140;
   const gap = 16;
-  const rowHeight = itemHeight + gap; 
-  const itemWidth = columnCount === 4 ? 110 : 130;
+  const resolvedItemHeight = itemHeight ?? 140;
+  const rowHeight = resolvedItemHeight + gap;
+  
+  // Calculate item width accounting for gaps
+  const totalGapWidth = (columnCount - 1) * gap;
+  const availableWidth = width - totalGapWidth - 24; // 24px for padding (px-3 = 12px each side)
+  const calculatedItemWidth = Math.floor(availableWidth / columnCount);
+  const resolvedItemWidth = itemWidth !== undefined ? itemWidth : calculatedItemWidth;
 
   const rowVirtualizer = useVirtualizer({
     count: rowCount,
@@ -46,7 +59,16 @@ export function VirtualizedGrid<T>({
         width,
         overflow: 'auto',
       }}
-      className="scrollbar-thin scrollbar-thumb-zinc-700 scrollbar-track-transparent"
+      className="scrollbar-thin scrollbar-thumb-gray-400 scrollbar-track-transparent dark:scrollbar-thumb-gray-600"
+      onScroll={(e) => {
+        if (onScrollEnd) {
+          const target = e.target as HTMLDivElement;
+          // check if we are near the bottom (e.g. within 100px)
+          if (target.scrollHeight - target.scrollTop - target.clientHeight < 100) {
+            onScrollEnd();
+          }
+        }
+      }}
     >
       <div
         style={{
@@ -71,6 +93,7 @@ export function VirtualizedGrid<T>({
                 transform: `translateY(${virtualRow.start}px)`,
                 display: 'flex',
                 gap: `${gap}px`,
+                padding: '0 12px', // px-3 equivalent
               }}
             >
               {rowItems.map((item, localIndex) => {
@@ -79,8 +102,9 @@ export function VirtualizedGrid<T>({
                   <div
                     key={getItemId(item)}
                     style={{
-                      width: `${itemWidth}px`,
-                      height: `${itemHeight}px`,
+                      width: typeof resolvedItemWidth === 'number' ? `${resolvedItemWidth}px` : resolvedItemWidth,
+                      height: `${resolvedItemHeight}px`,
+                      flexShrink: 0,
                     }}
                   >
                     {renderItem(item, index)}
@@ -91,6 +115,13 @@ export function VirtualizedGrid<T>({
           );
         })}
       </div>
+      {isFetchingNextPage && (
+        <div className="py-4 text-center text-sm font-medium text-gray-400 flex items-center justify-center gap-2">
+          <div className="w-4 h-4 rounded-full border-2 border-[#7c3aed] border-t-transparent animate-spin" />
+          Loading more...
+        </div>
+      )}
     </div>
   );
 }
+
