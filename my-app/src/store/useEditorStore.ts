@@ -81,11 +81,6 @@ export const useEditorStore = create<EditorState>()(
             // This means ONE checkpoint per gesture, not one per pixel.
             autoArchive: false,
             maxHistory: 50,
-            // @ts-ignore - partialize is not explicitly typed in TravelsOptions but required for proper isolation
-            partialize: (state) => ({
-                elements: state.elements,
-                elementIds: state.elementIds,
-            }),
         }
     )
 );

@@ -303,25 +303,30 @@ const SaasVideoEditor = () => {
     const { selectedId, setSelectedId } = useUIStore();
 
     useEffect(() => {
-        // If selected element is deleted, clear selection
-        if (selectedId && !elements.has(selectedId)) {
-            setSelectedId(null);
+        if (selectedId) {
+            // Check existence imperatively, not as dependency
+            const exists = useEditorStore.getState().elements.has(selectedId);
+            if (!exists) setSelectedId(null);
         }
-    }, [elements, selectedId, setSelectedId]);
+    }, [selectedId, setSelectedId]);
 
     // Undo/redo state — subscribe to store so buttons re-render on history change
     const [canUndo, setCanUndo] = useState(false);
     const [canRedo, setCanRedo] = useState(false);
     useEffect(() => {
         const controls = getHistoryControls();
-        // Sync immediately, then on every store change
         const sync = () => {
             setCanUndo(controls.canBack());
             setCanRedo(controls.canForward());
         };
         sync();
+        
+        window.addEventListener('history-updated', sync);
         const unsub = useEditorStore.subscribe(sync);
-        return unsub;
+        return () => {
+            window.removeEventListener('history-updated', sync);
+            unsub();
+        };
     }, []);
     const [activeDragItem, setActiveDragItem] = useState<string | null>(null);
     const [savedActiveTab, setSavedActiveTab] = useState<string | null>(null);
@@ -368,6 +373,7 @@ const SaasVideoEditor = () => {
                 e.preventDefault();
                 removeElement(selectedId);
                 getHistoryControls().archive(); // Archive the deletion
+                window.dispatchEvent(new CustomEvent('history-updated'));
             }
 
             // Escape: unselect
@@ -542,6 +548,7 @@ const SaasVideoEditor = () => {
 
         // Archive ONE history checkpoint for the entire drop operation
         getHistoryControls().archive();
+        window.dispatchEvent(new CustomEvent('history-updated'));
 
         // Panel stays closed after drop (original behavior)
     }, [addElement, savedActiveTab]);

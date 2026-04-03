@@ -19,6 +19,7 @@
     "@remotion/web-renderer": "^4.0.443",
     "@tailwindcss/vite": "^4.2.2",
     "axios": "1.14.0",
+    "immer": "^11.1.4",
     "lucide-react": "0.487.0",
     "motion": "^12.38.0",
     "mutative": "^1.3.0",

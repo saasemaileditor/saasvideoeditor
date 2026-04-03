@@ -1,4 +1,4 @@
-import { useRef, useCallback, useEffect } from 'react';
+import { useRef, useCallback, useEffect, useMemo } from 'react';
 import { useThree } from '@react-three/fiber';
 import { Line } from '@react-three/drei';
 import * as THREE from 'three';
@@ -50,66 +50,58 @@ function CornerHandle({ localOffset, el, updateElement, cornerDragActiveRef }: C
         startScale: [number, number, number];
     } | null>(null);
 
-    const onPointerDown = useCallback(
-        (e: { nativeEvent: PointerEvent; stopPropagation: () => void }) => {
-            e.stopPropagation();
-            (e.nativeEvent.target as Element).setPointerCapture(e.nativeEvent.pointerId);
+    const onPointerDown = (e: { nativeEvent: PointerEvent; stopPropagation: () => void }) => {
+        e.stopPropagation();
+        (e.nativeEvent.target as Element).setPointerCapture(e.nativeEvent.pointerId);
 
-            // Mark corner drag active — the safety valve watches this flag
-            cornerDragActiveRef.current = true;
+        // Mark corner drag active — the safety valve watches this flag
+        cornerDragActiveRef.current = true;
 
-            const [wx, wy] = clientToWorld(
-                e.nativeEvent.clientX,
-                e.nativeEvent.clientY,
-                camera as THREE.OrthographicCamera,
-                gl.domElement
-            );
-            const cx = el.position[0];
-            const cy = el.position[1];
-            const dist = Math.sqrt((wx - cx) ** 2 + (wy - cy) ** 2);
+        const [wx, wy] = clientToWorld(
+            e.nativeEvent.clientX,
+            e.nativeEvent.clientY,
+            camera as THREE.OrthographicCamera,
+            gl.domElement
+        );
+        const cx = el.position[0];
+        const cy = el.position[1];
+        const dist = Math.sqrt((wx - cx) ** 2 + (wy - cy) ** 2);
 
-            dragRef.current = {
-                active: true,
-                startDist: dist || 0.001, // guard against divide-by-zero
-                startScale: [...el.scale] as [number, number, number],
-            };
-        },
-        [camera, gl, el, cornerDragActiveRef]
-    );
+        dragRef.current = {
+            active: true,
+            startDist: dist || 0.001, // guard against divide-by-zero
+            startScale: [...el.scale] as [number, number, number],
+        };
+    };
 
-    const onPointerMove = useCallback(
-        (e: { nativeEvent: PointerEvent }) => {
-            if (!dragRef.current?.active) return;
-            const { startDist, startScale } = dragRef.current;
+    const onPointerMove = (e: { nativeEvent: PointerEvent }) => {
+        if (!dragRef.current?.active) return;
+        const { startDist, startScale } = dragRef.current;
 
-            const [wx, wy] = clientToWorld(
-                e.nativeEvent.clientX,
-                e.nativeEvent.clientY,
-                camera as THREE.OrthographicCamera,
-                gl.domElement
-            );
-            const cx = el.position[0];
-            const cy = el.position[1];
-            const dist = Math.sqrt((wx - cx) ** 2 + (wy - cy) ** 2);
+        const [wx, wy] = clientToWorld(
+            e.nativeEvent.clientX,
+            e.nativeEvent.clientY,
+            camera as THREE.OrthographicCamera,
+            gl.domElement
+        );
+        const cx = el.position[0];
+        const cy = el.position[1];
+        const dist = Math.sqrt((wx - cx) ** 2 + (wy - cy) ** 2);
 
-            const ratio = dist / startDist;
-            const newScale = Math.max(0.05, startScale[0] * ratio);
-            updateElement(el.id, { scale: [newScale, newScale, 1] });
-        },
-        [camera, gl, el, updateElement]
-    );
+        const ratio = dist / startDist;
+        const newScale = Math.max(0.05, startScale[0] * ratio);
+        updateElement(el.id, { scale: [newScale, newScale, 1] });
+    };
 
-    const onPointerUp = useCallback(
-        (e: { nativeEvent: PointerEvent }) => {
-            if (!dragRef.current) return;
-            dragRef.current.active = false;
-            cornerDragActiveRef.current = false;
-            (e.nativeEvent.target as Element).releasePointerCapture(e.nativeEvent.pointerId);
-            // Save ONE history checkpoint for the entire scale gesture
-            getHistoryControls().archive();
-        },
-        [cornerDragActiveRef]
-    );
+    const onPointerUp = (e: { nativeEvent: PointerEvent }) => {
+        if (!dragRef.current) return;
+        dragRef.current.active = false;
+        cornerDragActiveRef.current = false;
+        (e.nativeEvent.target as Element).releasePointerCapture(e.nativeEvent.pointerId);
+        // Save ONE history checkpoint for the entire scale gesture
+        getHistoryControls().archive();
+        window.dispatchEvent(new CustomEvent('history-updated'));
+    };
 
     return (
         <mesh
@@ -172,22 +164,35 @@ export function CanvaBoundingBox({ el, updateElement }: CanvaBoundingBoxProps) {
     const { camera, gl } = useThree();
     const { setSelectedId } = useUIStore();
 
+    const elementRef = useRef(el);
+    elementRef.current = el; // Always keep fresh
+
     const onElementClick = useCallback((e: any) => {
         e.stopPropagation();
-        setSelectedId(el.id);
-    }, [el.id, setSelectedId]);
+        setSelectedId(elementRef.current.id); // Use ref, not closure
+    }, [setSelectedId]); // Only depends on stable setter
 
     const [cx, cy, cz] = el.position;
     const [sx, sy] = el.scale; // scale applied to the element itself
 
-    // Use the element's declared bounding size (world units before scale) if present.
-    // Fall back to text defaults [3, 0.4] so existing text elements are unaffected.
-    const [BASE_W, BASE_H] = el.boundingSize ?? [3, 0.4];
+    const dimensions = useMemo(() => {
+        const [BASE_W, BASE_H] = el.boundingSize ?? [3, 0.4];
+        const w = BASE_W * sx;
+        const h = BASE_H * sy;
+        return {
+            w, h,
+            hw: w / 2,
+            hh: h / 2,
+            corners: [
+                [-w / 2, -h / 2], // bottom-left
+                [w / 2, -h / 2],  // bottom-right
+                [w / 2, h / 2],   // top-right
+                [-w / 2, h / 2],  // top-left
+            ] as [number, number][],
+        };
+    }, [el.boundingSize, sx, sy]);
 
-    const w = BASE_W * sx;
-    const h = BASE_H * sy;
-    const hw = w / 2;
-    const hh = h / 2;
+    const { w, h, hw, hh, corners } = dimensions;
 
     // ── Move drag state ──────────────────────────────────────────────────────
     const moveDragRef = useRef<{
@@ -214,6 +219,7 @@ export function CanvaBoundingBox({ el, updateElement }: CanvaBoundingBoxProps) {
                 cornerDragActiveRef.current = false;
                 // Still archive so the interrupted drag is recoverable
                 getHistoryControls().archive();
+                window.dispatchEvent(new CustomEvent('history-updated'));
             }
         };
 
@@ -221,64 +227,50 @@ export function CanvaBoundingBox({ el, updateElement }: CanvaBoundingBoxProps) {
         return () => window.removeEventListener('pointerup', handleWindowPointerUp);
     }, []); // refs are stable—no deps needed
 
-    const onMovePointerDown = useCallback(
-        (e: { nativeEvent: PointerEvent; stopPropagation: () => void }) => {
-            e.stopPropagation();
-            (e.nativeEvent.target as Element).setPointerCapture(e.nativeEvent.pointerId);
+    const onMovePointerDown = (e: { nativeEvent: PointerEvent; stopPropagation: () => void }) => {
+        e.stopPropagation();
+        (e.nativeEvent.target as Element).setPointerCapture(e.nativeEvent.pointerId);
 
-            const [wx, wy] = clientToWorld(
-                e.nativeEvent.clientX,
-                e.nativeEvent.clientY,
-                camera as THREE.OrthographicCamera,
-                gl.domElement
-            );
-            moveDragRef.current = {
-                active: true,
-                startPointer: [wx, wy],
-                startPos: [...el.position] as [number, number, number],
-            };
-        },
-        [camera, gl, el]
-    );
+        const [wx, wy] = clientToWorld(
+            e.nativeEvent.clientX,
+            e.nativeEvent.clientY,
+            camera as THREE.OrthographicCamera,
+            gl.domElement
+        );
+        moveDragRef.current = {
+            active: true,
+            startPointer: [wx, wy],
+            startPos: [...el.position] as [number, number, number],
+        };
+    };
 
-    const onMovePointerMove = useCallback(
-        (e: { nativeEvent: PointerEvent }) => {
-            if (!moveDragRef.current?.active) return;
-            const { startPointer, startPos } = moveDragRef.current;
+    const onMovePointerMove = (e: { nativeEvent: PointerEvent }) => {
+        if (!moveDragRef.current?.active) return;
+        const { startPointer, startPos } = moveDragRef.current;
 
-            const [wx, wy] = clientToWorld(
-                e.nativeEvent.clientX,
-                e.nativeEvent.clientY,
-                camera as THREE.OrthographicCamera,
-                gl.domElement
-            );
-            const dx = wx - startPointer[0];
-            const dy = wy - startPointer[1];
-            updateElement(el.id, {
-                position: [startPos[0] + dx, startPos[1] + dy, startPos[2]],
-            });
-        },
-        [camera, gl, el, updateElement]
-    );
+        const [wx, wy] = clientToWorld(
+            e.nativeEvent.clientX,
+            e.nativeEvent.clientY,
+            camera as THREE.OrthographicCamera,
+            gl.domElement
+        );
+        const dx = wx - startPointer[0];
+        const dy = wy - startPointer[1];
+        updateElement(el.id, {
+            position: [startPos[0] + dx, startPos[1] + dy, startPos[2]],
+        });
+    };
 
-    const onMovePointerUp = useCallback(
-        (e: { nativeEvent: PointerEvent }) => {
-            if (!moveDragRef.current) return;
-            moveDragRef.current.active = false;
-            (e.nativeEvent.target as Element).releasePointerCapture(e.nativeEvent.pointerId);
-            // Save ONE history checkpoint for the entire move gesture
-            getHistoryControls().archive();
-        },
-        []
-    );
+    const onMovePointerUp = (e: { nativeEvent: PointerEvent }) => {
+        if (!moveDragRef.current) return;
+        moveDragRef.current.active = false;
+        (e.nativeEvent.target as Element).releasePointerCapture(e.nativeEvent.pointerId);
+        // Save ONE history checkpoint for the entire move gesture
+        getHistoryControls().archive();
+        window.dispatchEvent(new CustomEvent('history-updated'));
+    };
 
-    // The four corner offsets in LOCAL space (relative to element centre)
-    const corners: [number, number][] = [
-        [-hw, -hh], // bottom-left
-        [hw, -hh],  // bottom-right
-        [hw, hh],   // top-right
-        [-hw, hh],  // top-left
-    ];
+
 
     return (
         <group position={[cx, cy, cz]} onClick={onElementClick}>
