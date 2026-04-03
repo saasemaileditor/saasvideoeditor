@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, memo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Canvas } from '@react-three/fiber';
 import { Text } from '@react-three/drei';
@@ -290,6 +290,41 @@ const CanvasDropZone = ({ canvasRef, isDark, setSelectedId, children }: {
         </div>
     );
 };
+
+// Extracted text component so it can use a stable per-element hook without closures
+const SceneElement = memo(({ el, isDark, isSelected, updateElement, setSelectedId }: any) => {
+    // Stable per-element handler
+    const handleClick = useCallback((e: any) => {
+        e.stopPropagation();
+        setSelectedId(el.id);
+    }, [el.id, setSelectedId]);
+
+    return (
+        <group>
+            {/* The actual text element */}
+            <Text
+                position={el.position}
+                scale={el.scale}
+                fontSize={0.24}
+                color={isDark ? '#ffffff' : '#000000'}
+                anchorX="left"
+                anchorY="top"
+                maxWidth={3}
+                onClick={handleClick}
+            >
+                {el.content ?? ''}
+            </Text>
+
+            {/* Canva-style 2-D bounding box shown only when selected */}
+            {isSelected && (
+                <CanvaBoundingBox
+                    el={el}
+                    updateElement={updateElement}
+                />
+            )}
+        </group>
+    );
+});
 
 const SaasVideoEditor = () => {
     const [activeTab, setActiveTab] = useState<string | null>(null);
@@ -820,32 +855,14 @@ const SaasVideoEditor = () => {
                                     const isSelected = el.id === selectedId;
 
                                     return (
-                                        <group key={el.id}>
-                                            {/* The actual text element */}
-                                            <Text
-                                                position={el.position}
-                                                scale={el.scale}
-                                                fontSize={0.24}
-                                                color={isDark ? '#ffffff' : '#000000'}
-                                                anchorX="left"
-                                                anchorY="top"
-                                                maxWidth={3}
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    setSelectedId(el.id);
-                                                }}
-                                            >
-                                                {el.content ?? ''}
-                                            </Text>
-
-                                            {/* Canva-style 2-D bounding box shown only when selected */}
-                                            {isSelected && (
-                                                <CanvaBoundingBox
-                                                    el={el}
-                                                    updateElement={updateElement}
-                                                />
-                                            )}
-                                        </group>
+                                        <SceneElement 
+                                            key={el.id}
+                                            el={el}
+                                            isDark={isDark}
+                                            isSelected={isSelected}
+                                            updateElement={updateElement}
+                                            setSelectedId={setSelectedId}
+                                        />
                                     );
                                 })}
                             </Canvas>
