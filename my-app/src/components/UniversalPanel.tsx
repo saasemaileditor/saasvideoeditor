@@ -1,59 +1,60 @@
-import { useRef, useEffect } from 'react';
+import { useRef, useEffect, useState } from 'react';
 import { Search } from 'lucide-react';
 import { VirtualizedGrid } from './VirtualizedGrid';
 
+// ── Smart search helper ──────────────────────────────────────────────────────
+function filterAndSortItems<T>(
+  items: T[],
+  query: string,
+  getLabel: (item: T) => string
+): T[] {
+  if (!query.trim()) return items;
+  const lowerQuery = query.toLowerCase();
+  return items
+    .filter((item) => getLabel(item).toLowerCase().includes(lowerQuery))
+    .sort((a, b) => {
+      const labelA = getLabel(a).toLowerCase();
+      const labelB = getLabel(b).toLowerCase();
+      const startsWithA = labelA.startsWith(lowerQuery);
+      const startsWithB = labelB.startsWith(lowerQuery);
+      if (startsWithA && !startsWithB) return -1;
+      if (!startsWithA && startsWithB) return 1;
+      return 0;
+    });
+}
+
+// ── Props ────────────────────────────────────────────────────────────────────
 export interface UniversalPanelProps<T> {
-  /** Data to render */
   items: T[];
-  /** Number of columns in the grid */
   columnCount: number;
-  /** Full pixel width of the panel (controls grid + scrollbar position) */
   width: number;
-  /** Height passed through to VirtualizedGrid (default: '100%') */
   height?: number | string;
-  /** Optional fixed item height (VirtualizedGrid default: 140px) */
   itemHeight?: number;
-  /** Optional fixed item width — pass '100%' for full-width single-column layouts */
   itemWidth?: number | string;
 
-  /** Search bar */
+  /** e.g. "Elements" — used for dynamic loading text and empty state */
+  panelName: string;
+  /** Lucide icon component shown in the empty-state illustration */
+  panelIcon: React.ComponentType<{ size?: number; className?: string }>;
+
   searchQuery: string;
   onSearchChange: (q: string) => void;
   placeholder?: string;
+  getItemLabel: (item: T) => string;
 
-  /** Infinite-scroll / loading state */
   isLoading?: boolean;
   isFetchingNextPage?: boolean;
   hasNextPage?: boolean;
   fetchNextPage?: () => void;
 
-  /** Render helpers */
   renderItem: (item: T, index: number) => React.ReactNode;
   getItemId: (item: T) => string;
 
-  /** Optional subheading beneath the search bar */
   subtitle?: string;
-
-  /** Dark-mode flag — passed down from parent */
   isDark?: boolean;
-
-  /** Loading text shown in centre spinner (default: 'Loading...') */
-  loadingText?: string;
 }
 
-/**
- * UniversalPanel
- *
- * A single, self-contained panel body used by ALL sidebar tabs:
- * Elements, Templates, Animations, and any future panels.
- *
- * Features:
- *  • Search input with animated focus ring
- *  • VirtualizedGrid with infinite-scroll throttle guard
- *  • Initial loading spinner
- *  • Scroll reset when search query changes
- *  • Scrollbar flush to right edge
- */
+// ── Component ────────────────────────────────────────────────────────────────
 export function UniversalPanel<T>({
   items,
   columnCount,
@@ -61,9 +62,12 @@ export function UniversalPanel<T>({
   height = '100%',
   itemHeight,
   itemWidth,
+  panelName,
+  panelIcon: PanelIcon,
   searchQuery,
   onSearchChange,
   placeholder = 'Search...',
+  getItemLabel,
   isLoading = false,
   isFetchingNextPage = false,
   hasNextPage = false,
@@ -72,22 +76,42 @@ export function UniversalPanel<T>({
   getItemId,
   subtitle,
   isDark = false,
-  loadingText = 'Loading...',
 }: UniversalPanelProps<T>) {
-  // Scroll-reset ref — holds the reset function exposed by VirtualizedGrid
+  // ── Scroll reset ───────────────────────────────────────────────────────────
   const resetScrollRef = useRef<(() => void) | undefined>(undefined);
 
-  // Whenever searchQuery changes, jump the list back to the top
-  useEffect(() => {
-    if (resetScrollRef.current) {
-      resetScrollRef.current();
-    }
-  }, [searchQuery]);
+  // ── Debounced search ───────────────────────────────────────────────────────
+  const [debouncedQuery, setDebouncedQuery] = useState(searchQuery);
+  const [isSearching, setIsSearching] = useState(false);
 
+  useEffect(() => {
+    if (searchQuery !== debouncedQuery) setIsSearching(true);
+    const timer = setTimeout(() => {
+      setDebouncedQuery(searchQuery);
+      setIsSearching(false);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Reset scroll when settled query changes
+  useEffect(() => {
+    if (resetScrollRef.current) resetScrollRef.current();
+  }, [debouncedQuery]);
+
+  // ── Smart filtering ────────────────────────────────────────────────────────
+  const filteredItems = filterAndSortItems(items, debouncedQuery, getItemLabel);
+
+  // ── Dynamic text ───────────────────────────────────────────────────────────
+  const dynamicLoadingText = `Loading ${panelName.toLowerCase()}...`;
+  const hasQuery = debouncedQuery.trim().length > 0;
+  const isEmpty = filteredItems.length === 0 && hasQuery && !isLoading && !isSearching;
+
+  // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <div className="flex flex-col flex-1 min-h-0">
-      {/* ── Search Bar ─────────────────────────────────────────── */}
-      <div className="px-4 pb-3 flex-shrink-0">
+
+      {/* ── Search Bar ─────────────────────────────────────────────────────── */}
+      <div className="px-4 pb-2 flex-shrink-0">
         <div
           className={`flex items-center gap-2 px-3 py-2.5 rounded-lg border transition-all ${
             isDark
@@ -95,7 +119,13 @@ export function UniversalPanel<T>({
               : 'bg-gray-50 border-gray-200 focus-within:border-[#7c3aed] focus-within:ring-1 focus-within:ring-[#7c3aed]/50'
           }`}
         >
-          <Search size={16} className={isDark ? 'text-gray-400' : 'text-gray-500'} />
+          {/* Spinner while typing / stable icon otherwise */}
+          {isSearching ? (
+            <div className="w-4 h-4 rounded-full border-2 border-[#7c3aed] border-t-transparent animate-spin flex-shrink-0" />
+          ) : (
+            <Search size={16} className={`flex-shrink-0 ${isDark ? 'text-gray-400' : 'text-gray-500'}`} />
+          )}
+
           <input
             type="text"
             placeholder={placeholder}
@@ -106,43 +136,60 @@ export function UniversalPanel<T>({
             }`}
           />
         </div>
+
+        {/* Result count — only after query settles */}
+        {!isSearching && hasQuery && !isEmpty && (
+          <p className={`text-[11px] mt-1 px-1 ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
+            {filteredItems.length} result{filteredItems.length === 1 ? '' : 's'}
+          </p>
+        )}
       </div>
 
-      {/* ── Optional subtitle ──────────────────────────────────── */}
-      {subtitle && (
-        <span
-          className={`text-sm font-semibold px-4 pb-2 flex-shrink-0 ${
-            isDark ? 'text-white' : 'text-gray-800'
-          }`}
-        >
+      {/* ── Subtitle (hidden when searching) ───────────────────────────────── */}
+      {subtitle && !hasQuery && (
+        <span className={`text-sm font-semibold px-4 pb-2 flex-shrink-0 ${isDark ? 'text-white' : 'text-gray-800'}`}>
           {subtitle}
         </span>
       )}
 
-      {/* ── Grid ───────────────────────────────────────────────── */}
-      <div className="flex-1 min-h-0">
-        <VirtualizedGrid
-          items={items}
-          columnCount={columnCount}
-          width={width}
-          height={height}
-          itemHeight={itemHeight}
-          itemWidth={itemWidth}
-          getItemId={getItemId}
-          renderItem={renderItem}
-          isLoading={isLoading}
-          loadingText={loadingText}
-          isFetchingNextPage={isFetchingNextPage}
-          onScrollEnd={() => {
-            if (hasNextPage && !isFetchingNextPage && fetchNextPage) {
-              fetchNextPage();
-            }
-          }}
-          onResetScroll={(fn) => {
-            resetScrollRef.current = fn;
-          }}
-        />
-      </div>
+      {/* ── Empty State ─────────────────────────────────────────────────────── */}
+      {isEmpty ? (
+        <div className="flex-1 flex flex-col items-center justify-center min-h-[300px] select-none">
+          <PanelIcon
+            size={64}
+            className={`mb-4 ${isDark ? 'text-gray-600' : 'text-gray-300'}`}
+          />
+          <p className={`text-lg font-semibold ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+            No results found
+          </p>
+          <p className={`text-sm mt-1 ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
+            Try a different search term
+          </p>
+        </div>
+      ) : (
+        /* ── Grid ──────────────────────────────────────────────────────────── */
+        <div className="flex-1 min-h-0">
+          <VirtualizedGrid
+            items={filteredItems}
+            columnCount={columnCount}
+            width={width}
+            height={height}
+            itemHeight={itemHeight}
+            itemWidth={itemWidth}
+            getItemId={getItemId}
+            renderItem={renderItem}
+            isLoading={isLoading}
+            loadingText={dynamicLoadingText}
+            isFetchingNextPage={isFetchingNextPage}
+            onScrollEnd={() => {
+              if (hasNextPage && !isFetchingNextPage && fetchNextPage) {
+                fetchNextPage();
+              }
+            }}
+            onResetScroll={(fn) => { resetScrollRef.current = fn; }}
+          />
+        </div>
+      )}
     </div>
   );
 }

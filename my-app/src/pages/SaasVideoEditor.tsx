@@ -855,7 +855,9 @@ const SaasVideoEditor = () => {
                                                 hasNextPage={hasNextPage}
                                                 fetchNextPage={fetchNextPage}
                                                 getItemId={(el) => el.id}
-                                                loadingText="Loading elements..."
+                                                getItemLabel={(el) => el.label}
+                                                panelName="Elements"
+                                                panelIcon={Layers}
                                                 isDark={isDark}
                                                 renderItem={(el) => (
                                                     <DraggableCard
@@ -868,9 +870,7 @@ const SaasVideoEditor = () => {
                                             />
                                         ) : activeTab === 'Templates' ? (
                                             <UniversalPanel
-                                                items={TEMPLATES.filter((t) =>
-                                                    t.label.toLowerCase().includes(templateSearchQuery.toLowerCase())
-                                                )}
+                                                items={TEMPLATES}
                                                 columnCount={isPanelExpanded ? 3 : 2}
                                                 width={isPanelExpanded ? 480 : 280}
                                                 searchQuery={templateSearchQuery}
@@ -881,6 +881,9 @@ const SaasVideoEditor = () => {
                                                 isFetchingNextPage={false}
                                                 hasNextPage={false}
                                                 getItemId={(el) => el.id}
+                                                getItemLabel={(el) => el.label}
+                                                panelName="Templates"
+                                                panelIcon={LayoutTemplate}
                                                 isDark={isDark}
                                                 renderItem={(el) => (
                                                     <DraggableCard
@@ -1008,9 +1011,6 @@ const SaasVideoEditor = () => {
                                     </button>
                                 </div>
                             </div>
-                            <div className="px-4 pb-3 flex-shrink-0">
-                                {/* search now handled inside UniversalPanel below */}
-                            </div>
                             <div className="flex-1 min-h-0 flex flex-col">
                                 <p className={`text-[11px] px-4 pb-2 flex-shrink-0 ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
                                     Hover or click to preview. Click to apply.
@@ -1028,6 +1028,9 @@ const SaasVideoEditor = () => {
                                     isFetchingNextPage={false}
                                     hasNextPage={false}
                                     getItemId={(preset) => preset.id}
+                                    getItemLabel={(preset) => preset.label}
+                                    panelName="Animations"
+                                    panelIcon={Sparkles}
                                     isDark={isDark}
                                     renderItem={(preset) => (
                                         <AnimationCard
