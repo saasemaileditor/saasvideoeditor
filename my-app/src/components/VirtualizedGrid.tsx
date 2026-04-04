@@ -1,6 +1,5 @@
 import { useVirtualizer } from '@tanstack/react-virtual';
 import React, { useRef, useEffect } from 'react';
-import { GlobalLoader } from './ui/global-loader';
 import { SkeletonCard } from './ui/SkeletonCard';
 
 export interface VirtualizedGridProps<T> {

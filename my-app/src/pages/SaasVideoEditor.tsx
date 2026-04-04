@@ -417,7 +417,7 @@ const SceneElement = memo(({ el, isDark, isSelected, updateElement, setSelectedI
 const SaasVideoEditor = () => {
     const [activeTab, setActiveTab] = useState<string | null>(null);
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-    const [panelLayout, setPanelLayout] = useState<'grid' | 'small-grid'>('grid');
+
     const [searchQuery, setSearchQuery] = useState('');
     const [templateSearchQuery, setTemplateSearchQuery] = useState('');
     const [animationSearchQuery, setAnimationSearchQuery] = useState('');
@@ -882,7 +882,6 @@ const SaasVideoEditor = () => {
                                                 title="Elements"
                                                 onClose={() => { setActiveTab(null); }}
                                                 items={flatElements}
-                                                columnCount={panelLayout === 'grid' ? 2 : 3}
                                                 width={480}
                                                 height="100%"
                                                 itemHeight={140}
@@ -899,9 +898,6 @@ const SaasVideoEditor = () => {
                                                 panelIcon={Layers}
                                                 isDark={isDark}
                                                 showCloseButton={true}
-                                                showLayoutDropdown={true}
-                                                layout={panelLayout}
-                                                onLayoutChange={setPanelLayout}
                                                 renderItem={(el) => (
                                                     <DraggableCard
                                                         elementId={el.id}
@@ -916,7 +912,6 @@ const SaasVideoEditor = () => {
                                                 title="Templates"
                                                 onClose={() => { setActiveTab(null); }}
                                                 items={flatTemplates}
-                                                columnCount={panelLayout === 'grid' ? 2 : 3}
                                                 width={480}
                                                 height="100%"
                                                 itemHeight={140}
@@ -933,9 +928,6 @@ const SaasVideoEditor = () => {
                                                 panelIcon={LayoutTemplate}
                                                 isDark={isDark}
                                                 showCloseButton={true}
-                                                showLayoutDropdown={true}
-                                                layout={panelLayout}
-                                                onLayoutChange={setPanelLayout}
                                                 renderItem={(el) => (
                                                     <DraggableCard
                                                         elementId={el.id}
@@ -1009,11 +1001,7 @@ const SaasVideoEditor = () => {
                                 <UniversalPanel
                                     title="Animations"
                                     onClose={() => setIsRightPanelAnimationOpen(false)}
-                                    showLayoutDropdown={true}
-                                    layout={panelLayout}
-                                    onLayoutChange={setPanelLayout}
                                     items={flatAnimations}
-                                    columnCount={panelLayout === 'grid' ? 2 : 3}
                                     width={480}
                                     height="100%"
                                     itemHeight={140}

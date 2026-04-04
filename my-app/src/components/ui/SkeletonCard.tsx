@@ -1,10 +1,7 @@
-import React from 'react';
-
 export function SkeletonCard() {
   return (
-    <div className="animate-pulse bg-gray-200 dark:bg-gray-700 rounded-lg h-[140px] w-full border border-gray-200 dark:border-transparent">
-      <div className="h-12 w-12 bg-gray-300 dark:bg-gray-600 rounded-full mx-auto mt-8"></div>
-      <div className="h-4 w-20 bg-gray-300 dark:bg-gray-600 rounded mx-auto mt-4"></div>
+    <div className="relative h-[140px] w-full rounded-xl bg-[#f0f0f0] overflow-hidden">
+      <div className="absolute inset-0 animate-shimmer bg-gradient-to-r from-transparent via-white/50 to-transparent" />
     </div>
   );
 }
