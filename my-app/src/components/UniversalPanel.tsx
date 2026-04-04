@@ -105,6 +105,7 @@ export function UniversalPanel<T>({
   const dynamicLoadingText = `Loading ${panelName.toLowerCase()}...`;
   const hasQuery = debouncedQuery.trim().length > 0;
   const isEmpty = filteredItems.length === 0 && hasQuery && !isLoading && !isSearching;
+  const isShowLoading = isLoading;
 
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
@@ -119,8 +120,8 @@ export function UniversalPanel<T>({
               : 'bg-gray-50 border-gray-200 focus-within:border-[#7c3aed] focus-within:ring-1 focus-within:ring-[#7c3aed]/50'
           }`}
         >
-          {/* Spinner while typing / stable icon otherwise */}
-          {isSearching ? (
+          {/* Spinner while typing / loading or stable icon otherwise */}
+          {isLoading || isSearching ? (
             <div className="w-4 h-4 rounded-full border-2 border-[#7c3aed] border-t-transparent animate-spin flex-shrink-0" />
           ) : (
             <Search size={16} className={`flex-shrink-0 ${isDark ? 'text-gray-400' : 'text-gray-500'}`} />
@@ -152,8 +153,24 @@ export function UniversalPanel<T>({
         </span>
       )}
 
-      {/* ── Empty State ─────────────────────────────────────────────────────── */}
-      {isEmpty ? (
+      {/* ── Loading State / Empty State / Grid ───────────────────────────────── */}
+      {isShowLoading ? (
+        <div className="flex-1 flex flex-col items-center justify-center min-h-[300px] select-none">
+          {/* Big Spinner - 64px, same size as empty state icon */}
+          <div className="w-16 h-16 rounded-full border-[4px] border-[#7c3aed] border-t-transparent animate-spin mb-4" />
+          
+          {/* Smart loading text - shrinks if too long */}
+          <p 
+            className={`font-semibold whitespace-nowrap px-4 text-center ${
+              dynamicLoadingText.length > 25 
+                ? 'text-base'  // Long text = smaller
+                : 'text-lg'    // Normal text = default size
+            } ${isDark ? 'text-gray-400' : 'text-gray-500'}`}
+          >
+            {dynamicLoadingText}
+          </p>
+        </div>
+      ) : isEmpty ? (
         <div className="flex-1 flex flex-col items-center justify-center min-h-[300px] select-none">
           <PanelIcon
             size={64}
@@ -178,8 +195,6 @@ export function UniversalPanel<T>({
             itemWidth={itemWidth}
             getItemId={getItemId}
             renderItem={renderItem}
-            isLoading={isLoading}
-            loadingText={dynamicLoadingText}
             isFetchingNextPage={isFetchingNextPage}
             onScrollEnd={() => {
               if (hasNextPage && !isFetchingNextPage && fetchNextPage) {

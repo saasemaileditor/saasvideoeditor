@@ -13,9 +13,6 @@ export interface VirtualizedGridProps<T> {
   // Phase 1: throttled infinite scroll
   onScrollEnd?: () => void;
   isFetchingNextPage?: boolean;
-  // Phase 2: initial loading skeleton
-  isLoading?: boolean;
-  loadingText?: string;
   // Phase 3: expose scroll-reset to parent
   onResetScroll?: (resetFn: () => void) => void;
 }
@@ -31,8 +28,6 @@ export function VirtualizedGrid<T>({
   getItemId,
   onScrollEnd,
   isFetchingNextPage,
-  isLoading,
-  loadingText = 'Loading...',
   onResetScroll,
 }: VirtualizedGridProps<T>) {
   const parentRef = useRef<HTMLDivElement>(null);
@@ -95,71 +90,59 @@ export function VirtualizedGrid<T>({
       className="scrollbar-thin scrollbar-thumb-gray-400 scrollbar-track-transparent dark:scrollbar-thumb-gray-600"
       onScroll={handleScroll}
     >
-      {/* Phase 2: full-height initial loader */}
-      {isLoading ? (
-        <div className="flex items-center justify-center min-h-[200px]">
-          <div className="flex flex-col items-center gap-3">
-            <div className="w-8 h-8 rounded-full border-[3px] border-[#7c3aed] border-t-transparent animate-spin" />
-            <span className="text-sm font-medium text-gray-400">{loadingText}</span>
-          </div>
-        </div>
-      ) : (
-        <>
-          <div
-            style={{
-              height: `${rowVirtualizer.getTotalSize()}px`,
-              width: '100%',
-              position: 'relative',
-            }}
-          >
-            {rowVirtualizer.getVirtualItems().map((virtualRow) => {
-              const startIndex = virtualRow.index * columnCount;
-              const rowItems = items.slice(startIndex, startIndex + columnCount);
+      <div
+        style={{
+          height: `${rowVirtualizer.getTotalSize()}px`,
+          width: '100%',
+          position: 'relative',
+        }}
+      >
+        {rowVirtualizer.getVirtualItems().map((virtualRow) => {
+          const startIndex = virtualRow.index * columnCount;
+          const rowItems = items.slice(startIndex, startIndex + columnCount);
 
-              return (
-                <div
-                  key={virtualRow.index}
-                  style={{
-                    position: 'absolute',
-                    top: 0,
-                    left: 0,
-                    width: '100%',
-                    height: `${virtualRow.size}px`,
-                    transform: `translateY(${virtualRow.start}px)`,
-                    display: 'flex',
-                    gap: `${gap}px`,
-                    // Left padding only — scrollbar flush at right edge
-                    padding: `0 0 0 ${LEFT_PADDING}px`,
-                  }}
-                >
-                  {rowItems.map((item, localIndex) => {
-                    const index = startIndex + localIndex;
-                    return (
-                      <div
-                        key={getItemId(item)}
-                        style={{
-                          width: typeof resolvedItemWidth === 'number' ? `${resolvedItemWidth}px` : resolvedItemWidth,
-                          height: `${resolvedItemHeight}px`,
-                          flexShrink: 0,
-                        }}
-                      >
-                        {renderItem(item, index)}
-                      </div>
-                    );
-                  })}
-                </div>
-              );
-            })}
-          </div>
-
-          {/* Bottom infinite-scroll loader */}
-          {isFetchingNextPage && (
-            <div className="py-4 text-center text-sm font-medium text-gray-400 flex items-center justify-center gap-2">
-              <div className="w-4 h-4 rounded-full border-2 border-[#7c3aed] border-t-transparent animate-spin" />
-              Loading more...
+          return (
+            <div
+              key={virtualRow.index}
+              style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                width: '100%',
+                height: `${virtualRow.size}px`,
+                transform: `translateY(${virtualRow.start}px)`,
+                display: 'flex',
+                gap: `${gap}px`,
+                // Left padding only — scrollbar flush at right edge
+                padding: `0 0 0 ${LEFT_PADDING}px`,
+              }}
+            >
+              {rowItems.map((item, localIndex) => {
+                const index = startIndex + localIndex;
+                return (
+                  <div
+                    key={getItemId(item)}
+                    style={{
+                      width: typeof resolvedItemWidth === 'number' ? `${resolvedItemWidth}px` : resolvedItemWidth,
+                      height: `${resolvedItemHeight}px`,
+                      flexShrink: 0,
+                    }}
+                  >
+                    {renderItem(item, index)}
+                  </div>
+                );
+              })}
             </div>
-          )}
-        </>
+          );
+        })}
+      </div>
+
+      {/* Bottom infinite-scroll loader */}
+      {isFetchingNextPage && (
+        <div className="py-4 text-center text-sm font-medium text-gray-400 flex items-center justify-center gap-2">
+          <div className="w-4 h-4 rounded-full border-2 border-[#7c3aed] border-t-transparent animate-spin" />
+          Loading more...
+        </div>
       )}
     </div>
   );

@@ -235,6 +235,59 @@ const TEMPLATES: { id: string; icon: LucideIcon; label: string }[] = [
     { id: 'template-abstract', icon: Triangle, label: 'Abstract' },
 ];
 
+export const useTemplates = (searchQuery: string) => {
+    return useInfiniteQuery({
+        queryKey: ['templates', searchQuery],
+        queryFn: async () => {
+            // Simulate network delay for loading state
+            await new Promise((resolve) => setTimeout(resolve, 300));
+            
+            // Filter templates based on search query
+            const filtered = searchQuery
+                ? TEMPLATES.filter((t) => 
+                    t.label.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                    t.id.toLowerCase().includes(searchQuery.toLowerCase())
+                  )
+                : TEMPLATES;
+            
+            return {
+                data: filtered,
+                nextPage: undefined, // No pagination for templates
+            };
+        },
+        initialPageParam: 0,
+        getNextPageParam: () => undefined,
+    });
+};
+
+export const useAnimations = (searchQuery: string) => {
+    return useInfiniteQuery({
+        queryKey: ['animations', searchQuery],
+        queryFn: async () => {
+            // Simulate network delay for loading state
+            await new Promise((resolve) => setTimeout(resolve, 300));
+            
+            // Filter animations based on search query
+            // @ts-ignore
+            const filtered = searchQuery
+                // @ts-ignore
+                ? ANIMATION_PRESETS.filter((a) => 
+                    a.label.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                    a.id.toLowerCase().includes(searchQuery.toLowerCase())
+                  )
+                // @ts-ignore
+                : ANIMATION_PRESETS;
+            
+            return {
+                data: filtered,
+                nextPage: undefined, // No pagination for animations
+            };
+        },
+        initialPageParam: 0,
+        getNextPageParam: () => undefined,
+    });
+};
+
 /* ─── Draggable sidebar card (uses @dnd-kit useDraggable) ─── */
 const DraggableCard = ({ elementId, icon: Icon, label, isDark }: {
     elementId: string;
@@ -374,6 +427,12 @@ const SaasVideoEditor = () => {
     // Infinite Query Hook for Elements
     const { data: elementsData, fetchNextPage, hasNextPage, isFetchingNextPage, isLoading: isElementsLoading } = useInfiniteElements(searchQuery);
     const flatElements = elementsData?.pages.flatMap((page) => page.data) ?? [];
+
+    const { data: templatesData, isLoading: isTemplatesLoading } = useTemplates(templateSearchQuery);
+    const flatTemplates = templatesData?.pages.flatMap((page) => page.data) ?? [];
+
+    const { data: animationsData, isLoading: isAnimationsLoading } = useAnimations(animationSearchQuery);
+    const flatAnimations = animationsData?.pages.flatMap((page) => page.data) ?? [];
 
     // Canvas States (global store)
     const { elements, elementIds, addElement, updateElement, removeElement } = useEditorStore();
@@ -870,14 +929,14 @@ const SaasVideoEditor = () => {
                                             />
                                         ) : activeTab === 'Templates' ? (
                                             <UniversalPanel
-                                                items={TEMPLATES}
+                                                items={flatTemplates}
                                                 columnCount={isPanelExpanded ? 3 : 2}
                                                 width={isPanelExpanded ? 480 : 280}
                                                 searchQuery={templateSearchQuery}
                                                 onSearchChange={setTemplateSearchQuery}
                                                 placeholder="Search templates..."
                                                 subtitle="Browse templates"
-                                                isLoading={false}
+                                                isLoading={isTemplatesLoading}
                                                 isFetchingNextPage={false}
                                                 hasNextPage={false}
                                                 getItemId={(el) => el.id}
@@ -1016,7 +1075,7 @@ const SaasVideoEditor = () => {
                                     Hover or click to preview. Click to apply.
                                 </p>
                                 <UniversalPanel
-                                    items={ANIMATION_PRESETS}
+                                    items={flatAnimations}
                                     columnCount={panelLayout === 'list' ? 1 : panelLayout === 'grid' ? 2 : 3}
                                     width={isRightPanelExpanded ? 480 : 280}
                                     itemHeight={panelLayout === 'list' ? 60 : panelLayout === 'grid' ? 100 : 80}
@@ -1024,7 +1083,7 @@ const SaasVideoEditor = () => {
                                     searchQuery={animationSearchQuery}
                                     onSearchChange={setAnimationSearchQuery}
                                     placeholder="Search animations..."
-                                    isLoading={false}
+                                    isLoading={isAnimationsLoading}
                                     isFetchingNextPage={false}
                                     hasNextPage={false}
                                     getItemId={(preset) => preset.id}
