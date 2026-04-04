@@ -424,7 +424,7 @@ const SaasVideoEditor = () => {
     const [selectedAnimationId, setSelectedAnimationId] = useState<string | null>(null);
 
     // Infinite Query Hook for Elements
-    const elementsPageSize = 20;
+    const elementsPageSize = 99;
     const { data: elementsData, fetchNextPage, hasNextPage, isFetchingNextPage, isLoading: isElementsLoading } = useInfiniteElements(searchQuery, elementsPageSize);
     const flatElements = elementsData?.pages.flatMap((page) => page.data) ?? [];
 
