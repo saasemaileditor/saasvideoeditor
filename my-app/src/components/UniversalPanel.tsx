@@ -31,7 +31,7 @@ export interface UniversalPanelProps<T> {
   height?: number | string;
   itemHeight?: number;
   itemWidth?: number | string;
-  disableAutoLoad?: boolean;  // Prevent auto-loading more than once per scroll
+  loadOnce?: boolean;  // Prevent auto-loading more than once per scroll
 
 
   /** e.g. "Elements" — used for dynamic loading text and empty state */
@@ -97,7 +97,7 @@ export function UniversalPanel<T>({
   title,
   onClose,
   showCloseButton = true,
-  disableAutoLoad = false,
+  loadOnce = false,
 }: UniversalPanelProps<T>) {
   // ── Scroll reset ───────────────────────────────────────────────────────────
   const resetScrollRef = useRef<(() => void) | undefined>(undefined);
@@ -120,6 +120,13 @@ export function UniversalPanel<T>({
   useEffect(() => {
     if (resetScrollRef.current) resetScrollRef.current();
   }, [debouncedQuery]);
+
+  // Clear search on unmount
+  useEffect(() => {
+    return () => {
+      onSearchChange('');
+    };
+  }, [onSearchChange]);
 
   // ── Smart filtering ────────────────────────────────────────────────────────
   const filteredItems = filterAndSortItems(items, debouncedQuery, getItemLabel);
@@ -232,7 +239,7 @@ export function UniversalPanel<T>({
             renderItem={renderItem}
             isFetchingNextPage={isFetchingNextPage}
             isFetchingPreviousPage={isFetchingPreviousPage}
-            disableAutoLoad={disableAutoLoad}
+            loadOnce={loadOnce}
             totalCount={totalCount}
             pageSize={pageSize}
             firstPageParam={firstPageParam}

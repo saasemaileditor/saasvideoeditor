@@ -15,7 +15,7 @@ export interface VirtualizedGridProps<T> {
   onScrollStart?: () => void;
   isFetchingNextPage?: boolean;
   isFetchingPreviousPage?: boolean;
-  disableAutoLoad?: boolean;
+  loadOnce?: boolean;
   
   // Page windowing props for sliding window data (maxPages)
   totalCount?: number;
@@ -39,7 +39,7 @@ export function VirtualizedGrid<T>({
   onScrollStart,
   isFetchingNextPage,
   isFetchingPreviousPage,
-  disableAutoLoad = false,
+  loadOnce = false,
   totalCount,
   pageSize,
   firstPageParam = 0,
@@ -58,9 +58,16 @@ export function VirtualizedGrid<T>({
           parentRef.current.scrollTop = 0;
         }
         isFetchingRef.current = false;
+        hasScrolledToBottomRef.current = false;
       });
     }
   }, [onResetScroll]);
+
+  // Bug Fix: Reset state when items change (e.g. search)
+  useEffect(() => {
+    hasScrolledToBottomRef.current = false;
+    isFetchingRef.current = false;
+  }, [items]);
 
   const activeItemCount = totalCount ?? (isFetchingNextPage ? items.length + columnCount * 2 : items.length);
   const rowCount = Math.ceil(activeItemCount / columnCount);
@@ -89,7 +96,7 @@ export function VirtualizedGrid<T>({
     // Check bottom
     if (onScrollEnd && !isFetchingRef.current && !isFetchingNextPage) {
         const isNearBottom = target.scrollHeight - target.scrollTop - target.clientHeight < 100;
-        if (isNearBottom && (!disableAutoLoad || !hasScrolledToBottomRef.current)) {
+        if (isNearBottom && (!loadOnce || !hasScrolledToBottomRef.current)) {
             hasScrolledToBottomRef.current = true;
             isFetchingRef.current = true;
             onScrollEnd();
