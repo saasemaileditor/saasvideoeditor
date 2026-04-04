@@ -14,6 +14,7 @@ export interface VirtualizedGridProps<T> {
   // Phase 1: throttled infinite scroll
   onScrollEnd?: () => void;
   isFetchingNextPage?: boolean;
+  disableAutoLoad?: boolean;
   // Phase 3: expose scroll-reset to parent
   onResetScroll?: (resetFn: () => void) => void;
 }
@@ -29,12 +30,14 @@ export function VirtualizedGrid<T>({
   getItemId,
   onScrollEnd,
   isFetchingNextPage,
+  disableAutoLoad = false,
   onResetScroll,
 }: VirtualizedGridProps<T>) {
   const parentRef = useRef<HTMLDivElement>(null);
 
   // Phase 1: ref-based fetch guard — prevents re-firing while already fetching
   const isFetchingRef = useRef(false);
+  const hasScrolledToBottomRef = useRef(false);
 
   // Phase 3: expose resetScroll to parent via callback
   useEffect(() => {
@@ -70,20 +73,28 @@ export function VirtualizedGrid<T>({
     count: rowCount,
     getScrollElement: () => parentRef.current,
     estimateSize: () => rowHeight,
-    overscan: 5,
+    overscan: 10,
   });
 
   // Phase 1: throttled scroll handler
   const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
     if (!onScrollEnd || isFetchingRef.current || isFetchingNextPage) return;
+    if (disableAutoLoad && hasScrolledToBottomRef.current) return;
+
     const target = e.target as HTMLDivElement;
-    if (target.scrollHeight - target.scrollTop - target.clientHeight < 100) {
+    const isNearBottom = target.scrollHeight - target.scrollTop - target.clientHeight < 100;
+
+    if (isNearBottom) {
+      hasScrolledToBottomRef.current = true;
       isFetchingRef.current = true;
       onScrollEnd();
       // reset guard after 200ms — lets normal scrolling continue without re-firing
       setTimeout(() => {
         isFetchingRef.current = false;
       }, 200);
+    } else {
+      // Reset when user scrolls back up
+      hasScrolledToBottomRef.current = false;
     }
   };
 

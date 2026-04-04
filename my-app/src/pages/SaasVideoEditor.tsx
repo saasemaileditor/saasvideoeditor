@@ -131,12 +131,11 @@ const ANIMATION_PRESETS = [
     },
 ];
 
-const AnimationCard = ({ preset, isDark, isSelected, onSelect, layout }: {
+const AnimationCard = ({ preset, isDark, isSelected, onSelect }: {
     preset: typeof ANIMATION_PRESETS[0];
     isDark: boolean;
     isSelected: boolean;
     onSelect: () => void;
-    layout: 'list' | 'grid' | 'small-grid';
 }) => {
     const [key, setKey] = useState(0);
     const replay = () => setKey(k => k + 1);
@@ -145,8 +144,7 @@ const AnimationCard = ({ preset, isDark, isSelected, onSelect, layout }: {
         <button
             onClick={() => { onSelect(); replay(); }}
             onMouseEnter={replay}
-            className={`relative w-full h-full flex border transition-all cursor-pointer ${layout === 'list' ? 'flex-row items-center gap-3 px-3 py-2.5 text-left' : 'flex-col items-center justify-center p-3 gap-2 text-center'
-                } rounded-xl ${isSelected
+            className={`relative w-full h-full flex border transition-all cursor-pointer flex-col items-center justify-center p-3 gap-2 text-center rounded-xl ${isSelected
                     ? isDark
                         ? 'border-[#7c3aed] bg-[#2d1f5e]'
                         : 'border-[#7c3aed] bg-[#ede9fe]'
@@ -179,22 +177,22 @@ const AnimationCard = ({ preset, isDark, isSelected, onSelect, layout }: {
                 {preset.label}
             </span>
             {isSelected && (
-                <span className={`${layout === 'list' ? 'ml-auto' : 'absolute top-1.5 right-1.5'} text-[10px] font-bold text-[#7c3aed] uppercase tracking-wide`}>
-                    {layout === 'list' ? 'Applied' : '✓'}
+                <span className="absolute top-1.5 right-1.5 text-[10px] font-bold text-[#7c3aed] uppercase tracking-wide">
+                    ✓
                 </span>
             )}
         </button>
     );
 };
 
-// Generate 100k test items as mock DB
-const MOCK_ELEMENTS = Array.from({ length: 100000 }, (_, i) => ({
+// Generate 10k test items as mock DB
+const MOCK_ELEMENTS = Array.from({ length: 10000 }, (_, i) => ({
     id: `element-${i}`,
     icon: [Type, Smartphone, Hash, Box, PieChart, AppWindow, MousePointer2, Smile, Triangle][i % 9],
     label: `Item ${i}`,
 }));
 
-export const useInfiniteElements = (searchQuery: string) => {
+export const useInfiniteElements = (searchQuery: string, pageSize: number = 20) => {
     return useInfiniteQuery({
         queryKey: ['elements', searchQuery],
         queryFn: async ({ pageParam = 0 }) => {
@@ -209,7 +207,6 @@ export const useInfiniteElements = (searchQuery: string) => {
                   )
                 : MOCK_ELEMENTS;
 
-            const pageSize = 20;
             const start = pageParam * pageSize;
             const end = start + pageSize;
             const data = filteredElements.slice(start, end);
@@ -417,14 +414,15 @@ const SceneElement = memo(({ el, isDark, isSelected, updateElement, setSelectedI
 const SaasVideoEditor = () => {
     const [activeTab, setActiveTab] = useState<string | null>(null);
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-    const [isPanelExpanded, setIsPanelExpanded] = useState(true);
-    const [panelLayout, setPanelLayout] = useState<'list' | 'grid' | 'small-grid'>('list');
+    const [panelLayout, setPanelLayout] = useState<'grid' | 'small-grid'>('grid');
     const [searchQuery, setSearchQuery] = useState('');
     const [templateSearchQuery, setTemplateSearchQuery] = useState('');
     const [animationSearchQuery, setAnimationSearchQuery] = useState('');
+    const [selectedAnimationId, setSelectedAnimationId] = useState<string | null>(null);
 
     // Infinite Query Hook for Elements
-    const { data: elementsData, fetchNextPage, hasNextPage, isFetchingNextPage, isLoading: isElementsLoading } = useInfiniteElements(searchQuery);
+    const elementsPageSize = 20;
+    const { data: elementsData, fetchNextPage, hasNextPage, isFetchingNextPage, isLoading: isElementsLoading } = useInfiniteElements(searchQuery, elementsPageSize);
     const flatElements = elementsData?.pages.flatMap((page) => page.data) ?? [];
 
     const { data: templatesData, isLoading: isTemplatesLoading } = useTemplates(templateSearchQuery);
@@ -527,7 +525,6 @@ const SaasVideoEditor = () => {
     const [defaultPanelExpanded, setDefaultPanelExpanded] = useState(true);
     const [toolbarShouldCenter, setToolbarShouldCenter] = useState(false);
     const [isRightPanelAnimationOpen, setIsRightPanelAnimationOpen] = useState(false);
-    const [isRightPanelExpanded, setIsRightPanelExpanded] = useState(true);
 
     useEffect(() => {
         const checkIfExpanded = () => {
@@ -839,8 +836,10 @@ const SaasVideoEditor = () => {
                                     <button
                                         key={tab.id}
                                         onClick={() => {
-                                            setActiveTab(isActive ? null : tab.id);
-                                            if (!isActive) setIsPanelExpanded(defaultPanelExpanded);
+                                            const newTab = isActive ? null : tab.id;
+                                            setActiveTab(newTab);
+                                            // Close right panel when any left panel opens
+                                            if (newTab) setIsRightPanelAnimationOpen(false);
                                         }}
                                         className={`w-10 h-10 flex items-center justify-center rounded-xl transition-colors cursor-pointer ${isActive
                                             ? isDark
@@ -870,7 +869,7 @@ const SaasVideoEditor = () => {
                         <div
                             className={`absolute top-0 left-[62px] bottom-0 rounded-xl overflow-hidden z-40 flex flex-col transition-all duration-300 ease-in-out ${activeTab ? 'translate-x-0 shadow-xl opacity-100' : '-translate-x-12 opacity-0 pointer-events-none'
                                 } ${isDark ? 'bg-[#1e2235] border border-[#2a2d45]' : 'bg-white border border-gray-100'}`}
-                            style={{ width: isPanelExpanded ? '480px' : '280px' }}
+                            style={{ width: '320px' }}
                         >
                             {activeTab && (
                                 <>
@@ -878,13 +877,10 @@ const SaasVideoEditor = () => {
                                         {activeTab === 'Elements' ? (
                                             <UniversalPanel
                                                 title="Elements"
-                                                onClose={() => { setActiveTab(null); setIsPanelExpanded(false); }}
-                                                isExpanded={isPanelExpanded}
-                                                onToggleExpand={() => setIsPanelExpanded(e => !e)}
-                                                canExpand={true}
+                                                onClose={() => { setActiveTab(null); }}
                                                 items={flatElements}
-                                                columnCount={panelLayout === 'list' ? 1 : panelLayout === 'grid' ? 2 : 3}
-                                                width={isPanelExpanded ? 480 : 280}
+                                                columnCount={panelLayout === 'grid' ? 2 : 3}
+                                                width={320}
                                                 height="100%"
                                                 itemHeight={140}
                                                 searchQuery={searchQuery}
@@ -901,7 +897,6 @@ const SaasVideoEditor = () => {
                                                 panelIcon={Layers}
                                                 isDark={isDark}
                                                 showCloseButton={true}
-                                                showExpandButton={true}
                                                 showLayoutDropdown={true}
                                                 layout={panelLayout}
                                                 onLayoutChange={setPanelLayout}
@@ -917,13 +912,10 @@ const SaasVideoEditor = () => {
                                         ) : activeTab === 'Templates' ? (
                                             <UniversalPanel
                                                 title="Templates"
-                                                onClose={() => { setActiveTab(null); setIsPanelExpanded(false); }}
-                                                isExpanded={isPanelExpanded}
-                                                onToggleExpand={() => setIsPanelExpanded(e => !e)}
-                                                canExpand={true}
+                                                onClose={() => { setActiveTab(null); }}
                                                 items={flatTemplates}
-                                                columnCount={panelLayout === 'list' ? 1 : panelLayout === 'grid' ? 2 : 3}
-                                                width={isPanelExpanded ? 480 : 280}
+                                                columnCount={panelLayout === 'grid' ? 2 : 3}
+                                                width={320}
                                                 height="100%"
                                                 itemHeight={140}
                                                 searchQuery={templateSearchQuery}
@@ -940,7 +932,6 @@ const SaasVideoEditor = () => {
                                                 panelIcon={LayoutTemplate}
                                                 isDark={isDark}
                                                 showCloseButton={true}
-                                                showExpandButton={true}
                                                 showLayoutDropdown={true}
                                                 layout={panelLayout}
                                                 onLayoutChange={setPanelLayout}
@@ -1011,23 +1002,20 @@ const SaasVideoEditor = () => {
                         <div
                             className={`absolute top-0 right-[290px] bottom-0 rounded-xl overflow-hidden z-40 flex flex-col transition-all duration-300 ease-in-out ${isRightPanelAnimationOpen ? '-translate-x-0 shadow-xl opacity-100' : 'translate-x-12 opacity-0 pointer-events-none'
                                 } ${isDark ? 'bg-[#1e2235] border border-[#2a2d45]' : 'bg-white border border-gray-100'}`}
-                            style={{ width: isRightPanelExpanded ? '480px' : '280px' }}
+                            style={{ width: '320px' }}
                         >
                             <div className="flex-1 min-h-0 flex flex-col">
                                 <UniversalPanel
                                     title="Animations"
                                     onClose={() => setIsRightPanelAnimationOpen(false)}
-                                    isExpanded={isRightPanelExpanded}
-                                    onToggleExpand={() => setIsRightPanelExpanded(e => !e)}
-                                    canExpand={true}
                                     showLayoutDropdown={true}
                                     layout={panelLayout}
                                     onLayoutChange={setPanelLayout}
                                     items={flatAnimations}
-                                    columnCount={panelLayout === 'list' ? 1 : panelLayout === 'grid' ? 2 : 3}
-                                    width={isRightPanelExpanded ? 480 : 280}
+                                    columnCount={panelLayout === 'grid' ? 2 : 3}
+                                    width={320}
                                     height="100%"
-                                    itemHeight={panelLayout === 'list' ? 60 : panelLayout === 'grid' ? 100 : 80}
+                                    itemHeight={140}
                                     fetchNextPage={undefined}
                                     searchQuery={animationSearchQuery}
                                     onSearchChange={setAnimationSearchQuery}
@@ -1042,14 +1030,12 @@ const SaasVideoEditor = () => {
                                     panelIcon={Sparkles}
                                     isDark={isDark}
                                     showCloseButton={true}
-                                    showExpandButton={true}
                                     renderItem={(preset) => (
                                         <AnimationCard
                                             preset={preset}
                                             isDark={isDark}
-                                            isSelected={false}
-                                            onSelect={() => {}}
-                                            layout={panelLayout}
+                                            isSelected={selectedAnimationId === preset.id}
+                                            onSelect={() => setSelectedAnimationId(preset.id)}
                                         />
                                     )}
                                 />
@@ -1062,7 +1048,12 @@ const SaasVideoEditor = () => {
                                 Properties
                             </span>
                             <button
-                                onClick={() => setIsRightPanelAnimationOpen(prev => !prev)}
+                                onClick={() => {
+                                    const newState = !isRightPanelAnimationOpen;
+                                    setIsRightPanelAnimationOpen(newState);
+                                    // Close left panel when Animations opens
+                                    if (newState) setActiveTab(null);
+                                }}
                                 className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg border transition-colors cursor-pointer group ${isRightPanelAnimationOpen
                                     ? 'border-[#7c3aed] bg-[#7c3aed] text-white shadow-sm'
                                     : isDark

@@ -1,5 +1,5 @@
 import { useRef, useEffect, useState } from 'react';
-import { Search, X, Maximize2, Minimize2, ChevronDown, Rows2, LayoutGrid, Grid3X3 } from 'lucide-react';
+import { Search, X, ChevronDown, LayoutGrid, Grid3X3 } from 'lucide-react';
 import { VirtualizedGrid } from './VirtualizedGrid';
 import { GlobalLoader } from './ui/global-loader';
 
@@ -32,6 +32,8 @@ export interface UniversalPanelProps<T> {
   height?: number | string;
   itemHeight?: number;
   itemWidth?: number | string;
+  disableAutoLoad?: boolean;  // Prevent auto-loading more than once per scroll
+
 
   /** e.g. "Elements" — used for dynamic loading text and empty state */
   panelName: string;
@@ -59,15 +61,9 @@ export interface UniversalPanelProps<T> {
   onClose?: () => void;
   showCloseButton?: boolean;
   
-  // Expand/collapse
-  isExpanded?: boolean;
-  onToggleExpand?: () => void;
-  showExpandButton?: boolean;
-  canExpand?: boolean;
-  
   // Layout dropdown
-  layout?: 'list' | 'grid' | 'small-grid';
-  onLayoutChange?: (layout: 'list' | 'grid' | 'small-grid') => void;
+  layout?: 'grid' | 'small-grid';
+  onLayoutChange?: (layout: 'grid' | 'small-grid') => void;
   showLayoutDropdown?: boolean;
 }
 
@@ -96,13 +92,10 @@ export function UniversalPanel<T>({
   title,
   onClose,
   showCloseButton = true,
-  isExpanded = true,
-  onToggleExpand,
-  showExpandButton = true,
-  canExpand = true,
-  layout = 'list',
+  layout = 'grid',
   onLayoutChange,
   showLayoutDropdown = false,
+  disableAutoLoad = false,
 }: UniversalPanelProps<T>) {
   // ── Scroll reset ───────────────────────────────────────────────────────────
   const resetScrollRef = useRef<(() => void) | undefined>(undefined);
@@ -154,7 +147,7 @@ export function UniversalPanel<T>({
                     isDark ? 'border-[#2a2d45] bg-[#1e2235] text-gray-300 hover:bg-[#252840]' : 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50'
                   }`}
                 >
-                  {layout === 'list' ? <Rows2 size={16} /> : layout === 'grid' ? <LayoutGrid size={16} /> : <Grid3X3 size={16} />}
+                  {layout === 'grid' ? <LayoutGrid size={16} /> : <Grid3X3 size={16} />}
                   <ChevronDown size={14} />
                 </button>
 
@@ -165,7 +158,6 @@ export function UniversalPanel<T>({
                       isDark ? 'bg-[#1e2235] border-[#2a2d45]' : 'bg-white border-gray-100'
                     }`}>
                       {[
-                        { id: 'list', icon: Rows2, label: 'List' },
                         { id: 'grid', icon: LayoutGrid, label: 'Grid' },
                         { id: 'small-grid', icon: Grid3X3, label: 'Small Grid' }
                       ].map(opt => (
@@ -186,15 +178,6 @@ export function UniversalPanel<T>({
                   </>
                 )}
               </div>
-            )}
-            {canExpand && showExpandButton && onToggleExpand && (
-              <button
-                onClick={onToggleExpand}
-                className={`p-1.5 rounded-lg transition-colors cursor-pointer ${isDark ? 'text-gray-400 hover:text-white hover:bg-gray-800' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100'}`}
-                title={isExpanded ? 'Collapse panel' : 'Expand panel'}
-              >
-                {isExpanded ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
-              </button>
             )}
             {showCloseButton && onClose && (
               <button
@@ -291,6 +274,7 @@ export function UniversalPanel<T>({
             getItemId={getItemId}
             renderItem={renderItem}
             isFetchingNextPage={isFetchingNextPage}
+            disableAutoLoad={disableAutoLoad}
             onScrollEnd={() => {
               if (hasNextPage && !isFetchingNextPage && fetchNextPage) {
                 fetchNextPage();
