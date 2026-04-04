@@ -145,7 +145,7 @@ const AnimationCard = ({ preset, isDark, isSelected, onSelect, layout }: {
         <button
             onClick={() => { onSelect(); replay(); }}
             onMouseEnter={replay}
-            className={`relative w-full flex border transition-all cursor-pointer ${layout === 'list' ? 'flex-row items-center gap-3 px-3 py-2.5 text-left' : 'flex-col items-center justify-center p-3 gap-2 text-center'
+            className={`relative w-full h-full flex border transition-all cursor-pointer ${layout === 'list' ? 'flex-row items-center gap-3 px-3 py-2.5 text-left' : 'flex-col items-center justify-center p-3 gap-2 text-center'
                 } rounded-xl ${isSelected
                     ? isDark
                         ? 'border-[#7c3aed] bg-[#2d1f5e]'
@@ -305,7 +305,7 @@ const DraggableCard = ({ elementId, icon: Icon, label, isDark }: {
             ref={setNodeRef}
             {...listeners}
             {...attributes}
-            className={`relative aspect-square w-full max-h-[140px] hover:cursor-grab group touch-none ${isDragging ? 'opacity-40' : ''
+            className={`relative w-full h-full max-h-[140px] hover:cursor-grab group touch-none ${isDragging ? 'opacity-40' : ''
                 }`}
         >
             {/* The Back Card */}
@@ -883,11 +883,10 @@ const SaasVideoEditor = () => {
                                                 onToggleExpand={() => setIsPanelExpanded(e => !e)}
                                                 canExpand={true}
                                                 items={flatElements}
-                                                columnCount={isPanelExpanded ? 3 : 2}
+                                                columnCount={panelLayout === 'list' ? 1 : panelLayout === 'grid' ? 2 : 3}
                                                 width={isPanelExpanded ? 480 : 280}
                                                 height="100%"
-                                                itemHeight={140}
-                                                itemWidth="100%"
+                                                itemHeight={panelLayout === 'list' ? 72 : 140}
                                                 searchQuery={searchQuery}
                                                 onSearchChange={setSearchQuery}
                                                 placeholder="Search elements..."
@@ -923,11 +922,10 @@ const SaasVideoEditor = () => {
                                                 onToggleExpand={() => setIsPanelExpanded(e => !e)}
                                                 canExpand={true}
                                                 items={flatTemplates}
-                                                columnCount={isPanelExpanded ? 3 : 2}
+                                                columnCount={panelLayout === 'list' ? 1 : panelLayout === 'grid' ? 2 : 3}
                                                 width={isPanelExpanded ? 480 : 280}
                                                 height="100%"
-                                                itemHeight={140}
-                                                itemWidth="100%"
+                                                itemHeight={panelLayout === 'list' ? 72 : 140}
                                                 searchQuery={templateSearchQuery}
                                                 onSearchChange={setTemplateSearchQuery}
                                                 placeholder="Search templates..."
@@ -1030,7 +1028,6 @@ const SaasVideoEditor = () => {
                                     width={isRightPanelExpanded ? 480 : 280}
                                     height="100%"
                                     itemHeight={panelLayout === 'list' ? 60 : panelLayout === 'grid' ? 100 : 80}
-                                    itemWidth="100%"
                                     fetchNextPage={undefined}
                                     searchQuery={animationSearchQuery}
                                     onSearchChange={setAnimationSearchQuery}

@@ -51,17 +51,20 @@ export function VirtualizedGrid<T>({
 
   const rowCount = Math.ceil(items.length / columnCount);
 
-  // Gap: 10px
-  const gap = 10;
+  // Gap: 12px
+  const gap = 12;
   const resolvedItemHeight = itemHeight ?? 140;
   const rowHeight = resolvedItemHeight + gap;
 
-  // Left padding only — scrollbar sits flush at right edge (Bug #4 fix)
-  const LEFT_PADDING = 12;
+  // Symmetric padding + reserve space for scrollbar so no horizontal overflow
+  const H_PADDING = 16; // 16px each side = 32px total
+  const SCROLLBAR_WIDTH = 14; // reserve for vertical scrollbar
   const totalGapWidth = (columnCount - 1) * gap;
-  const availableWidth = width - totalGapWidth - LEFT_PADDING; // only left padding
-  const calculatedItemWidth = Math.floor(availableWidth / columnCount);
-  const resolvedItemWidth = itemWidth !== undefined ? itemWidth : calculatedItemWidth;
+  const availableWidth = width - totalGapWidth - H_PADDING * 2 - SCROLLBAR_WIDTH;
+  const calculatedItemWidth = Math.max(40, Math.floor(availableWidth / columnCount));
+  // Only fall back to caller-supplied itemWidth if it is a number; ignore "100%" strings
+  const resolvedItemWidth =
+    typeof itemWidth === 'number' ? itemWidth : calculatedItemWidth;
 
   const rowVirtualizer = useVirtualizer({
     count: rowCount,
@@ -87,7 +90,7 @@ export function VirtualizedGrid<T>({
   return (
     <div
       ref={parentRef}
-      style={{ height, width, overflow: 'auto' }}
+      style={{ height, width, overflowY: 'auto', overflowX: 'hidden' }}
       className="scrollbar-thin scrollbar-thumb-gray-400 scrollbar-track-transparent dark:scrollbar-thumb-gray-600"
       onScroll={handleScroll}
     >
@@ -114,8 +117,8 @@ export function VirtualizedGrid<T>({
                 transform: `translateY(${virtualRow.start}px)`,
                 display: 'flex',
                 gap: `${gap}px`,
-                // Left padding only — scrollbar flush at right edge
-                padding: `0 0 0 ${LEFT_PADDING}px`,
+                padding: `0 ${H_PADDING}px`,
+                boxSizing: 'border-box',
               }}
             >
               {rowItems.map((item, localIndex) => {
