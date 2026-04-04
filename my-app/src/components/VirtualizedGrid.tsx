@@ -1,5 +1,6 @@
 import { useVirtualizer } from '@tanstack/react-virtual';
-import { useRef, useEffect } from 'react';
+import React, { useRef, useEffect } from 'react';
+import { GlobalLoader } from './ui/global-loader';
 
 export interface VirtualizedGridProps<T> {
   items: T[];
@@ -140,7 +141,7 @@ export function VirtualizedGrid<T>({
       {/* Bottom infinite-scroll loader */}
       {isFetchingNextPage && (
         <div className="py-4 text-center text-sm font-medium text-gray-400 flex items-center justify-center gap-2">
-          <div className="w-4 h-4 rounded-full border-2 border-[#7c3aed] border-t-transparent animate-spin" />
+          <GlobalLoader size={16} fullScreen={false} />
           Loading more...
         </div>
       )}

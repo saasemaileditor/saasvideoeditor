@@ -1,6 +1,7 @@
 import { useRef, useEffect, useState } from 'react';
 import { Search } from 'lucide-react';
 import { VirtualizedGrid } from './VirtualizedGrid';
+import { GlobalLoader } from './ui/global-loader';
 
 // ── Smart search helper ──────────────────────────────────────────────────────
 function filterAndSortItems<T>(
@@ -122,7 +123,7 @@ export function UniversalPanel<T>({
         >
           {/* Spinner while typing / loading or stable icon otherwise */}
           {isLoading || isSearching ? (
-            <div className="w-4 h-4 rounded-full border-2 border-[#7c3aed] border-t-transparent animate-spin flex-shrink-0" />
+            <GlobalLoader size={16} fullScreen={false} className="flex-shrink-0" />
           ) : (
             <Search size={16} className={`flex-shrink-0 ${isDark ? 'text-gray-400' : 'text-gray-500'}`} />
           )}
@@ -156,8 +157,8 @@ export function UniversalPanel<T>({
       {/* ── Loading State / Empty State / Grid ───────────────────────────────── */}
       {isShowLoading ? (
         <div className="flex-1 flex flex-col items-center justify-center min-h-[300px] select-none">
-          {/* Big Spinner - 64px, same size as empty state icon */}
-          <div className="w-16 h-16 rounded-full border-[4px] border-[#7c3aed] border-t-transparent animate-spin mb-4" />
+          {/* GlobalLoader - 64px, no fullScreen */}
+          <GlobalLoader size={64} fullScreen={false} className="mb-4" />
           
           {/* Smart loading text - shrinks if too long */}
           <p 
