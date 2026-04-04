@@ -334,6 +334,87 @@ export const useAnimations = (searchQuery: string) => {
     });
 };
 
+export const useMedia = (searchQuery: string, pageSize: number = 20) => {
+    return useInfiniteQuery({
+        queryKey: ['media', searchQuery],
+        queryFn: async ({ pageParam = 0 }) => {
+            await new Promise((resolve) => setTimeout(resolve, 300));
+            const filtered = searchQuery
+                ? MEDIA_ITEMS.filter((el) =>
+                      el.label.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                      el.id.toLowerCase().includes(searchQuery.toLowerCase())
+                  )
+                : MEDIA_ITEMS;
+
+            const start = pageParam * pageSize;
+            const end = start + pageSize;
+            const data = filtered.slice(start, end);
+
+            return {
+                data,
+                currentPage: pageParam,
+                nextPage: end < filtered.length ? pageParam + 1 : undefined,
+            };
+        },
+        initialPageParam: 0,
+        getNextPageParam: (lastPage) => lastPage.nextPage,
+    });
+};
+
+export const usePosition = (searchQuery: string, pageSize: number = 20) => {
+    return useInfiniteQuery({
+        queryKey: ['position', searchQuery],
+        queryFn: async ({ pageParam = 0 }) => {
+            await new Promise((resolve) => setTimeout(resolve, 300));
+            const filtered = searchQuery
+                ? POSITION_ITEMS.filter((el) =>
+                      el.label.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                      el.id.toLowerCase().includes(searchQuery.toLowerCase())
+                  )
+                : POSITION_ITEMS;
+
+            const start = pageParam * pageSize;
+            const end = start + pageSize;
+            const data = filtered.slice(start, end);
+
+            return {
+                data,
+                currentPage: pageParam,
+                nextPage: end < filtered.length ? pageParam + 1 : undefined,
+            };
+        },
+        initialPageParam: 0,
+        getNextPageParam: (lastPage) => lastPage.nextPage,
+    });
+};
+
+export const useText = (searchQuery: string, pageSize: number = 20) => {
+    return useInfiniteQuery({
+        queryKey: ['text', searchQuery],
+        queryFn: async ({ pageParam = 0 }) => {
+            await new Promise((resolve) => setTimeout(resolve, 300));
+            const filtered = searchQuery
+                ? TEXT_ITEMS.filter((el) =>
+                      el.label.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                      el.id.toLowerCase().includes(searchQuery.toLowerCase())
+                  )
+                : TEXT_ITEMS;
+
+            const start = pageParam * pageSize;
+            const end = start + pageSize;
+            const data = filtered.slice(start, end);
+
+            return {
+                data,
+                currentPage: pageParam,
+                nextPage: end < filtered.length ? pageParam + 1 : undefined,
+            };
+        },
+        initialPageParam: 0,
+        getNextPageParam: (lastPage) => lastPage.nextPage,
+    });
+};
+
 /* ─── Draggable sidebar card (uses @dnd-kit useDraggable) ─── */
 const DraggableCard = ({ elementId, icon: Icon, label, isDark }: {
     elementId: string;
@@ -485,6 +566,34 @@ const SaasVideoEditor = () => {
 
     const { data: templatesData, isLoading: isTemplatesLoading } = useTemplates(templateSearchQuery);
     const flatTemplates = templatesData?.pages.flatMap((page) => page.data) ?? [];
+
+    const defaultPageSize = 12;
+    const { 
+        data: mediaData, 
+        isLoading: isMediaLoading, 
+        fetchNextPage: fetchNextMediaPage, 
+        hasNextPage: hasNextMediaPage, 
+        isFetchingNextPage: isFetchingNextMediaPage 
+    } = useMedia(mediaSearchQuery, defaultPageSize);
+    const flatMedia = mediaData?.pages.flatMap((page) => page.data) ?? [];
+
+    const { 
+        data: positionData, 
+        isLoading: isPositionLoading, 
+        fetchNextPage: fetchNextPositionPage, 
+        hasNextPage: hasNextPositionPage, 
+        isFetchingNextPage: isFetchingNextPositionPage 
+    } = usePosition(positionSearchQuery, defaultPageSize);
+    const flatPosition = positionData?.pages.flatMap((page) => page.data) ?? [];
+
+    const { 
+        data: textData, 
+        isLoading: isTextLoading, 
+        fetchNextPage: fetchNextTextPage, 
+        hasNextPage: hasNextTextPage, 
+        isFetchingNextPage: isFetchingNextTextPage 
+    } = useText(textSearchQuery, defaultPageSize);
+    const flatText = textData?.pages.flatMap((page) => page.data) ?? [];
 
     const { data: animationsData, isLoading: isAnimationsLoading } = useAnimations(animationSearchQuery);
     const flatAnimations = animationsData?.pages.flatMap((page) => page.data) ?? [];
@@ -1007,17 +1116,19 @@ const SaasVideoEditor = () => {
                                             <UniversalPanel
                                                 title="Media"
                                                 onClose={() => { setActiveTab(null); }}
-                                                items={MEDIA_ITEMS}
+                                                items={flatMedia}
                                                 width={480}
                                                 height="100%"
                                                 itemHeight={140}
                                                 searchQuery={mediaSearchQuery}
                                                 onSearchChange={setMediaSearchQuery}
                                                 placeholder="Search media..."
-                                                isLoading={false}
-                                                isFetchingNextPage={false}
-                                                hasNextPage={false}
-                                                fetchNextPage={undefined}
+                                                isLoading={isMediaLoading}
+                                                isFetchingNextPage={isFetchingNextMediaPage}
+                                                hasNextPage={hasNextMediaPage}
+                                                fetchNextPage={fetchNextMediaPage}
+                                                pageSize={defaultPageSize}
+                                                firstPageParam={mediaData?.pageParams?.[0] as number ?? 0}
                                                 getItemId={(el) => el.id}
                                                 getItemLabel={(el) => el.label}
                                                 panelName="Media"
@@ -1037,17 +1148,19 @@ const SaasVideoEditor = () => {
                                             <UniversalPanel
                                                 title="Position"
                                                 onClose={() => { setActiveTab(null); }}
-                                                items={POSITION_ITEMS}
+                                                items={flatPosition}
                                                 width={480}
                                                 height="100%"
                                                 itemHeight={140}
                                                 searchQuery={positionSearchQuery}
                                                 onSearchChange={setPositionSearchQuery}
                                                 placeholder="Search positions..."
-                                                isLoading={false}
-                                                isFetchingNextPage={false}
-                                                hasNextPage={false}
-                                                fetchNextPage={undefined}
+                                                isLoading={isPositionLoading}
+                                                isFetchingNextPage={isFetchingNextPositionPage}
+                                                hasNextPage={hasNextPositionPage}
+                                                fetchNextPage={fetchNextPositionPage}
+                                                pageSize={defaultPageSize}
+                                                firstPageParam={positionData?.pageParams?.[0] as number ?? 0}
                                                 getItemId={(el) => el.id}
                                                 getItemLabel={(el) => el.label}
                                                 panelName="Position"
@@ -1067,17 +1180,19 @@ const SaasVideoEditor = () => {
                                             <UniversalPanel
                                                 title="Text"
                                                 onClose={() => { setActiveTab(null); }}
-                                                items={TEXT_ITEMS}
+                                                items={flatText}
                                                 width={480}
                                                 height="100%"
                                                 itemHeight={140}
                                                 searchQuery={textSearchQuery}
                                                 onSearchChange={setTextSearchQuery}
                                                 placeholder="Search text styles..."
-                                                isLoading={false}
-                                                isFetchingNextPage={false}
-                                                hasNextPage={false}
-                                                fetchNextPage={undefined}
+                                                isLoading={isTextLoading}
+                                                isFetchingNextPage={isFetchingNextTextPage}
+                                                hasNextPage={hasNextTextPage}
+                                                fetchNextPage={fetchNextTextPage}
+                                                pageSize={defaultPageSize}
+                                                firstPageParam={textData?.pageParams?.[0] as number ?? 0}
                                                 getItemId={(el) => el.id}
                                                 getItemLabel={(el) => el.label}
                                                 panelName="Text"
