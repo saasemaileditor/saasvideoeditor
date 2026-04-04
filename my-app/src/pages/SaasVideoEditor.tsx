@@ -213,13 +213,17 @@ export const useInfiniteElements = (searchQuery: string, pageSize: number = 20) 
 
             return {
                 data,
+                currentPage: pageParam,
                 nextPage: end < filteredElements.length ? pageParam + 1 : undefined,
+                prevPage: pageParam > 0 ? pageParam - 1 : undefined
             };
         },
         initialPageParam: 0,
         getNextPageParam: (lastPage) => lastPage.nextPage,
+        getPreviousPageParam: (firstPage) => firstPage.prevPage,
         staleTime: 5 * 60 * 1000,
         gcTime: 10 * 60 * 1000,
+        maxPages: 10,
         refetchOnWindowFocus: false,
     });
 };
@@ -422,7 +426,16 @@ const SaasVideoEditor = () => {
 
     // Infinite Query Hook for Elements
     const elementsPageSize = 12;
-    const { data: elementsData, fetchNextPage, hasNextPage, isFetchingNextPage, isLoading: isElementsLoading } = useInfiniteElements(searchQuery, elementsPageSize);
+    const { 
+        data: elementsData, 
+        fetchNextPage, 
+        hasNextPage, 
+        isFetchingNextPage, 
+        fetchPreviousPage, 
+        hasPreviousPage, 
+        isFetchingPreviousPage, 
+        isLoading: isElementsLoading 
+    } = useInfiniteElements(searchQuery, elementsPageSize);
     const flatElements = elementsData?.pages.flatMap((page) => page.data) ?? [];
 
     const { data: templatesData, isLoading: isTemplatesLoading } = useTemplates(templateSearchQuery);
@@ -879,6 +892,8 @@ const SaasVideoEditor = () => {
                                                 title="Elements"
                                                 onClose={() => { setActiveTab(null); }}
                                                 items={flatElements}
+                                                pageSize={elementsPageSize}
+                                                firstPageParam={elementsData?.pageParams?.[0] as number ?? 0}
                                                 width={480}
                                                 height="100%"
                                                 itemHeight={140}
@@ -889,6 +904,9 @@ const SaasVideoEditor = () => {
                                                 isFetchingNextPage={isFetchingNextPage}
                                                 hasNextPage={hasNextPage}
                                                 fetchNextPage={fetchNextPage}
+                                                isFetchingPreviousPage={isFetchingPreviousPage}
+                                                hasPreviousPage={hasPreviousPage}
+                                                fetchPreviousPage={fetchPreviousPage}
                                                 getItemId={(el) => el.id}
                                                 getItemLabel={(el) => el.label}
                                                 panelName="Elements"

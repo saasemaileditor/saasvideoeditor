@@ -48,6 +48,13 @@ export interface UniversalPanelProps<T> {
   isFetchingNextPage?: boolean;
   hasNextPage?: boolean;
   fetchNextPage?: () => void;
+  isFetchingPreviousPage?: boolean;
+  hasPreviousPage?: boolean;
+  fetchPreviousPage?: () => void;
+  
+  totalCount?: number;
+  pageSize?: number;
+  firstPageParam?: number;
 
   renderItem: (item: T, index: number) => React.ReactNode;
   getItemId: (item: T) => string;
@@ -78,6 +85,12 @@ export function UniversalPanel<T>({
   isFetchingNextPage = false,
   hasNextPage = false,
   fetchNextPage,
+  isFetchingPreviousPage = false,
+  hasPreviousPage = false,
+  fetchPreviousPage,
+  totalCount,
+  pageSize,
+  firstPageParam = 0,
   renderItem,
   getItemId,
   isDark = false,
@@ -218,10 +231,19 @@ export function UniversalPanel<T>({
             getItemId={getItemId}
             renderItem={renderItem}
             isFetchingNextPage={isFetchingNextPage}
+            isFetchingPreviousPage={isFetchingPreviousPage}
             disableAutoLoad={disableAutoLoad}
+            totalCount={totalCount}
+            pageSize={pageSize}
+            firstPageParam={firstPageParam}
             onScrollEnd={() => {
               if (hasNextPage && !isFetchingNextPage && fetchNextPage) {
                 fetchNextPage();
+              }
+            }}
+            onScrollStart={() => {
+              if (hasPreviousPage && !isFetchingPreviousPage && fetchPreviousPage) {
+                fetchPreviousPage();
               }
             }}
             onResetScroll={(fn) => { resetScrollRef.current = fn; }}

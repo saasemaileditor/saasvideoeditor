@@ -11,11 +11,17 @@ export interface VirtualizedGridProps<T> {
   itemWidth?: number | string;
   renderItem: (item: T, index: number) => React.ReactNode;
   getItemId: (item: T) => string;
-  // Phase 1: throttled infinite scroll
   onScrollEnd?: () => void;
+  onScrollStart?: () => void;
   isFetchingNextPage?: boolean;
+  isFetchingPreviousPage?: boolean;
   disableAutoLoad?: boolean;
-  // Phase 3: expose scroll-reset to parent
+  
+  // Page windowing props for sliding window data (maxPages)
+  totalCount?: number;
+  pageSize?: number;
+  firstPageParam?: number;
+  
   onResetScroll?: (resetFn: () => void) => void;
   renderSkeleton?: () => React.ReactNode;
 }
@@ -30,48 +36,45 @@ export function VirtualizedGrid<T>({
   renderItem,
   getItemId,
   onScrollEnd,
+  onScrollStart,
   isFetchingNextPage,
+  isFetchingPreviousPage,
   disableAutoLoad = false,
+  totalCount,
+  pageSize,
+  firstPageParam = 0,
   onResetScroll,
   renderSkeleton,
 }: VirtualizedGridProps<T>) {
   const parentRef = useRef<HTMLDivElement>(null);
 
-  // Phase 1: ref-based fetch guard — prevents re-firing while already fetching
   const isFetchingRef = useRef(false);
   const hasScrolledToBottomRef = useRef(false);
 
-  // Phase 3: expose resetScroll to parent via callback
   useEffect(() => {
     if (onResetScroll) {
       onResetScroll(() => {
         if (parentRef.current) {
           parentRef.current.scrollTop = 0;
         }
-        // also reset the throttle guard so the next page can load immediately
         isFetchingRef.current = false;
       });
     }
   }, [onResetScroll]);
 
-  // Artificially increase row count by 2 full rows (e.g. 6 skeletons) when loading more
-  const activeItemCount = isFetchingNextPage ? items.length + columnCount * 2 : items.length;
+  const activeItemCount = totalCount ?? (isFetchingNextPage ? items.length + columnCount * 2 : items.length);
   const rowCount = Math.ceil(activeItemCount / columnCount);
 
-  // Gap: 12px
   const gap = 12;
   const resolvedItemHeight = itemHeight ?? 140;
   const rowHeight = resolvedItemHeight + gap;
 
-  // Symmetric padding + reserve space for scrollbar so no horizontal overflow
-  const H_PADDING = 16; // 16px each side = 32px total
-  const SCROLLBAR_WIDTH = 14; // reserve for vertical scrollbar
+  const H_PADDING = 16;
+  const SCROLLBAR_WIDTH = 14;
   const totalGapWidth = (columnCount - 1) * gap;
-  const availableWidth = width - totalGapWidth - H_PADDING * 2 - SCROLLBAR_WIDTH;
+  const availableWidth = width - totalGapWidth - (H_PADDING * 2) - SCROLLBAR_WIDTH;
   const calculatedItemWidth = Math.max(40, Math.floor(availableWidth / columnCount));
-  // Only fall back to caller-supplied itemWidth if it is a number; ignore "100%" strings
-  const resolvedItemWidth =
-    typeof itemWidth === 'number' ? itemWidth : calculatedItemWidth;
+  const resolvedItemWidth = typeof itemWidth === 'number' ? itemWidth : calculatedItemWidth;
 
   const rowVirtualizer = useVirtualizer({
     count: rowCount,
@@ -80,25 +83,33 @@ export function VirtualizedGrid<T>({
     overscan: 10,
   });
 
-  // Phase 1: throttled scroll handler
   const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
-    if (!onScrollEnd || isFetchingRef.current || isFetchingNextPage) return;
-    if (disableAutoLoad && hasScrolledToBottomRef.current) return;
-
     const target = e.target as HTMLDivElement;
-    const isNearBottom = target.scrollHeight - target.scrollTop - target.clientHeight < 100;
+    
+    // Check bottom
+    if (onScrollEnd && !isFetchingRef.current && !isFetchingNextPage) {
+        const isNearBottom = target.scrollHeight - target.scrollTop - target.clientHeight < 100;
+        if (isNearBottom && (!disableAutoLoad || !hasScrolledToBottomRef.current)) {
+            hasScrolledToBottomRef.current = true;
+            isFetchingRef.current = true;
+            onScrollEnd();
+            setTimeout(() => { isFetchingRef.current = false; }, 200);
+            return;
+        }
+    }
 
-    if (isNearBottom) {
-      hasScrolledToBottomRef.current = true;
-      isFetchingRef.current = true;
-      onScrollEnd();
-      // reset guard after 200ms — lets normal scrolling continue without re-firing
-      setTimeout(() => {
-        isFetchingRef.current = false;
-      }, 200);
-    } else {
-      // Reset when user scrolls back up
-      hasScrolledToBottomRef.current = false;
+    // Check top
+    if (onScrollStart && !isFetchingRef.current && !isFetchingPreviousPage) {
+        const isNearTop = target.scrollTop < 100;
+        if (isNearTop && firstPageParam > 0) {
+            isFetchingRef.current = true;
+            onScrollStart();
+            setTimeout(() => { isFetchingRef.current = false; }, 200);
+        }
+    }
+
+    if (target.scrollTop > 100) {
+        hasScrolledToBottomRef.current = false;
     }
   };
 
@@ -118,8 +129,7 @@ export function VirtualizedGrid<T>({
       >
         {rowVirtualizer.getVirtualItems().map((virtualRow) => {
           const startIndex = virtualRow.index * columnCount;
-          const rowItems = Array.from({ length: columnCount }).map((_, i) => items[startIndex + i]);
-
+          
           return (
             <div
               key={virtualRow.index}
@@ -136,13 +146,18 @@ export function VirtualizedGrid<T>({
                 boxSizing: 'border-box',
               }}
             >
-              {rowItems.map((item, localIndex) => {
-                const index = startIndex + localIndex;
+              {Array.from({ length: columnCount }).map((_, localIndex) => {
+                const globalIndex = startIndex + localIndex;
+                const relativeIndex = totalCount ? globalIndex - (firstPageParam * (pageSize ?? 1)) : globalIndex;
+                const item = items[relativeIndex];
                 
-                if (!item && index >= items.length) {
+                if (!item) {
+                  const isPastEnd = totalCount ? globalIndex >= totalCount : globalIndex >= items.length;
+                  if (isPastEnd) return <div key={`empty-${globalIndex}`} style={{ width: resolvedItemWidth, height: resolvedItemHeight, flexShrink: 0 }} />;
+                  
                   return (
                     <div
-                      key={`skeleton-${index}`}
+                      key={`skeleton-${globalIndex}`}
                       style={{
                         width: typeof resolvedItemWidth === 'number' ? `${resolvedItemWidth}px` : resolvedItemWidth,
                         height: `${resolvedItemHeight}px`,
@@ -152,18 +167,6 @@ export function VirtualizedGrid<T>({
                       {renderSkeleton ? renderSkeleton() : <SkeletonCard />}
                     </div>
                   );
-                } else if (!item) {
-                   // Optional: empty spacing for the last row if not fetching more but grid isn't full
-                   return (
-                     <div
-                        key={`empty-${index}`}
-                        style={{
-                          width: typeof resolvedItemWidth === 'number' ? `${resolvedItemWidth}px` : resolvedItemWidth,
-                          height: `${resolvedItemHeight}px`,
-                          flexShrink: 0,
-                        }}
-                     />
-                   );
                 }
 
                 return (
@@ -175,7 +178,7 @@ export function VirtualizedGrid<T>({
                       flexShrink: 0,
                     }}
                   >
-                    {renderItem(item, index)}
+                    {renderItem(item, globalIndex)}
                   </div>
                 );
               })}
