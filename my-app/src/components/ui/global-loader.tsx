@@ -50,19 +50,13 @@ export function GlobalLoader({
                     strokeWidth="8"
                     className="text-gray-200 dark:text-gray-700 opacity-30"
                 />
-                {/* Primary gradient spinner segment */}
-                <defs>
-                    <linearGradient id={`loader-gradient-${size}`} x1="0%" y1="0%" x2="100%" y2="0%">
-                        <stop offset="0%" stopColor="#436DDD" />
-                        <stop offset="100%" stopColor="#7B4EE8" />
-                    </linearGradient>
-                </defs>
+                {/* App purple spinner segment - solid color, no gradient */}
                 <circle
                     cx="50"
                     cy="50"
                     r="42"
                     fill="none"
-                    stroke={`url(#loader-gradient-${size})`}
+                    stroke="#7c3aed"
                     strokeWidth="8"
                     strokeLinecap="round"
                     strokeDasharray="66 198"

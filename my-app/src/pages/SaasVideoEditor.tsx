@@ -19,7 +19,7 @@ import {
     Undo2, Redo2, Play, Pause, Download,
     Layers, Video, Sparkles, LayoutTemplate,
     X, Settings as SettingsIcon, Sun, Moon, Monitor, Plus, Type, Square,
-    Maximize2, Minimize2, LayoutGrid, Grid3X3, Rows2, ChevronDown, Move, Smartphone, Hash,
+    Move, Smartphone, Hash, ChevronDown,
     Box, PieChart, AppWindow, MousePointer2, Smile, Triangle
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
@@ -419,7 +419,6 @@ const SaasVideoEditor = () => {
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
     const [isPanelExpanded, setIsPanelExpanded] = useState(true);
     const [panelLayout, setPanelLayout] = useState<'list' | 'grid' | 'small-grid'>('list');
-    const [isLayoutDropdownOpen, setIsLayoutDropdownOpen] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
     const [templateSearchQuery, setTemplateSearchQuery] = useState('');
     const [animationSearchQuery, setAnimationSearchQuery] = useState('');
@@ -875,36 +874,20 @@ const SaasVideoEditor = () => {
                         >
                             {activeTab && (
                                 <>
-                                    <div className="flex items-center justify-between px-4 py-3 flex-shrink-0">
-                                        <span className={`font-bold text-[16px] ${isDark ? 'text-white' : 'text-gray-800'}`}>
-                                            {TABS.find(t => t.id === activeTab)?.label}
-                                        </span>
-                                        <div className="flex items-center gap-1">
-                                            {activeTab !== 'Position' && (
-                                                <button
-                                                    onClick={() => setIsPanelExpanded(e => !e)}
-                                                    className={`p-1.5 rounded-lg transition-colors cursor-pointer ${isDark ? 'text-gray-400 hover:text-white hover:bg-gray-800' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100'}`}
-                                                    title={isPanelExpanded ? 'Collapse panel' : 'Expand panel'}
-                                                >
-                                                    {isPanelExpanded ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
-                                                </button>
-                                            )}
-                                            <button
-                                                onClick={() => { setActiveTab(null); setIsPanelExpanded(false); }}
-                                                className={`p-1.5 rounded-lg transition-colors cursor-pointer ${isDark ? 'text-gray-400 hover:text-white hover:bg-gray-800' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100'}`}
-                                                title="Close panel"
-                                            >
-                                                <X size={20} />
-                                            </button>
-                                        </div>
-                                    </div>
-
                                     <div className="flex-1 min-h-0 flex flex-col">
                                         {activeTab === 'Elements' ? (
                                             <UniversalPanel
+                                                title="Elements"
+                                                onClose={() => { setActiveTab(null); setIsPanelExpanded(false); }}
+                                                isExpanded={isPanelExpanded}
+                                                onToggleExpand={() => setIsPanelExpanded(e => !e)}
+                                                canExpand={true}
                                                 items={flatElements}
                                                 columnCount={isPanelExpanded ? 3 : 2}
                                                 width={isPanelExpanded ? 480 : 280}
+                                                height="100%"
+                                                itemHeight={140}
+                                                itemWidth="100%"
                                                 searchQuery={searchQuery}
                                                 onSearchChange={setSearchQuery}
                                                 placeholder="Search elements..."
@@ -918,6 +901,11 @@ const SaasVideoEditor = () => {
                                                 panelName="Elements"
                                                 panelIcon={Layers}
                                                 isDark={isDark}
+                                                showCloseButton={true}
+                                                showExpandButton={true}
+                                                showLayoutDropdown={true}
+                                                layout={panelLayout}
+                                                onLayoutChange={setPanelLayout}
                                                 renderItem={(el) => (
                                                     <DraggableCard
                                                         elementId={el.id}
@@ -929,9 +917,17 @@ const SaasVideoEditor = () => {
                                             />
                                         ) : activeTab === 'Templates' ? (
                                             <UniversalPanel
+                                                title="Templates"
+                                                onClose={() => { setActiveTab(null); setIsPanelExpanded(false); }}
+                                                isExpanded={isPanelExpanded}
+                                                onToggleExpand={() => setIsPanelExpanded(e => !e)}
+                                                canExpand={true}
                                                 items={flatTemplates}
                                                 columnCount={isPanelExpanded ? 3 : 2}
                                                 width={isPanelExpanded ? 480 : 280}
+                                                height="100%"
+                                                itemHeight={140}
+                                                itemWidth="100%"
                                                 searchQuery={templateSearchQuery}
                                                 onSearchChange={setTemplateSearchQuery}
                                                 placeholder="Search templates..."
@@ -939,11 +935,17 @@ const SaasVideoEditor = () => {
                                                 isLoading={isTemplatesLoading}
                                                 isFetchingNextPage={false}
                                                 hasNextPage={false}
+                                                fetchNextPage={undefined}
                                                 getItemId={(el) => el.id}
                                                 getItemLabel={(el) => el.label}
                                                 panelName="Templates"
                                                 panelIcon={LayoutTemplate}
                                                 isDark={isDark}
+                                                showCloseButton={true}
+                                                showExpandButton={true}
+                                                showLayoutDropdown={true}
+                                                layout={panelLayout}
+                                                onLayoutChange={setPanelLayout}
                                                 renderItem={(el) => (
                                                     <DraggableCard
                                                         elementId={el.id}
@@ -1013,76 +1015,27 @@ const SaasVideoEditor = () => {
                                 } ${isDark ? 'bg-[#1e2235] border border-[#2a2d45]' : 'bg-white border border-gray-100'}`}
                             style={{ width: isRightPanelExpanded ? '480px' : '280px' }}
                         >
-                            <div className="flex items-center justify-between px-4 py-3 flex-shrink-0">
-                                <span className={`font-bold text-[16px] ${isDark ? 'text-white' : 'text-gray-800'}`}>
-                                    Animations
-                                </span>
-                                <div className="flex items-center gap-1">
-                                    <div className="relative z-50 mr-1">
-                                        <button
-                                            onClick={() => setIsLayoutDropdownOpen(!isLayoutDropdownOpen)}
-                                            className={`flex items-center gap-1.5 px-2 py-1.5 rounded-md border text-sm font-medium cursor-pointer transition-colors ${isDark ? 'border-[#2a2d45] bg-[#1e2235] text-gray-300 hover:bg-[#252840]' : 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50'
-                                                }`}
-                                        >
-                                            {panelLayout === 'list' ? <Rows2 size={16} /> : panelLayout === 'grid' ? <LayoutGrid size={16} /> : <Grid3X3 size={16} />}
-                                            <ChevronDown size={14} />
-                                        </button>
-
-                                        {isLayoutDropdownOpen && (
-                                            <>
-                                                <div className="fixed inset-0 z-[110]" onClick={() => setIsLayoutDropdownOpen(false)} />
-                                                <div className={`absolute top-full right-0 mt-1 p-1 w-32 rounded-lg shadow-xl border z-[120] flex flex-col ${isDark ? 'bg-[#1e2235] border-[#2a2d45]' : 'bg-white border-gray-100'
-                                                    }`}>
-                                                    {[
-                                                        { id: 'list', icon: Rows2, label: 'List' },
-                                                        { id: 'grid', icon: LayoutGrid, label: 'Grid' },
-                                                        { id: 'small-grid', icon: Grid3X3, label: 'Small Grid' }
-                                                    ].map(opt => (
-                                                        <button
-                                                            key={opt.id}
-                                                            onClick={() => { setPanelLayout(opt.id as any); setIsLayoutDropdownOpen(false); }}
-                                                            className={`flex items-center gap-2 px-2 py-1.5 rounded-md text-xs font-medium cursor-pointer transition-colors ${panelLayout === opt.id
-                                                                ? isDark ? 'bg-[#4c1d95] text-[#a78bfa]' : 'bg-[#ede9fe] text-[#7c3aed]'
-                                                                : isDark ? 'text-gray-300 hover:bg-[#252840]' : 'text-gray-600 hover:bg-gray-50'
-                                                                }`}
-                                                        >
-                                                            <opt.icon size={14} />
-                                                            {opt.label}
-                                                        </button>
-                                                    ))}
-                                                </div>
-                                            </>
-                                        )}
-                                    </div>
-                                    <button
-                                        onClick={() => setIsRightPanelExpanded(e => !e)}
-                                        className={`p-1.5 rounded-lg transition-colors cursor-pointer ${isDark ? 'text-gray-400 hover:text-white hover:bg-gray-800' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100'}`}
-                                        title={isRightPanelExpanded ? 'Collapse panel' : 'Expand panel'}
-                                    >
-                                        {isRightPanelExpanded ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
-                                    </button>
-                                    <button
-                                        onClick={() => setIsRightPanelAnimationOpen(false)}
-                                        className={`p-1.5 rounded-lg transition-colors cursor-pointer ${isDark ? 'text-gray-400 hover:text-white hover:bg-gray-800' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100'}`}
-                                        title="Close panel"
-                                    >
-                                        <X size={20} />
-                                    </button>
-                                </div>
-                            </div>
                             <div className="flex-1 min-h-0 flex flex-col">
-                                <p className={`text-[11px] px-4 pb-2 flex-shrink-0 ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
-                                    Hover or click to preview. Click to apply.
-                                </p>
                                 <UniversalPanel
+                                    title="Animations"
+                                    onClose={() => setIsRightPanelAnimationOpen(false)}
+                                    isExpanded={isRightPanelExpanded}
+                                    onToggleExpand={() => setIsRightPanelExpanded(e => !e)}
+                                    canExpand={true}
+                                    showLayoutDropdown={true}
+                                    layout={panelLayout}
+                                    onLayoutChange={setPanelLayout}
                                     items={flatAnimations}
                                     columnCount={panelLayout === 'list' ? 1 : panelLayout === 'grid' ? 2 : 3}
                                     width={isRightPanelExpanded ? 480 : 280}
+                                    height="100%"
                                     itemHeight={panelLayout === 'list' ? 60 : panelLayout === 'grid' ? 100 : 80}
                                     itemWidth="100%"
+                                    fetchNextPage={undefined}
                                     searchQuery={animationSearchQuery}
                                     onSearchChange={setAnimationSearchQuery}
                                     placeholder="Search animations..."
+                                    subtitle="Hover or click to preview. Click to apply."
                                     isLoading={isAnimationsLoading}
                                     isFetchingNextPage={false}
                                     hasNextPage={false}
@@ -1091,6 +1044,8 @@ const SaasVideoEditor = () => {
                                     panelName="Animations"
                                     panelIcon={Sparkles}
                                     isDark={isDark}
+                                    showCloseButton={true}
+                                    showExpandButton={true}
                                     renderItem={(preset) => (
                                         <AnimationCard
                                             preset={preset}
