@@ -1,6 +1,7 @@
 import { useVirtualizer } from '@tanstack/react-virtual';
 import React, { useRef, useEffect } from 'react';
 import { GlobalLoader } from './ui/global-loader';
+import { SkeletonCard } from './ui/SkeletonCard';
 
 export interface VirtualizedGridProps<T> {
   items: T[];
@@ -17,6 +18,7 @@ export interface VirtualizedGridProps<T> {
   disableAutoLoad?: boolean;
   // Phase 3: expose scroll-reset to parent
   onResetScroll?: (resetFn: () => void) => void;
+  renderSkeleton?: () => React.ReactNode;
 }
 
 export function VirtualizedGrid<T>({
@@ -32,6 +34,7 @@ export function VirtualizedGrid<T>({
   isFetchingNextPage,
   disableAutoLoad = false,
   onResetScroll,
+  renderSkeleton,
 }: VirtualizedGridProps<T>) {
   const parentRef = useRef<HTMLDivElement>(null);
 
@@ -52,7 +55,9 @@ export function VirtualizedGrid<T>({
     }
   }, [onResetScroll]);
 
-  const rowCount = Math.ceil(items.length / columnCount);
+  // Artificially increase row count by 2 full rows (e.g. 6 skeletons) when loading more
+  const activeItemCount = isFetchingNextPage ? items.length + columnCount * 2 : items.length;
+  const rowCount = Math.ceil(activeItemCount / columnCount);
 
   // Gap: 12px
   const gap = 12;
@@ -114,7 +119,7 @@ export function VirtualizedGrid<T>({
       >
         {rowVirtualizer.getVirtualItems().map((virtualRow) => {
           const startIndex = virtualRow.index * columnCount;
-          const rowItems = items.slice(startIndex, startIndex + columnCount);
+          const rowItems = Array.from({ length: columnCount }).map((_, i) => items[startIndex + i]);
 
           return (
             <div
@@ -134,6 +139,34 @@ export function VirtualizedGrid<T>({
             >
               {rowItems.map((item, localIndex) => {
                 const index = startIndex + localIndex;
+                
+                if (!item && index >= items.length) {
+                  return (
+                    <div
+                      key={`skeleton-${index}`}
+                      style={{
+                        width: typeof resolvedItemWidth === 'number' ? `${resolvedItemWidth}px` : resolvedItemWidth,
+                        height: `${resolvedItemHeight}px`,
+                        flexShrink: 0,
+                      }}
+                    >
+                      {renderSkeleton ? renderSkeleton() : <SkeletonCard />}
+                    </div>
+                  );
+                } else if (!item) {
+                   // Optional: empty spacing for the last row if not fetching more but grid isn't full
+                   return (
+                     <div
+                        key={`empty-${index}`}
+                        style={{
+                          width: typeof resolvedItemWidth === 'number' ? `${resolvedItemWidth}px` : resolvedItemWidth,
+                          height: `${resolvedItemHeight}px`,
+                          flexShrink: 0,
+                        }}
+                     />
+                   );
+                }
+
                 return (
                   <div
                     key={getItemId(item)}
@@ -151,14 +184,6 @@ export function VirtualizedGrid<T>({
           );
         })}
       </div>
-
-      {/* Bottom infinite-scroll loader */}
-      {isFetchingNextPage && (
-        <div className="py-4 text-center text-sm font-medium text-gray-400 flex items-center justify-center gap-2">
-          <GlobalLoader size={16} fullScreen={false} />
-          Loading more...
-        </div>
-      )}
     </div>
   );
 }

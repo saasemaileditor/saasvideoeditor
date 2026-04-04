@@ -53,7 +53,6 @@ export interface UniversalPanelProps<T> {
   renderItem: (item: T, index: number) => React.ReactNode;
   getItemId: (item: T) => string;
 
-  subtitle?: string;
   isDark?: boolean;
 
   // Header controls
@@ -87,7 +86,6 @@ export function UniversalPanel<T>({
   fetchNextPage,
   renderItem,
   getItemId,
-  subtitle,
   isDark = false,
   title,
   onClose,
@@ -219,18 +217,12 @@ export function UniversalPanel<T>({
           />
         </div>
 
-        {/* Result count — only after query settles */}
-        {!isSearching && hasQuery && !isEmpty && (
-          <p className={`text-[11px] mt-1 px-1 ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
-            {filteredItems.length} result{filteredItems.length === 1 ? '' : 's'}
-          </p>
-        )}
       </div>
 
       {/* ── Subtitle (hidden when searching) ───────────────────────────────── */}
-      {subtitle && !hasQuery && (
+      {!hasQuery && (
         <span className={`text-sm font-semibold px-4 pb-2 flex-shrink-0 ${isDark ? 'text-white' : 'text-gray-800'}`}>
-          {subtitle}
+          Browse categories
         </span>
       )}
 

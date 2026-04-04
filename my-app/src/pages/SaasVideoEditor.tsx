@@ -218,6 +218,9 @@ export const useInfiniteElements = (searchQuery: string, pageSize: number = 20) 
         },
         initialPageParam: 0,
         getNextPageParam: (lastPage) => lastPage.nextPage,
+        staleTime: 5 * 60 * 1000,
+        gcTime: 10 * 60 * 1000,
+        refetchOnWindowFocus: false,
     });
 };
 
@@ -869,7 +872,7 @@ const SaasVideoEditor = () => {
                         <div
                             className={`absolute top-0 left-[62px] bottom-0 rounded-xl overflow-hidden z-40 flex flex-col transition-all duration-300 ease-in-out ${activeTab ? 'translate-x-0 shadow-xl opacity-100' : '-translate-x-12 opacity-0 pointer-events-none'
                                 } ${isDark ? 'bg-[#1e2235] border border-[#2a2d45]' : 'bg-white border border-gray-100'}`}
-                            style={{ width: '320px' }}
+                            style={{ width: '480px' }}
                         >
                             {activeTab && (
                                 <>
@@ -880,13 +883,12 @@ const SaasVideoEditor = () => {
                                                 onClose={() => { setActiveTab(null); }}
                                                 items={flatElements}
                                                 columnCount={panelLayout === 'grid' ? 2 : 3}
-                                                width={320}
+                                                width={480}
                                                 height="100%"
                                                 itemHeight={140}
                                                 searchQuery={searchQuery}
                                                 onSearchChange={setSearchQuery}
                                                 placeholder="Search elements..."
-                                                subtitle="Browse categories"
                                                 isLoading={isElementsLoading}
                                                 isFetchingNextPage={isFetchingNextPage}
                                                 hasNextPage={hasNextPage}
@@ -915,13 +917,12 @@ const SaasVideoEditor = () => {
                                                 onClose={() => { setActiveTab(null); }}
                                                 items={flatTemplates}
                                                 columnCount={panelLayout === 'grid' ? 2 : 3}
-                                                width={320}
+                                                width={480}
                                                 height="100%"
                                                 itemHeight={140}
                                                 searchQuery={templateSearchQuery}
                                                 onSearchChange={setTemplateSearchQuery}
                                                 placeholder="Search templates..."
-                                                subtitle="Browse templates"
                                                 isLoading={isTemplatesLoading}
                                                 isFetchingNextPage={false}
                                                 hasNextPage={false}
@@ -1002,7 +1003,7 @@ const SaasVideoEditor = () => {
                         <div
                             className={`absolute top-0 right-[290px] bottom-0 rounded-xl overflow-hidden z-40 flex flex-col transition-all duration-300 ease-in-out ${isRightPanelAnimationOpen ? '-translate-x-0 shadow-xl opacity-100' : 'translate-x-12 opacity-0 pointer-events-none'
                                 } ${isDark ? 'bg-[#1e2235] border border-[#2a2d45]' : 'bg-white border border-gray-100'}`}
-                            style={{ width: '320px' }}
+                            style={{ width: '480px' }}
                         >
                             <div className="flex-1 min-h-0 flex flex-col">
                                 <UniversalPanel
@@ -1013,14 +1014,13 @@ const SaasVideoEditor = () => {
                                     onLayoutChange={setPanelLayout}
                                     items={flatAnimations}
                                     columnCount={panelLayout === 'grid' ? 2 : 3}
-                                    width={320}
+                                    width={480}
                                     height="100%"
                                     itemHeight={140}
                                     fetchNextPage={undefined}
                                     searchQuery={animationSearchQuery}
                                     onSearchChange={setAnimationSearchQuery}
                                     placeholder="Search animations..."
-                                    subtitle="Hover or click to preview. Click to apply."
                                     isLoading={isAnimationsLoading}
                                     isFetchingNextPage={false}
                                     hasNextPage={false}
