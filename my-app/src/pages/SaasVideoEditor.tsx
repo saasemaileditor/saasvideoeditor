@@ -308,11 +308,8 @@ const DraggableCard = ({ elementId, icon: Icon, label, isDark }: {
             className={`relative w-full h-full max-h-[140px] hover:cursor-grab group touch-none ${isDragging ? 'opacity-40' : ''
                 }`}
         >
-            {/* The Back Card */}
-            <div className={`absolute inset-0 rounded-xl transition-transform duration-300 transform translate-x-1.5 translate-y-1.5 rotate-3 group-hover:translate-x-2.5 group-hover:translate-y-2.5 group-hover:rotate-6 ${isDark ? 'bg-[#2a2d45] border border-[#1e2235]' : 'bg-[#f0f0f5] border border-gray-200'}`} />
-
             {/* The Front Card */}
-            <div className={`relative w-full h-full flex flex-col items-center justify-center gap-2.5 border rounded-xl z-10 transition-all duration-300 transform group-hover:-translate-y-1 group-hover:-translate-x-1 ${isDark
+            <div className={`relative w-full h-full flex flex-col items-center justify-center gap-2.5 border rounded-xl z-10 transition-all duration-300 ${isDark
                 ? 'bg-[#161625] border-[#2a2d45] group-hover:border-[#7c3aed] group-hover:bg-[#2d1f5e]'
                 : 'bg-white border-gray-200 shadow-sm group-hover:border-[#7c3aed] group-hover:bg-[#ede9fe] group-hover:shadow-md'
                 }`}>
@@ -424,7 +421,7 @@ const SaasVideoEditor = () => {
     const [selectedAnimationId, setSelectedAnimationId] = useState<string | null>(null);
 
     // Infinite Query Hook for Elements
-    const elementsPageSize = 99;
+    const elementsPageSize = 12;
     const { data: elementsData, fetchNextPage, hasNextPage, isFetchingNextPage, isLoading: isElementsLoading } = useInfiniteElements(searchQuery, elementsPageSize);
     const flatElements = elementsData?.pages.flatMap((page) => page.data) ?? [];
 
