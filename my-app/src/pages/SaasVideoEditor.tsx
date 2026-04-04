@@ -20,11 +20,7 @@ import {
     Layers, Video, Sparkles, LayoutTemplate,
     X, Settings as SettingsIcon, Sun, Moon, Monitor, Plus, Type, Square,
     Move, Smartphone, Hash, ChevronDown,
-    Box, PieChart, AppWindow, MousePointer2, Smile, Triangle,
-    Music, Image, Film, Upload, Camera, Zap,
-    ArrowUpLeft, ArrowUp, ArrowUpRight, ArrowLeft, Circle, ArrowRight,
-    ArrowDownLeft, ArrowDown, ArrowDownRight,
-    AlignLeft, Subtitles, Quote, Code, List, Link
+    Box, PieChart, AppWindow, MousePointer2, Smile, Triangle
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
@@ -243,44 +239,6 @@ const TEMPLATES: { id: string; icon: LucideIcon; label: string }[] = [
     { id: 'template-abstract', icon: Triangle, label: 'Abstract' },
 ];
 
-const MEDIA_ITEMS = [
-    { id: 'media-video', icon: Video, label: 'Video' },
-    { id: 'media-audio', icon: Music, label: 'Audio' },
-    { id: 'media-image', icon: Image, label: 'Image' },
-    { id: 'media-gif', icon: Film, label: 'GIF' },
-    { id: 'media-shape', icon: Square, label: 'Shape' },
-    { id: 'media-icon', icon: Smile, label: 'Icon' },
-    { id: 'media-upload', icon: Upload, label: 'Upload' },
-    { id: 'media-stock', icon: Camera, label: 'Stock Photo' },
-    { id: 'media-background', icon: Monitor, label: 'Background' },
-    { id: 'media-overlay', icon: Layers, label: 'Overlay' },
-    { id: 'media-transition', icon: Sparkles, label: 'Transition' },
-    { id: 'media-effect', icon: Zap, label: 'Effect' },
-];
-
-const POSITION_ITEMS = [
-    { id: 'pos-top-left', icon: ArrowUpLeft, label: 'Top Left' },
-    { id: 'pos-top-center', icon: ArrowUp, label: 'Top Center' },
-    { id: 'pos-top-right', icon: ArrowUpRight, label: 'Top Right' },
-    { id: 'pos-center-left', icon: ArrowLeft, label: 'Center Left' },
-    { id: 'pos-center', icon: Circle, label: 'Center' },
-    { id: 'pos-center-right', icon: ArrowRight, label: 'Center Right' },
-    { id: 'pos-bottom-left', icon: ArrowDownLeft, label: 'Bottom Left' },
-    { id: 'pos-bottom-center', icon: ArrowDown, label: 'Bottom Center' },
-    { id: 'pos-bottom-right', icon: ArrowDownRight, label: 'Bottom Right' },
-];
-
-const TEXT_ITEMS = [
-    { id: 'text-h1', icon: Type, label: 'Heading 1' },
-    { id: 'text-h2', icon: Type, label: 'Heading 2' },
-    { id: 'text-body', icon: AlignLeft, label: 'Body Text' },
-    { id: 'text-caption', icon: Subtitles, label: 'Caption' },
-    { id: 'text-quote', icon: Quote, label: 'Quote' },
-    { id: 'text-code', icon: Code, label: 'Code Block' },
-    { id: 'text-list', icon: List, label: 'List Item' },
-    { id: 'text-link', icon: Link, label: 'Link' },
-];
-
 export const useTemplates = (searchQuery: string) => {
     return useInfiniteQuery({
         queryKey: ['templates', searchQuery],
@@ -331,87 +289,6 @@ export const useAnimations = (searchQuery: string) => {
         },
         initialPageParam: 0,
         getNextPageParam: () => undefined,
-    });
-};
-
-export const useMedia = (searchQuery: string, pageSize: number = 20) => {
-    return useInfiniteQuery({
-        queryKey: ['media', searchQuery],
-        queryFn: async ({ pageParam = 0 }) => {
-            await new Promise((resolve) => setTimeout(resolve, 300));
-            const filtered = searchQuery
-                ? MEDIA_ITEMS.filter((el) =>
-                      el.label.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                      el.id.toLowerCase().includes(searchQuery.toLowerCase())
-                  )
-                : MEDIA_ITEMS;
-
-            const start = pageParam * pageSize;
-            const end = start + pageSize;
-            const data = filtered.slice(start, end);
-
-            return {
-                data,
-                currentPage: pageParam,
-                nextPage: end < filtered.length ? pageParam + 1 : undefined,
-            };
-        },
-        initialPageParam: 0,
-        getNextPageParam: (lastPage) => lastPage.nextPage,
-    });
-};
-
-export const usePosition = (searchQuery: string, pageSize: number = 20) => {
-    return useInfiniteQuery({
-        queryKey: ['position', searchQuery],
-        queryFn: async ({ pageParam = 0 }) => {
-            await new Promise((resolve) => setTimeout(resolve, 300));
-            const filtered = searchQuery
-                ? POSITION_ITEMS.filter((el) =>
-                      el.label.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                      el.id.toLowerCase().includes(searchQuery.toLowerCase())
-                  )
-                : POSITION_ITEMS;
-
-            const start = pageParam * pageSize;
-            const end = start + pageSize;
-            const data = filtered.slice(start, end);
-
-            return {
-                data,
-                currentPage: pageParam,
-                nextPage: end < filtered.length ? pageParam + 1 : undefined,
-            };
-        },
-        initialPageParam: 0,
-        getNextPageParam: (lastPage) => lastPage.nextPage,
-    });
-};
-
-export const useText = (searchQuery: string, pageSize: number = 20) => {
-    return useInfiniteQuery({
-        queryKey: ['text', searchQuery],
-        queryFn: async ({ pageParam = 0 }) => {
-            await new Promise((resolve) => setTimeout(resolve, 300));
-            const filtered = searchQuery
-                ? TEXT_ITEMS.filter((el) =>
-                      el.label.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                      el.id.toLowerCase().includes(searchQuery.toLowerCase())
-                  )
-                : TEXT_ITEMS;
-
-            const start = pageParam * pageSize;
-            const end = start + pageSize;
-            const data = filtered.slice(start, end);
-
-            return {
-                data,
-                currentPage: pageParam,
-                nextPage: end < filtered.length ? pageParam + 1 : undefined,
-            };
-        },
-        initialPageParam: 0,
-        getNextPageParam: (lastPage) => lastPage.nextPage,
     });
 };
 
@@ -544,9 +421,6 @@ const SaasVideoEditor = () => {
 
     const [searchQuery, setSearchQuery] = useState('');
     const [templateSearchQuery, setTemplateSearchQuery] = useState('');
-    const [mediaSearchQuery, setMediaSearchQuery] = useState('');
-    const [positionSearchQuery, setPositionSearchQuery] = useState('');
-    const [textSearchQuery, setTextSearchQuery] = useState('');
     const [animationSearchQuery, setAnimationSearchQuery] = useState('');
     const [selectedAnimationId, setSelectedAnimationId] = useState<string | null>(null);
 
@@ -566,34 +440,6 @@ const SaasVideoEditor = () => {
 
     const { data: templatesData, isLoading: isTemplatesLoading } = useTemplates(templateSearchQuery);
     const flatTemplates = templatesData?.pages.flatMap((page) => page.data) ?? [];
-
-    const defaultPageSize = 12;
-    const { 
-        data: mediaData, 
-        isLoading: isMediaLoading, 
-        fetchNextPage: fetchNextMediaPage, 
-        hasNextPage: hasNextMediaPage, 
-        isFetchingNextPage: isFetchingNextMediaPage 
-    } = useMedia(mediaSearchQuery, defaultPageSize);
-    const flatMedia = mediaData?.pages.flatMap((page) => page.data) ?? [];
-
-    const { 
-        data: positionData, 
-        isLoading: isPositionLoading, 
-        fetchNextPage: fetchNextPositionPage, 
-        hasNextPage: hasNextPositionPage, 
-        isFetchingNextPage: isFetchingNextPositionPage 
-    } = usePosition(positionSearchQuery, defaultPageSize);
-    const flatPosition = positionData?.pages.flatMap((page) => page.data) ?? [];
-
-    const { 
-        data: textData, 
-        isLoading: isTextLoading, 
-        fetchNextPage: fetchNextTextPage, 
-        hasNextPage: hasNextTextPage, 
-        isFetchingNextPage: isFetchingNextTextPage 
-    } = useText(textSearchQuery, defaultPageSize);
-    const flatText = textData?.pages.flatMap((page) => page.data) ?? [];
 
     const { data: animationsData, isLoading: isAnimationsLoading } = useAnimations(animationSearchQuery);
     const flatAnimations = animationsData?.pages.flatMap((page) => page.data) ?? [];
@@ -639,12 +485,6 @@ const SaasVideoEditor = () => {
     // Derived dnd-kit state (replaces isDragOver / isDraggingElement)
     const isDraggingElement = activeDragItem !== null;
 
-    // Settings States
-    const [theme, setTheme] = useState<'light' | 'dark' | 'system'>('light');
-    const [defaultPanelExpanded, setDefaultPanelExpanded] = useState(true);
-    const [toolbarShouldCenter, setToolbarShouldCenter] = useState(false);
-    const [isRightPanelAnimationOpen, setIsRightPanelAnimationOpen] = useState(false);
-
     // Keyboard shortcuts (undo, redo, delete, escape)
     useEffect(() => {
         // Helper to check if the user is actively typing in a text field
@@ -658,6 +498,7 @@ const SaasVideoEditor = () => {
             if (isTyping(e)) {
                 if (e.key === 'Escape') {
                     (e.target as HTMLElement).blur();
+                    setSelectedId(null);
                 }
                 return;
             }
@@ -682,22 +523,21 @@ const SaasVideoEditor = () => {
                 window.dispatchEvent(new CustomEvent('history-updated'));
             }
 
-            // Escape: close panels or unselect
+            // Escape: unselect
             if (e.key === 'Escape') {
-                if (activeTab) {
-                    setActiveTab(null);
-                } else if (isRightPanelAnimationOpen) {
-                    setIsRightPanelAnimationOpen(false);
-                } else {
-                    setSelectedId(null);
-                }
+                setSelectedId(null);
             }
         };
 
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [selectedId, setSelectedId, removeElement, activeTab, setActiveTab, isRightPanelAnimationOpen, setIsRightPanelAnimationOpen]);
+    }, [selectedId, setSelectedId, removeElement]);
 
+    // Settings States
+    const [theme, setTheme] = useState<'light' | 'dark' | 'system'>('light');
+    const [defaultPanelExpanded, setDefaultPanelExpanded] = useState(true);
+    const [toolbarShouldCenter, setToolbarShouldCenter] = useState(false);
+    const [isRightPanelAnimationOpen, setIsRightPanelAnimationOpen] = useState(false);
 
     useEffect(() => {
         const checkIfExpanded = () => {
@@ -1112,102 +952,6 @@ const SaasVideoEditor = () => {
                                                     />
                                                 )}
                                             />
-                                        ) : activeTab === 'Media' ? (
-                                            <UniversalPanel
-                                                title="Media"
-                                                onClose={() => { setActiveTab(null); }}
-                                                items={flatMedia}
-                                                width={480}
-                                                height="100%"
-                                                itemHeight={140}
-                                                searchQuery={mediaSearchQuery}
-                                                onSearchChange={setMediaSearchQuery}
-                                                placeholder="Search media..."
-                                                isLoading={isMediaLoading}
-                                                isFetchingNextPage={isFetchingNextMediaPage}
-                                                hasNextPage={hasNextMediaPage}
-                                                fetchNextPage={fetchNextMediaPage}
-                                                pageSize={defaultPageSize}
-                                                firstPageParam={mediaData?.pageParams?.[0] as number ?? 0}
-                                                getItemId={(el) => el.id}
-                                                getItemLabel={(el) => el.label}
-                                                panelName="Media"
-                                                panelIcon={Video}
-                                                isDark={isDark}
-                                                showCloseButton={true}
-                                                renderItem={(el) => (
-                                                    <DraggableCard
-                                                        elementId={el.id}
-                                                        icon={el.icon}
-                                                        label={el.label}
-                                                        isDark={isDark}
-                                                    />
-                                                )}
-                                            />
-                                        ) : activeTab === 'Position' ? (
-                                            <UniversalPanel
-                                                title="Position"
-                                                onClose={() => { setActiveTab(null); }}
-                                                items={flatPosition}
-                                                width={480}
-                                                height="100%"
-                                                itemHeight={140}
-                                                searchQuery={positionSearchQuery}
-                                                onSearchChange={setPositionSearchQuery}
-                                                placeholder="Search positions..."
-                                                isLoading={isPositionLoading}
-                                                isFetchingNextPage={isFetchingNextPositionPage}
-                                                hasNextPage={hasNextPositionPage}
-                                                fetchNextPage={fetchNextPositionPage}
-                                                pageSize={defaultPageSize}
-                                                firstPageParam={positionData?.pageParams?.[0] as number ?? 0}
-                                                getItemId={(el) => el.id}
-                                                getItemLabel={(el) => el.label}
-                                                panelName="Position"
-                                                panelIcon={Move}
-                                                isDark={isDark}
-                                                showCloseButton={true}
-                                                renderItem={(el) => (
-                                                    <DraggableCard
-                                                        elementId={el.id}
-                                                        icon={el.icon}
-                                                        label={el.label}
-                                                        isDark={isDark}
-                                                    />
-                                                )}
-                                            />
-                                        ) : activeTab === 'Text' ? (
-                                            <UniversalPanel
-                                                title="Text"
-                                                onClose={() => { setActiveTab(null); }}
-                                                items={flatText}
-                                                width={480}
-                                                height="100%"
-                                                itemHeight={140}
-                                                searchQuery={textSearchQuery}
-                                                onSearchChange={setTextSearchQuery}
-                                                placeholder="Search text styles..."
-                                                isLoading={isTextLoading}
-                                                isFetchingNextPage={isFetchingNextTextPage}
-                                                hasNextPage={hasNextTextPage}
-                                                fetchNextPage={fetchNextTextPage}
-                                                pageSize={defaultPageSize}
-                                                firstPageParam={textData?.pageParams?.[0] as number ?? 0}
-                                                getItemId={(el) => el.id}
-                                                getItemLabel={(el) => el.label}
-                                                panelName="Text"
-                                                panelIcon={Type}
-                                                isDark={isDark}
-                                                showCloseButton={true}
-                                                renderItem={(el) => (
-                                                    <DraggableCard
-                                                        elementId={el.id}
-                                                        icon={el.icon}
-                                                        label={el.label}
-                                                        isDark={isDark}
-                                                    />
-                                                )}
-                                            />
                                         ) : (
                                             <div className={`text-sm font-medium px-4 pt-4 ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
                                                 {activeTab} content here
@@ -1469,24 +1213,6 @@ const SaasVideoEditor = () => {
                         (t) => `sidebar-${t.id}` === activeDragItem
                     );
                     if (templateEntry) return <DragOverlayCard icon={templateEntry.icon} label={templateEntry.label} />;
-
-                    // Check MEDIA_ITEMS
-                    const mediaEntry = MEDIA_ITEMS.find(
-                        (m) => `sidebar-${m.id}` === activeDragItem
-                    );
-                    if (mediaEntry) return <DragOverlayCard icon={mediaEntry.icon} label={mediaEntry.label} />;
-
-                    // Check POSITION_ITEMS
-                    const positionEntry = POSITION_ITEMS.find(
-                        (p) => `sidebar-${p.id}` === activeDragItem
-                    );
-                    if (positionEntry) return <DragOverlayCard icon={positionEntry.icon} label={positionEntry.label} />;
-
-                    // Check TEXT_ITEMS
-                    const textEntry = TEXT_ITEMS.find(
-                        (t) => `sidebar-${t.id}` === activeDragItem
-                    );
-                    if (textEntry) return <DragOverlayCard icon={textEntry.icon} label={textEntry.label} />;
                     
                     return null;
                 })()}
