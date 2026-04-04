@@ -886,7 +886,7 @@ const SaasVideoEditor = () => {
                                                 columnCount={panelLayout === 'list' ? 1 : panelLayout === 'grid' ? 2 : 3}
                                                 width={isPanelExpanded ? 480 : 280}
                                                 height="100%"
-                                                itemHeight={panelLayout === 'list' ? 72 : 140}
+                                                itemHeight={140}
                                                 searchQuery={searchQuery}
                                                 onSearchChange={setSearchQuery}
                                                 placeholder="Search elements..."
@@ -925,7 +925,7 @@ const SaasVideoEditor = () => {
                                                 columnCount={panelLayout === 'list' ? 1 : panelLayout === 'grid' ? 2 : 3}
                                                 width={isPanelExpanded ? 480 : 280}
                                                 height="100%"
-                                                itemHeight={panelLayout === 'list' ? 72 : 140}
+                                                itemHeight={140}
                                                 searchQuery={templateSearchQuery}
                                                 onSearchChange={setTemplateSearchQuery}
                                                 placeholder="Search templates..."
