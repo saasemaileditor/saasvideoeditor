@@ -101,6 +101,15 @@ export function UniversalPanel<T>({
 }: UniversalPanelProps<T>) {
   // ── Scroll reset ───────────────────────────────────────────────────────────
   const resetScrollRef = useRef<(() => void) | undefined>(undefined);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  // ── Auto-focus on mount ───────────────────────────────────────────────────
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      inputRef.current?.focus();
+    }, 50);
+    return () => clearTimeout(timer);
+  }, []);
 
   // ── Debounced search ───────────────────────────────────────────────────────
   const [debouncedQuery, setDebouncedQuery] = useState(searchQuery);
@@ -108,6 +117,13 @@ export function UniversalPanel<T>({
 
 
   useEffect(() => {
+    // If query is empty, update immediately to avoid flash
+    if (!searchQuery.trim()) {
+      setDebouncedQuery('');
+      setIsSearching(false);
+      return;
+    }
+
     if (searchQuery !== debouncedQuery) setIsSearching(true);
     const timer = setTimeout(() => {
       setDebouncedQuery(searchQuery);
@@ -179,6 +195,7 @@ export function UniversalPanel<T>({
           )}
 
           <input
+            ref={inputRef}
             type="text"
             placeholder={placeholder}
             value={searchQuery}
