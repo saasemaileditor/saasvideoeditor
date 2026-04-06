@@ -7,7 +7,7 @@ import { rawReturn } from 'mutative';
 
 export type CanvasElement = {
     id: string;
-    type: 'text' | 'device' | 'card' | '3d' | 'chart' | 'counter' | 'button' | 'icon' | 'shape';
+    type: 'text' | 'device' | 'card' | '3d' | 'chart' | 'counter' | 'button' | 'icon' | 'shape' | 'list' | 'searchBar' | 'notification';
     position: [number, number, number];
     rotation: [number, number, number];
     scale: [number, number, number];
@@ -18,6 +18,7 @@ export type CanvasElement = {
      * Omit for text elements; the bounding box falls back to [3, 0.4].
      */
     boundingSize?: [number, number];
+    props?: Record<string, any>; // Store element-specific properties
 };
 
 // ─── UI State Store (Non-Undoable) ──────────────────────────────────────────

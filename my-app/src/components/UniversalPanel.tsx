@@ -62,7 +62,7 @@ export interface UniversalPanelProps<T> {
   isDark?: boolean;
 
   // Header controls
-  title?: string;
+  title?: React.ReactNode;
   onClose?: () => void;
   showCloseButton?: boolean;
   

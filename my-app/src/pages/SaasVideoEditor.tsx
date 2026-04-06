@@ -1,9 +1,11 @@
-import { useState, useEffect, useRef, useCallback, memo } from 'react';
+import { useState, useEffect, useRef, useCallback, memo, Suspense } from 'react';
 import { useInfiniteQuery } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'motion/react';
 import { CanvaBoundingBox } from '../components/CanvaBoundingBox';
 import { UniversalPanel } from '../components/UniversalPanel';
 import { useEditorStore, useUIStore, getHistoryControls } from '../store/useEditorStore';
+import { PANEL_ELEMENTS, getElementComponent, ELEMENT_CATEGORIES } from '../components/elements';
+import type { PanelElementDef } from '../components/elements';
 
 import {
     DndContext,
@@ -17,8 +19,8 @@ import {
     Undo2, Redo2, Play, Pause, Download,
     Layers, Video, Sparkles, LayoutTemplate,
     X, Settings as SettingsIcon, Sun, Moon, Monitor, Plus, Type, Square,
-    Move, Smartphone, Hash, ChevronDown,
-    Box, PieChart, AppWindow, MousePointer2, Smile, Triangle
+    Move, Smartphone, ChevronDown, ArrowLeft,
+    Box, PieChart, AppWindow, Smile, Triangle
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
@@ -183,27 +185,28 @@ const AnimationCard = ({ preset, isDark, isSelected, onSelect }: {
     );
 };
 
-// Generate 10k test items as mock DB
-const MOCK_ELEMENTS = Array.from({ length: 10000 }, (_, i) => ({
-    id: `element-${i}`,
-    icon: [Type, Smartphone, Hash, Box, PieChart, AppWindow, MousePointer2, Smile, Triangle][i % 9],
-    label: `Item ${i}`,
-}));
+// Build the flat elements list for the panel from the registry
+const UI_ELEMENTS: PanelElementDef[] = PANEL_ELEMENTS;
 
-export const useInfiniteElements = (searchQuery: string, pageSize: number = 20) => {
+export const useInfiniteElements = (searchQuery: string, pageSize: number = 20, selectedCategory: string | null = null) => {
     return useInfiniteQuery({
-        queryKey: ['elements', searchQuery],
+        queryKey: ['elements', searchQuery, selectedCategory],
         queryFn: async ({ pageParam = 0 }) => {
             // Mock network delay
             await new Promise((resolve) => setTimeout(resolve, 300));
 
+            let filteredElements = UI_ELEMENTS;
+            if (selectedCategory) {
+               filteredElements = filteredElements.filter(el => el.category === selectedCategory);
+            }
+
             // Server-side filtering mock
-            const filteredElements = searchQuery
-                ? MOCK_ELEMENTS.filter((el) =>
+            filteredElements = searchQuery
+                ? filteredElements.filter((el) =>
                       el.label.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                      el.id.toLowerCase().includes(searchQuery.toLowerCase())
+                      el.category.toLowerCase().includes(searchQuery.toLowerCase())
                   )
-                : MOCK_ELEMENTS;
+                : filteredElements;
 
             const start = pageParam * pageSize;
             const end = start + pageSize;
@@ -288,6 +291,38 @@ export const useAnimations = (searchQuery: string) => {
         initialPageParam: 0,
         getNextPageParam: () => undefined,
     });
+};
+
+/* ─── Draggable element sidebar card ─── */
+const DraggableElementCard = ({ element, isDark }: { element: PanelElementDef, isDark: boolean }) => {
+    const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
+        id: `sidebar-${element.type}`,
+        data: { type: element.type, label: element.label, boundingSize: element.boundingSize },
+    });
+
+    return (
+        <div
+            ref={setNodeRef}
+            {...listeners}
+            {...attributes}
+            className={`relative w-full h-full max-h-[140px] hover:cursor-grab group touch-none ${isDragging ? 'opacity-40' : ''}`}
+        >
+            <div className={`relative w-full h-full flex flex-col items-center justify-center p-3 gap-2 border rounded-xl z-10 transition-all duration-300 overflow-hidden ${isDark 
+                ? 'bg-[#161625] border-[#2a2d45] group-hover:border-[#7c3aed] group-hover:bg-[#2d1f5e]' 
+                : 'bg-white border-gray-200 shadow-sm group-hover:border-[#7c3aed] group-hover:bg-[#ede9fe] group-hover:shadow-md'}`}>
+                {/* Preview: emoji icon */}
+                <div className="text-3xl leading-none select-none pointer-events-none">
+                    {element.previewEmoji ?? '📦'}
+                </div>
+                <span className={`text-[11px] font-semibold text-center leading-tight transition-colors ${isDark ? 'text-gray-300 group-hover:text-white' : 'text-gray-600 group-hover:text-[#7c3aed]'}`}>
+                    {element.label}
+                </span>
+                <span className={`text-[9px] font-medium uppercase tracking-wide ${isDark ? 'text-gray-500 group-hover:text-[#a78bfa]' : 'text-gray-400 group-hover:text-[#7c3aed]'}`}>
+                    {element.categoryLabel}
+                </span>
+            </div>
+        </div>
+    );
 };
 
 /* ─── Draggable sidebar card (uses @dnd-kit useDraggable) ─── */
@@ -380,7 +415,7 @@ const CanvasDropZone = ({ canvasRef, isDark, setSelectedId, children }: {
     );
 };
 
-// Extracted element component so it can use a stable per-element hook without closures
+// Extracted element component — lazy-loads from the element registry
 const SceneElement = memo(({ el, isDark, isSelected, updateElement, setSelectedId, containerRef }: any) => {
     const handleClick = useCallback((e: React.MouseEvent) => {
         e.stopPropagation();
@@ -388,9 +423,11 @@ const SceneElement = memo(({ el, isDark, isSelected, updateElement, setSelectedI
     }, [el.id, setSelectedId]);
 
     const [sx, sy] = el.scale;
-    const [BASE_W, BASE_H] = el.boundingSize ?? [150, 40];
+    const [BASE_W, BASE_H] = el.boundingSize ?? [200, 60];
     const w = BASE_W * sx;
     const h = BASE_H * sy;
+
+    const ElementComponent = getElementComponent(el.type);
 
     return (
         <>
@@ -408,14 +445,24 @@ const SceneElement = memo(({ el, isDark, isSelected, updateElement, setSelectedI
                     justifyContent: 'center',
                     cursor: 'pointer',
                     userSelect: 'none',
-                    fontSize: Math.max(12, 14 * sx),
-                    color: isDark ? '#ffffff' : '#000000',
-                    fontWeight: 500,
                     zIndex: isSelected ? 40 : 1,
                     pointerEvents: 'auto',
+                    overflow: 'visible',
                 }}
             >
-                {el.content ?? ''}
+                {ElementComponent ? (
+                    <Suspense fallback={
+                        <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: 0.4, fontSize: 24 }}>⏳</div>
+                    }>
+                        <ElementComponent
+                            isDark={isDark}
+                            style={{ width: '100%', boxSizing: 'border-box', pointerEvents: 'none' }}
+                            {...(el.props ?? {})}
+                        />
+                    </Suspense>
+                ) : (
+                    <div style={{ fontSize: 13, color: isDark ? '#94a3b8' : '#6b7280', fontWeight: 500, opacity: 0.6 }}>{el.type}</div>
+                )}
             </div>
 
             {isSelected && (
@@ -433,6 +480,8 @@ const SaasVideoEditor = () => {
     const [activeTab, setActiveTab] = useState<string | null>(null);
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
+    const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+
     const [searchQuery, setSearchQuery] = useState('');
     const [templateSearchQuery, setTemplateSearchQuery] = useState('');
     const [animationSearchQuery, setAnimationSearchQuery] = useState('');
@@ -449,7 +498,7 @@ const SaasVideoEditor = () => {
         hasPreviousPage, 
         isFetchingPreviousPage, 
         isLoading: isElementsLoading 
-    } = useInfiniteElements(searchQuery, elementsPageSize);
+    } = useInfiniteElements(searchQuery, elementsPageSize, selectedCategory);
     const flatElements = elementsData?.pages.flatMap((page) => page.data) ?? [];
 
     const { data: templatesData, isLoading: isTemplatesLoading } = useTemplates(templateSearchQuery);
@@ -688,21 +737,21 @@ const SaasVideoEditor = () => {
         const dropX = clientX - canvasRect.left;
         const dropY = clientY - canvasRect.top;
 
-        // Bounding sizes now in pixel units
-        const BOUNDING_SIZES: Record<string, [number, number]> = {
-            device: [180, 360],
-            card: [240, 140],
-            chart: [280, 200],
-        };
+        // Resolve bounding size from PANEL_ELEMENTS registry, or fallback
+        const panelDef = PANEL_ELEMENTS.find(el => el.type === type);
+        const resolvedBoundingSize: [number, number] = 
+            active.data.current?.boundingSize ?? 
+            panelDef?.boundingSize ?? 
+            [200, 80];
 
         addElement({
             id: Date.now().toString(),
-            type: type as 'text' | 'device' | 'card' | '3d' | 'chart' | 'counter' | 'button' | 'icon' | 'shape',
+            type: type as any,
             position: [dropX, dropY, 0],
             rotation: [0, 0, 0],
             scale: [1, 1, 1],
-            content: type === 'text' ? 'Edit this text' : undefined,
-            ...(BOUNDING_SIZES[type] ? { boundingSize: BOUNDING_SIZES[type] } : {}),
+            boundingSize: resolvedBoundingSize,
+            props: panelDef?.defaultProps ?? {},
         });
 
         getHistoryControls().archive();
@@ -890,10 +939,47 @@ const SaasVideoEditor = () => {
                             {activeTab && (
                                 <>
                                     <div className="flex-1 min-h-0 flex flex-col">
-                                        {activeTab === 'Elements' ? (
+                                        {activeTab === 'Elements' && !selectedCategory && !searchQuery ? (
                                             <UniversalPanel
                                                 title="Elements"
                                                 onClose={() => { setActiveTab(null); }}
+                                                items={ELEMENT_CATEGORIES}
+                                                width={480}
+                                                height="100%"
+                                                itemHeight={140}
+                                                searchQuery={searchQuery}
+                                                onSearchChange={setSearchQuery}
+                                                placeholder="Search elements..."
+                                                getItemId={(cat) => cat.id}
+                                                getItemLabel={(cat) => cat.label}
+                                                panelName="Categories"
+                                                panelIcon={Layers}
+                                                isDark={isDark}
+                                                showCloseButton={true}
+                                                renderItem={(cat) => (
+                                                    <div 
+                                                        onClick={() => setSelectedCategory(cat.id)} 
+                                                        className={`cursor-pointer w-full h-[140px] flex flex-col items-center justify-center border rounded-xl hover:scale-[1.03] transition-transform select-none ${isDark ? 'bg-[#1e2235] border-[#2a2d45] text-white shadow-md' : 'bg-white border-gray-200 text-gray-800 shadow-sm'}`}
+                                                    >
+                                                        <span className="text-[40px] mb-3">{cat.emoji}</span>
+                                                        <span className="font-semibold text-[15px]">{cat.label}</span>
+                                                    </div>
+                                                )}
+                                            />
+                                        ) : activeTab === 'Elements' ? (
+                                            <UniversalPanel
+                                                title={selectedCategory ? (
+                                                    <div className="flex items-center gap-2">
+                                                        <button 
+                                                            onClick={(e) => { e.stopPropagation(); setSelectedCategory(null); }}
+                                                            className={`flex items-center justify-center p-1.5 rounded-md transition-colors ${isDark ? 'hover:bg-gray-800 text-gray-400 hover:text-white' : 'hover:bg-gray-100 text-gray-500 hover:text-gray-900'}`}
+                                                        >
+                                                            <ArrowLeft size={18} />
+                                                        </button>
+                                                        <span>{ELEMENT_CATEGORIES.find(c => c.id === selectedCategory)?.label || "Elements"}</span>
+                                                    </div>
+                                                ) : "Elements"}
+                                                onClose={() => { setActiveTab(null); setSelectedCategory(null); setSearchQuery(''); }}
                                                 items={flatElements}
                                                 pageSize={elementsPageSize}
                                                 firstPageParam={elementsData?.pageParams?.[0] as number ?? 0}
@@ -910,17 +996,15 @@ const SaasVideoEditor = () => {
                                                 isFetchingPreviousPage={isFetchingPreviousPage}
                                                 hasPreviousPage={hasPreviousPage}
                                                 fetchPreviousPage={fetchPreviousPage}
-                                                getItemId={(el) => el.id}
+                                                getItemId={(el) => el.type}
                                                 getItemLabel={(el) => el.label}
-                                                panelName="Elements"
+                                                panelName={selectedCategory ? ELEMENT_CATEGORIES.find(c => c.id === selectedCategory)?.label || "Elements" : "Elements"}
                                                 panelIcon={Layers}
                                                 isDark={isDark}
                                                 showCloseButton={true}
                                                 renderItem={(el) => (
-                                                    <DraggableCard
-                                                        elementId={el.id}
-                                                        icon={el.icon}
-                                                        label={el.label}
+                                                    <DraggableElementCard
+                                                        element={el}
                                                         isDark={isDark}
                                                     />
                                                 )}
@@ -1203,11 +1287,19 @@ const SaasVideoEditor = () => {
             {/* Drag overlay — renders the floating card while dragging */}
             <DragOverlay dropAnimation={null}>
                 {activeDragItem != null && (() => {
-                    // Check MOCK_ELEMENTS first
-                    const elementEntry = MOCK_ELEMENTS.find(
-                        (el) => `sidebar-${el.id}` === activeDragItem
+                    // Check UI_ELEMENTS first
+                    const elementEntry = UI_ELEMENTS.find(
+                        (el) => `sidebar-${el.type}` === activeDragItem
                     );
-                    if (elementEntry) return <DragOverlayCard icon={elementEntry.icon} label={elementEntry.label} />;
+                    if (elementEntry) {
+                        const getIcon = (type: string) => {
+                            if (type === 'button') return Square;
+                            if (type === 'card') return AppWindow;
+                            if (type === 'list') return Move;
+                            return Box;
+                        };
+                        return <DragOverlayCard icon={getIcon(elementEntry.type)} label={elementEntry.label} />;
+                    }
                     
                     // Check TEMPLATES
                     const templateEntry = TEMPLATES.find(
