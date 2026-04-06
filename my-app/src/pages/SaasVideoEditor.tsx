@@ -1,8 +1,6 @@
 import { useState, useEffect, useRef, useCallback, memo } from 'react';
 import { useInfiniteQuery } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'motion/react';
-import { Canvas } from '@react-three/fiber';
-import { Text } from '@react-three/drei';
 import { CanvaBoundingBox } from '../components/CanvaBoundingBox';
 import { UniversalPanel } from '../components/UniversalPanel';
 import { useEditorStore, useUIStore, getHistoryControls } from '../store/useEditorStore';
@@ -382,36 +380,52 @@ const CanvasDropZone = ({ canvasRef, isDark, setSelectedId, children }: {
     );
 };
 
-// Extracted text component so it can use a stable per-element hook without closures
-const SceneElement = memo(({ el, isDark, isSelected, updateElement, setSelectedId }: any) => {
-    const handleClick = useCallback((e: any) => {
+// Extracted element component so it can use a stable per-element hook without closures
+const SceneElement = memo(({ el, isDark, isSelected, updateElement, setSelectedId, containerRef }: any) => {
+    const handleClick = useCallback((e: React.MouseEvent) => {
         e.stopPropagation();
         setSelectedId(el.id);
     }, [el.id, setSelectedId]);
 
+    const [sx, sy] = el.scale;
+    const [BASE_W, BASE_H] = el.boundingSize ?? [150, 40];
+    const w = BASE_W * sx;
+    const h = BASE_H * sy;
+
     return (
-        <group>
-            {/* The actual text element */}
-            <Text
-                position={el.position}
-                scale={el.scale}
-                fontSize={0.5}  // Larger for visibility
-                color={isDark ? '#ffffff' : '#000000'}
-                anchorX="center"  // Centered
-                anchorY="middle"  // Centered
-                maxWidth={5}
+        <>
+            {/* The actual element */}
+            <div
                 onClick={handleClick}
+                style={{
+                    position: 'absolute',
+                    left: el.position[0] - w / 2,
+                    top: el.position[1] - h / 2,
+                    width: w,
+                    height: h,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    cursor: 'pointer',
+                    userSelect: 'none',
+                    fontSize: Math.max(12, 14 * sx),
+                    color: isDark ? '#ffffff' : '#000000',
+                    fontWeight: 500,
+                    zIndex: isSelected ? 40 : 1,
+                    pointerEvents: 'auto',
+                }}
             >
                 {el.content ?? ''}
-            </Text>
+            </div>
 
             {isSelected && (
                 <CanvaBoundingBox
                     el={el}
                     updateElement={updateElement}
+                    containerRef={containerRef}
                 />
             )}
-        </group>
+        </>
     );
 });
 
@@ -662,40 +676,29 @@ const SaasVideoEditor = () => {
 
         const canvasRect = canvasRef.current.getBoundingClientRect();
 
-        // FIX: Use the drag overlay's final position instead of pointerRef
-        // The overlay follows the cursor, so its rect is accurate
+        // Use the drag overlay's final position
         const overlayRect = active.rect.current.translated;
         
         if (!overlayRect) return;
 
-        // Calculate drop position as center of the drag overlay
+        // Calculate drop position as center of the drag overlay, in pixel coords
         const clientX = overlayRect.left + overlayRect.width / 2;
         const clientY = overlayRect.top + overlayRect.height / 2;
 
         const dropX = clientX - canvasRect.left;
         const dropY = clientY - canvasRect.top;
 
-        // Convert to normalized device coordinates (-1 to +1)
-        const ndcX = (dropX / canvasRect.width) * 2 - 1;
-        const ndcY = -((dropY / canvasRect.height) * 2 - 1);
-
-        // For orthographic camera with zoom=100
-        const visibleWidth = canvasRect.width / 100;
-        const visibleHeight = canvasRect.height / 100;
-
-        const worldX = ndcX * (visibleWidth / 2);
-        const worldY = ndcY * (visibleHeight / 2);
-
+        // Bounding sizes now in pixel units
         const BOUNDING_SIZES: Record<string, [number, number]> = {
-            device: [1.8, 3.6],
-            card: [2.4, 1.4],
-            chart: [2.8, 2.0],
+            device: [180, 360],
+            card: [240, 140],
+            chart: [280, 200],
         };
 
         addElement({
             id: Date.now().toString(),
             type: type as 'text' | 'device' | 'card' | '3d' | 'chart' | 'counter' | 'button' | 'icon' | 'shape',
-            position: [worldX, worldY, 0],
+            position: [dropX, dropY, 0],
             rotation: [0, 0, 0],
             scale: [1, 1, 1],
             content: type === 'text' ? 'Edit this text' : undefined,
@@ -968,16 +971,13 @@ const SaasVideoEditor = () => {
                             isDark={isDark}
                             setSelectedId={setSelectedId}
                         >
-
-                            <Canvas
-                                style={{ width: '100%', height: '100%' }}
-                                orthographic
-                                camera={{ zoom: 100, position: [0, 0, 10] }}
-                                onPointerMissed={() => setSelectedId(null)}
+                            {/* 2D HTML Canvas Surface */}
+                            <div
+                                style={{ position: 'relative', width: '100%', height: '100%', overflow: 'hidden' }}
+                                onClick={(e) => {
+                                    if (e.target === e.currentTarget) setSelectedId(null);
+                                }}
                             >
-                                <ambientLight intensity={0.5} />
-                                <directionalLight position={[10, 10, 10]} />
-
                                 {elementIds.map(id => {
                                     const el = elements.get(id);
 
@@ -992,10 +992,11 @@ const SaasVideoEditor = () => {
                                             isSelected={isSelected}
                                             updateElement={updateElement}
                                             setSelectedId={setSelectedId}
+                                            containerRef={canvasRef}
                                         />
                                     );
                                 })}
-                            </Canvas>
+                            </div>
                         </CanvasDropZone>
 
                         {/* 6. Right panel Backdrop */}
