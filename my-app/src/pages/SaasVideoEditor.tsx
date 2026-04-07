@@ -300,25 +300,34 @@ const DraggableElementCard = ({ element, isDark }: { element: PanelElementDef, i
         data: { type: element.type, label: element.label, boundingSize: element.boundingSize },
     });
 
+    const PreviewComponent = getElementComponent(element.type) as React.ElementType<any>;
+
     return (
         <div
             ref={setNodeRef}
             {...listeners}
             {...attributes}
-            className={`relative w-full h-full max-h-[140px] hover:cursor-grab group touch-none ${isDragging ? 'opacity-40' : ''}`}
+            className={`relative w-full h-[120px] hover:cursor-grab group touch-none ${isDragging ? 'opacity-40' : ''}`}
         >
-            <div className={`relative w-full h-full flex flex-col items-center justify-center p-3 gap-2 border rounded-xl z-10 transition-all duration-300 overflow-hidden ${isDark 
+            <div className={`relative w-full h-full flex flex-col items-center justify-between p-3 border rounded-xl z-10 transition-all duration-300 overflow-hidden ${isDark 
                 ? 'bg-[#161625] border-[#2a2d45] group-hover:border-[#7c3aed] group-hover:bg-[#2d1f5e]' 
                 : 'bg-white border-gray-200 shadow-sm group-hover:border-[#7c3aed] group-hover:bg-[#ede9fe] group-hover:shadow-md'}`}>
-                {/* Preview: emoji icon */}
-                <div className="text-3xl leading-none select-none pointer-events-none">
-                    {element.previewEmoji ?? '📦'}
+                {/* Preview: actual component or fallback emoji */}
+                <div className="flex-1 w-full flex items-center justify-center select-none pointer-events-none" style={{transform: "scale(0.55)", transformOrigin: "center center"}}>
+                    {PreviewComponent ? (
+                        <Suspense fallback={<div className="text-4xl">{element.previewEmoji ?? '📦'}</div>}>
+                            {/* @ts-ignore */}
+                            <PreviewComponent>Preview</PreviewComponent>
+                        </Suspense>
+                    ) : (
+                        <div className="text-4xl leading-none">
+                            {element.previewEmoji ?? '📦'}
+                        </div>
+                    )}
                 </div>
-                <span className={`text-[11px] font-semibold text-center leading-tight transition-colors ${isDark ? 'text-gray-300 group-hover:text-white' : 'text-gray-600 group-hover:text-[#7c3aed]'}`}>
+                
+                <span className={`text-[11px] mt-1 font-semibold text-center leading-tight transition-colors line-clamp-2 ${isDark ? 'text-gray-300 group-hover:text-white' : 'text-gray-600 group-hover:text-[#7c3aed]'}`}>
                     {element.label}
-                </span>
-                <span className={`text-[9px] font-medium uppercase tracking-wide ${isDark ? 'text-gray-500 group-hover:text-[#a78bfa]' : 'text-gray-400 group-hover:text-[#7c3aed]'}`}>
-                    {element.categoryLabel}
                 </span>
             </div>
         </div>

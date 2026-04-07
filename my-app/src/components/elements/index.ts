@@ -25,14 +25,16 @@ export const elementRegistry: Partial<Record<ElementType, React.LazyExoticCompon
   imageCard: lazy(() => import('./cards/ImageCard').then(m => ({ default: m.ImageCard }))),
 
   // ── Buttons ───────────────────────────────────────────────────────
-  primaryButton: lazy(() => import('./buttons/Buttons').then(m => ({ default: m.PrimaryButton }))),
-  secondaryButton: lazy(() => import('./buttons/Buttons').then(m => ({ default: m.SecondaryButton }))),
-  outlineButton: lazy(() => import('./buttons/Buttons').then(m => ({ default: m.OutlineButton }))),
-  ghostButton: lazy(() => import('./buttons/Buttons').then(m => ({ default: m.GhostButton }))),
-  iconButton: lazy(() => import('./buttons/Buttons').then(m => ({ default: m.IconButton }))),
-  fab: lazy(() => import('./buttons/Buttons').then(m => ({ default: m.FAB }))),
-  pillButton: lazy(() => import('./buttons/Buttons').then(m => ({ default: m.PillButton }))),
-  socialButton: lazy(() => import('./buttons/Buttons').then(m => ({ default: m.SocialButton }))),
+  pillButton: lazy(() => import('./buttons/ProfessionalButtons').then(m => ({ default: m.PillButton }))),
+  squircleButton: lazy(() => import('./buttons/ProfessionalButtons').then(m => ({ default: m.SquircleButton }))),
+  ghostButton: lazy(() => import('./buttons/ProfessionalButtons').then(m => ({ default: m.GhostButton }))),
+  softShadowButton: lazy(() => import('./buttons/ProfessionalButtons').then(m => ({ default: m.SoftShadowButton }))),
+  gradientButton: lazy(() => import('./buttons/ProfessionalButtons').then(m => ({ default: m.GradientButton }))),
+  outlineGlowButton: lazy(() => import('./buttons/ProfessionalButtons').then(m => ({ default: m.OutlineGlowButton }))),
+  glassButton: lazy(() => import('./buttons/ProfessionalButtons').then(m => ({ default: m.GlassButton }))),
+  neumorphicButton: lazy(() => import('./buttons/ProfessionalButtons').then(m => ({ default: m.NeumorphicButton }))),
+  dashedButton: lazy(() => import('./buttons/ProfessionalButtons').then(m => ({ default: m.DashedButton }))),
+  bevelButton: lazy(() => import('./buttons/ProfessionalButtons').then(m => ({ default: m.BevelButton }))),
 
   // ── Inputs ────────────────────────────────────────────────────────
   searchBar: lazy(() => import('./inputs/Inputs').then(m => ({ default: m.SearchBarInput }))),
@@ -169,16 +171,19 @@ export const PANEL_ELEMENTS: PanelElementDef[] = [
   { type: 'imageCard', label: 'Image Card', category: 'cards', categoryLabel: 'Cards', boundingSize: [280, 180], previewEmoji: '🖼' },
 
   // ── Buttons ───────────────────────────────────────────────────────
-  { type: 'primaryButton', label: 'Primary', category: 'buttons', categoryLabel: 'Buttons', boundingSize: [160, 44], previewEmoji: '🟣' },
-  { type: 'secondaryButton', label: 'Secondary', category: 'buttons', categoryLabel: 'Buttons', boundingSize: [160, 44], previewEmoji: '⬜' },
-  { type: 'outlineButton', label: 'Outline', category: 'buttons', categoryLabel: 'Buttons', boundingSize: [160, 44], previewEmoji: '◻' },
-  { type: 'ghostButton', label: 'Ghost', category: 'buttons', categoryLabel: 'Buttons', boundingSize: [160, 44], previewEmoji: '👻' },
-  { type: 'iconButton', label: 'Icon Button', category: 'buttons', categoryLabel: 'Buttons', boundingSize: [44, 44], previewEmoji: '⚙' },
-  { type: 'fab', label: 'FAB', category: 'buttons', categoryLabel: 'Buttons', boundingSize: [56, 56], previewEmoji: '➕' },
-  { type: 'pillButton', label: 'Pill Button', category: 'buttons', categoryLabel: 'Buttons', boundingSize: [160, 44], previewEmoji: '💊' },
-  { type: 'socialButton', label: 'Social Button', category: 'buttons', categoryLabel: 'Buttons', boundingSize: [240, 48], previewEmoji: '🔗' },
 
   // ── Inputs ────────────────────────────────────────────────────────
+
+  { type: 'pillButton', label: 'Pill Button', category: 'buttons', categoryLabel: 'Buttons', boundingSize: [300, 100], previewEmoji: '💊' },
+  { type: 'squircleButton', label: 'Squircle Button', category: 'buttons', categoryLabel: 'Buttons', boundingSize: [300, 100], previewEmoji: '🔳' },
+  { type: 'ghostButton', label: 'Ghost Button', category: 'buttons', categoryLabel: 'Buttons', boundingSize: [300, 100], previewEmoji: '👻' },
+  { type: 'softShadowButton', label: 'Soft Shadow Button', category: 'buttons', categoryLabel: 'Buttons', boundingSize: [300, 100], previewEmoji: '☁️' },
+  { type: 'gradientButton', label: 'Gradient Button', category: 'buttons', categoryLabel: 'Buttons', boundingSize: [300, 100], previewEmoji: '🌈' },
+  { type: 'outlineGlowButton', label: 'Outline Glow Button', category: 'buttons', categoryLabel: 'Buttons', boundingSize: [300, 100], previewEmoji: '✨' },
+  { type: 'glassButton', label: 'Glass Button', category: 'buttons', categoryLabel: 'Buttons', boundingSize: [300, 100], previewEmoji: '🧊' },
+  { type: 'neumorphicButton', label: 'Neumorphic Button', category: 'buttons', categoryLabel: 'Buttons', boundingSize: [300, 100], previewEmoji: '🔘' },
+  { type: 'dashedButton', label: 'Dashed Button', category: 'buttons', categoryLabel: 'Buttons', boundingSize: [300, 100], previewEmoji: '➖' },
+  { type: 'bevelButton', label: 'Bevel Button', category: 'buttons', categoryLabel: 'Buttons', boundingSize: [300, 100], previewEmoji: '📦' },
   { type: 'searchBar', label: 'Search Bar', category: 'inputs', categoryLabel: 'Inputs', boundingSize: [280, 44], previewEmoji: '🔍' },
   { type: 'textInput', label: 'Text Input', category: 'inputs', categoryLabel: 'Inputs', boundingSize: [280, 68], previewEmoji: '✏' },
   { type: 'textarea', label: 'Textarea', category: 'inputs', categoryLabel: 'Inputs', boundingSize: [280, 120], previewEmoji: '📝' },

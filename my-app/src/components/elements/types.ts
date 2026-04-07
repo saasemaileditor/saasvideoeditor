@@ -11,7 +11,7 @@ export type ElementType =
   // Cards
   | 'basicCard' | 'featureCard' | 'pricingCard' | 'testimonialCard' | 'statsCard' | 'profileCard' | 'imageCard'
   // Buttons
-  | 'primaryButton' | 'secondaryButton' | 'outlineButton' | 'ghostButton' | 'iconButton' | 'fab' | 'pillButton' | 'socialButton'
+  | 'pillButton' | 'squircleButton' | 'ghostButton' | 'softShadowButton' | 'gradientButton' | 'outlineGlowButton' | 'glassButton' | 'neumorphicButton' | 'dashedButton' | 'bevelButton'
   // Inputs
   | 'searchBar' | 'textInput' | 'textarea' | 'dropdown' | 'checkbox' | 'radio' | 'toggle' | 'slider'
   // UI Badges
