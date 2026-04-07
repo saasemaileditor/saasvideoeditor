@@ -763,14 +763,7 @@ const SaasVideoEditor = () => {
             props: panelDef?.defaultProps ?? {},
         });
 
-        console.log('About to call archive()');
-        try {
-            getHistoryControls().archive();
-            console.log('archive() completed successfully');
-        } catch (e) {
-            console.error('archive() failed:', e);
-        }
-        window.dispatchEvent(new CustomEvent('history-updated'));
+        getHistoryControls().archive();
     }, [addElement, savedActiveTab]);
 
     return (

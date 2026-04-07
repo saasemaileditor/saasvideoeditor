@@ -55,19 +55,11 @@ export const useEditorStore = create<EditorState>()(
             elementIds: [] as string[],
 
             // Adds a new item to the canvas and selects it
-            addElement: (element) => {
-                console.log('addElement START - element:', element.id);
-                set((state) => {
-                    console.log('addElement set callback - state.elements size:', state.elements.size);
-                    const newState = {
-                        elements: new Map([...state.elements, [element.id, element]]),
-                        elementIds: [...state.elementIds, element.id],
-                    };
-                    console.log('addElement returning new state');
-                    return newState;
-                });
-                console.log('addElement END');
-            },
+            addElement: (element) =>
+                set((state) => ({
+                    elements: new Map([...state.elements, [element.id, element]]),
+                    elementIds: [...state.elementIds, element.id],
+                })),
 
             // Updates an item's fields (position/rotation/scale/etc.)
             updateElement: (id, data) =>
