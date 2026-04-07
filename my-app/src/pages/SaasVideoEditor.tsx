@@ -19,7 +19,7 @@ import {
     Undo2, Redo2, Play, Pause, Download,
     Layers, Video, Sparkles, LayoutTemplate,
     X, Settings as SettingsIcon, Sun, Moon, Monitor, Plus, Type, Square,
-    Move, Smartphone, ChevronDown, ArrowLeft,
+    Move, Smartphone, ChevronDown, ArrowLeft, GripVertical, MoreVertical,
     Box, PieChart, AppWindow, Smile, Triangle
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
@@ -265,6 +265,63 @@ export const useTemplates = (searchQuery: string) => {
     });
 };
 
+const MEDIA_STOCK = [
+    { id: 'media-1', label: 'Beach Sunset', type: 'video', url: 'https://cdn.pixabay.com/video/2016/09/13/4728-179738301_tiny.mp4', duration: '15s', thumbnail: 'https://images.pexels.com/photos/1032650/pexels-photo-1032650.jpeg?auto=compress&cs=tinysrgb&h=120' },
+    { id: 'media-2', label: 'Mountain Hike', type: 'video', url: 'https://cdn.pixabay.com/video/2021/04/12/70796-538356983_tiny.mp4', duration: '12s', thumbnail: 'https://images.pexels.com/photos/1271619/pexels-photo-1271619.jpeg?auto=compress&cs=tinysrgb&h=120' },
+    { id: 'media-3', label: 'Coffee Brewing', type: 'video', url: 'https://cdn.pixabay.com/video/2020/07/22/45131-441604547_tiny.mp4', duration: '8s', thumbnail: 'https://images.pexels.com/photos/302899/pexels-photo-302899.jpeg?auto=compress&cs=tinysrgb&h=120' },
+    { id: 'media-4', label: 'City Night', type: 'video', url: 'https://cdn.pixabay.com/video/2016/10/18/5888-186981145_tiny.mp4', duration: '10s', thumbnail: 'https://images.pexels.com/photos/1519088/pexels-photo-1519088.jpeg?auto=compress&cs=tinysrgb&h=120' },
+    { id: 'media-5', label: 'Forest Stream', type: 'video', url: 'https://cdn.pixabay.com/video/2021/09/06/87588-601726055_tiny.mp4', duration: '20s', thumbnail: 'https://images.pexels.com/photos/2280954/pexels-photo-2280954.jpeg?auto=compress&cs=tinysrgb&h=120' },
+    { id: 'media-6', label: 'Neon City', type: 'video', url: 'https://cdn.pixabay.com/video/2020/01/14/31154-386047378_tiny.mp4', duration: '14s', thumbnail: 'https://images.pexels.com/photos/3166786/pexels-photo-3166786.jpeg?auto=compress&cs=tinysrgb&h=120' },
+    { id: 'media-7', label: 'Desert Dunes', type: 'video', url: 'https://cdn.pixabay.com/video/2017/04/24/8910-213941423_tiny.mp4', duration: '18s', thumbnail: 'https://images.pexels.com/photos/2044434/pexels-photo-2044434.jpeg?auto=compress&cs=tinysrgb&h=120' },
+    { id: 'media-8', label: 'Cyberpunk Girl', type: 'video', url: 'https://cdn.pixabay.com/video/2020/12/29/60450-496660636_tiny.mp4', duration: '10s', thumbnail: 'https://images.pexels.com/photos/2773498/pexels-photo-2773498.jpeg?auto=compress&cs=tinysrgb&h=120' },
+];
+
+export const useMedia = (searchQuery: string) => {
+    return useInfiniteQuery({
+        queryKey: ['media', searchQuery],
+        queryFn: async () => {
+            await new Promise((resolve) => setTimeout(resolve, 300));
+            const filtered = searchQuery
+                ? MEDIA_STOCK.filter((m) => 
+                    m.label.toLowerCase().includes(searchQuery.toLowerCase())
+                  )
+                : MEDIA_STOCK;
+            return { data: filtered, nextPage: undefined };
+        },
+        initialPageParam: 0,
+        getNextPageParam: () => undefined,
+    });
+};
+
+const POSITION_PRESETS = [
+    { id: 'pos-tl', label: 'Top Left', x: 10, y: 10, icon: Move },
+    { id: 'pos-tc', label: 'Top Center', x: 50, y: 10, icon: Move },
+    { id: 'pos-tr', label: 'Top Right', x: 90, y: 10, icon: Move },
+    { id: 'pos-cl', label: 'Center Left', x: 10, y: 50, icon: Move },
+    { id: 'pos-center', label: 'Perfect Center', x: 50, y: 50, icon: Move },
+    { id: 'pos-cr', label: 'Center Right', x: 90, y: 50, icon: Move },
+    { id: 'pos-bl', label: 'Bottom Left', x: 10, y: 90, icon: Move },
+    { id: 'pos-bc', label: 'Bottom Center', x: 50, y: 90, icon: Move },
+    { id: 'pos-br', label: 'Bottom Right', x: 90, y: 90, icon: Move },
+];
+
+export const usePositions = (searchQuery: string) => {
+    return useInfiniteQuery({
+        queryKey: ['positions', searchQuery],
+        queryFn: async () => {
+            await new Promise((resolve) => setTimeout(resolve, 300));
+            const filtered = searchQuery
+                ? POSITION_PRESETS.filter((p) => 
+                    p.label.toLowerCase().includes(searchQuery.toLowerCase())
+                  )
+                : POSITION_PRESETS;
+            return { data: filtered, nextPage: undefined };
+        },
+        initialPageParam: 0,
+        getNextPageParam: () => undefined,
+    });
+};
+
 export const useAnimations = (searchQuery: string) => {
     return useInfiniteQuery({
         queryKey: ['animations', searchQuery],
@@ -454,7 +511,7 @@ const SceneElement = memo(({ el, isDark, isSelected, updateElement, setSelectedI
                     justifyContent: 'center',
                     cursor: 'pointer',
                     userSelect: 'none',
-                    zIndex: isSelected ? 40 : 1,
+                    zIndex: isSelected ? 1000 : (el.zIndex ?? 1),
                     pointerEvents: 'auto',
                     overflow: 'visible',
                 }}
@@ -493,7 +550,11 @@ const SaasVideoEditor = () => {
 
     const [searchQuery, setSearchQuery] = useState('');
     const [templateSearchQuery, setTemplateSearchQuery] = useState('');
+    const [mediaSearchQuery, setMediaSearchQuery] = useState('');
+    const [positionSearchQuery, setPositionSearchQuery] = useState('');
     const [animationSearchQuery, setAnimationSearchQuery] = useState('');
+    const [positionSubTab, setPositionSubTab] = useState<'Arrange' | 'Layers'>('Arrange');
+    const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
     const [selectedAnimationId, setSelectedAnimationId] = useState<string | null>(null);
 
     // Infinite Query Hook for Elements
@@ -513,11 +574,24 @@ const SaasVideoEditor = () => {
     const { data: templatesData, isLoading: isTemplatesLoading } = useTemplates(templateSearchQuery);
     const flatTemplates = templatesData?.pages.flatMap((page) => page.data) ?? [];
 
+    const { data: mediaData, isLoading: isMediaLoading } = useMedia(mediaSearchQuery);
+    const flatMedia = mediaData?.pages.flatMap((page) => page.data) ?? [];
+
+    const { data: positionsData, isLoading: isPositionsLoading } = usePositions(positionSearchQuery);
+    const flatPositions = positionsData?.pages.flatMap((page) => page.data) ?? [];
+
     const { data: animationsData, isLoading: isAnimationsLoading } = useAnimations(animationSearchQuery);
     const flatAnimations = animationsData?.pages.flatMap((page) => page.data) ?? [];
 
     // Canvas States (global store)
-    const { elements, elementIds, addElement, updateElement, removeElement } = useEditorStore();
+    const {
+        elements,
+        elementIds,
+        addElement,
+        updateElement,
+        reorderElements,
+        removeElement,
+    } = useEditorStore();
     const { selectedId, setSelectedId } = useUIStore();
 
     useEffect(() => {
@@ -1047,6 +1121,219 @@ const SaasVideoEditor = () => {
                                                     />
                                                 )}
                                             />
+                                        ) : activeTab === 'Media' ? (
+                                            <UniversalPanel
+                                                title="Media"
+                                                onClose={() => { setActiveTab(null); }}
+                                                items={flatMedia}
+                                                width={480}
+                                                height="100%"
+                                                itemHeight={140}
+                                                searchQuery={mediaSearchQuery}
+                                                onSearchChange={setMediaSearchQuery}
+                                                placeholder="Search assets..."
+                                                isLoading={isMediaLoading}
+                                                isFetchingNextPage={false}
+                                                hasNextPage={false}
+                                                fetchNextPage={undefined}
+                                                getItemId={(el) => el.id}
+                                                getItemLabel={(el) => el.label}
+                                                panelName="Media"
+                                                panelIcon={Video}
+                                                isDark={isDark}
+                                                showCloseButton={true}
+                                                renderItem={(el) => (
+                                                    <div 
+                                                        onClick={() => {
+                                                            addElement({
+                                                                id: Date.now().toString(),
+                                                                type: 'videoPlaceholder' as any,
+                                                                position: [400, 225, 0],
+                                                                rotation: [0, 0, 0],
+                                                                scale: [1, 1, 1],
+                                                                boundingSize: [280, 180],
+                                                                props: { url: el.url, thumbnail: el.thumbnail, label: el.label }
+                                                            });
+                                                            getHistoryControls().archive();
+                                                        }}
+                                                        className={`relative w-full h-[140px] rounded-xl overflow-hidden cursor-pointer border group hover:scale-[1.03] transition-all ${isDark ? 'border-[#2a2d45] bg-[#161625]' : 'border-gray-200 bg-gray-50'}`}
+                                                    >
+                                                        <img src={el.thumbnail} alt={el.label} className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" />
+                                                        <div className="absolute inset-0 bg-black/20 group-hover:bg-black/0 transition-colors" />
+                                                        <div className="absolute bottom-2 left-2 right-2 flex items-center justify-between pointer-events-none">
+                                                            <span className="text-[10px] font-bold text-white bg-black/50 px-1.5 py-0.5 rounded backdrop-blur-sm shadow-sm">{el.duration}</span>
+                                                        </div>
+                                                        <div className="absolute top-2 left-2 pointer-events-none">
+                                                            <span className="text-[10px] font-bold text-white bg-[#7c3aed]/80 px-1.5 py-0.5 rounded backdrop-blur-sm shadow-sm">VIDEO</span>
+                                                        </div>
+                                                        <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                                            <div className="bg-white/20 backdrop-blur-md p-2 rounded-full shadow-lg">
+                                                                <Play size={20} className="text-white fill-current" />
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            />
+                                        ) : activeTab === 'Position' ? (
+                                            <UniversalPanel
+                                                title="Position"
+                                                onClose={() => { setActiveTab(null); }}
+                                                items={positionSubTab === 'Arrange' ? flatPositions : [...Array.from(elements.values()).reverse(), { id: 'canvas-background', type: 'background', label: 'Background' }]}
+                                                width={480}
+                                                height="100%"
+                                                itemHeight={60}
+                                                columnCount={positionSubTab === 'Arrange' ? 3 : 1}
+                                                searchQuery={positionSearchQuery}
+                                                onSearchChange={setPositionSearchQuery}
+                                                placeholder="Search..."
+                                                isLoading={isPositionsLoading}
+                                                isFetchingNextPage={false}
+                                                hasNextPage={false}
+                                                fetchNextPage={undefined}
+                                                getItemId={(el) => (el as any).id}
+                                                getItemLabel={(el) => (el as any).label || (el as any).type || ''}
+                                                panelName="Positions"
+                                                panelIcon={Move}
+                                                isDark={isDark}
+                                                showCloseButton={true}
+                                                showSearch={false}
+                                                showSubtitle={false}
+                                                onReorder={(oldIdx, newIdx) => {
+                                                    // Since the list is reversed, we need to convert indices back to original
+                                                    const total = Array.from(elements.values()).length;
+                                                    reorderElements(total - 1 - oldIdx, total - 1 - newIdx);
+                                                }}
+                                                customHeaderContent={
+                                                    <div className={`flex p-1 mb-4 rounded-xl ${isDark ? 'bg-[#161625] border border-[#2a2d45]' : 'bg-gray-100'}`}>
+                                                        {['Arrange', 'Layers'].map((tab) => {
+                                                            const isActive = positionSubTab === tab;
+                                                            return (
+                                                                <button
+                                                                    key={tab}
+                                                                    onClick={() => setPositionSubTab(tab as any)}
+                                                                    className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all cursor-pointer ${isActive 
+                                                                        ? 'bg-[#7c3aed] text-white shadow-md' 
+                                                                        : isDark ? 'text-gray-400 hover:text-white' : 'text-gray-500 hover:text-gray-700'}`}
+                                                                >
+                                                                    {tab}
+                                                                </button>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                }
+                                                renderItem={(el: any, _index: number, listeners?: any, attributes?: any) => positionSubTab === 'Arrange' ? (
+                                                    <div 
+                                                        onClick={() => {
+                                                            if (selectedId && canvasRef.current) {
+                                                                const rect = canvasRef.current.getBoundingClientRect();
+                                                                updateElement(selectedId, {
+                                                                    position: [(el.x / 100) * rect.width, (el.y / 100) * rect.height, 0]
+                                                                });
+                                                                getHistoryControls().archive();
+                                                                window.dispatchEvent(new CustomEvent('history-updated'));
+                                                            }
+                                                        }}
+                                                        className={`w-full h-[140px] flex flex-col items-center justify-center border rounded-xl hover:scale-[1.03] transition-all cursor-pointer shadow-sm group ${isDark ? 'bg-[#1e2235] border-[#2a2d45] text-white hover:border-[#7c3aed] hover:bg-[#2d1f5e]' : 'bg-white border-gray-200 text-gray-800 hover:border-[#7c3aed] hover:bg-[#ede9fe]'}`}
+                                                    >
+                                                        <div className={`p-4 rounded-full mb-3 transition-colors ${isDark ? 'bg-[#252840] group-hover:bg-[#4c1d95]' : 'bg-gray-50 group-hover:bg-[#ddd6fe]'}`}>
+                                                            <el.icon size={28} className={`transition-colors ${isDark ? 'text-gray-400 group-hover:text-white' : 'text-gray-500 group-hover:text-[#7c3aed]'}`} />
+                                                        </div>
+                                                        <span className="font-semibold text-[14px]">{el.label}</span>
+                                                    </div>
+                                                ) : el.id === 'canvas-background' ? (
+                                                    <div 
+                                                        onClick={() => setSelectedId('canvas-background')}
+                                                        className={`mx-2 mb-1.5 h-[52px] flex items-center transition-all cursor-pointer group select-none border rounded-xl overflow-hidden ${selectedId === 'canvas-background' 
+                                                            ? isDark ? 'bg-[#2d1f5e] border-[#7c3aed] shadow-[0_0_15px_rgba(124,58,237,0.15)]' : 'bg-[#ede9fe] border-[#7c3aed] shadow-[0_0_15px_rgba(124,58,237,0.1)]'
+                                                            : isDark ? 'bg-[#2a2a35] border-[#3a3a45] hover:border-[#7c3aed]/50' : 'bg-gray-100/80 border-gray-200 hover:border-[#7c3aed]/30 hover:shadow-sm'}`}
+                                                    >
+                                                        <div className="flex-1 flex items-center justify-between min-w-0 px-3 pr-4">
+                                                            <div className="flex-1 flex items-center gap-3 min-w-0">
+                                                                <div className={`flex-1 h-8 rounded-lg flex items-center justify-center transition-colors flex-shrink-0 ${isDark ? 'bg-white/10' : 'bg-white shadow-inner border border-gray-200/50'}`}>
+                                                                    <div className="w-full h-full rounded-lg bg-white overflow-hidden" />
+                                                                </div>
+                                                            </div>
+
+                                                            <div className="ml-4 flex-shrink-0">
+                                                                <div 
+                                                                    className={`w-8 h-8 rounded-lg border transition-colors flex items-center justify-center relative overflow-hidden ${isDark ? 'bg-gray-800 border-gray-700' : 'bg-gray-50 border-gray-200'}`}
+                                                                    title="Background"
+                                                                >
+                                                                    <div 
+                                                                        className="absolute inset-0 opacity-40" 
+                                                                        style={{ 
+                                                                            backgroundImage: 'repeating-linear-gradient(45deg, currentColor 0, currentColor 1px, transparent 0, transparent 4px)',
+                                                                            color: isDark ? '#9ca3af' : '#6b7280'
+                                                                        }} 
+                                                                    />
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                ) : (
+                                                    <div 
+                                                        onClick={() => setSelectedId(el.id)}
+                                                        {...attributes} 
+                                                        {...listeners}
+                                                        className={`mx-2 mb-1.5 h-[52px] flex items-center cursor-pointer group select-none border rounded-xl overflow-hidden touch-none ${selectedId === el.id 
+                                                            ? isDark ? 'bg-[#2d1f5e] border-[#7c3aed] shadow-[0_0_15px_rgba(124,58,237,0.15)]' : 'bg-[#ede9fe] border-[#7c3aed] shadow-[0_0_15px_rgba(124,58,237,0.1)]'
+                                                            : isDark ? 'bg-[#2a2a35] border-[#3a3a45] hover:border-[#7c3aed]/50' : 'bg-gray-100/80 border-gray-200 hover:border-[#7c3aed]/30 hover:shadow-sm'}`}
+                                                    >
+                                                        <div 
+                                                            className={`flex items-center justify-center w-10 h-full border-r flex-shrink-0 cursor-grab active:cursor-grabbing transition-colors ${isDark ? 'border-r-[#2a2d45] text-gray-600 group-hover:text-gray-400' : 'border-r-gray-100 text-gray-300 group-hover:text-gray-500'}`}
+                                                        >
+                                                            <GripVertical size={20} strokeWidth={3} />
+                                                        </div>
+
+                                                        <div className="flex-1 flex items-center justify-between min-w-0 px-3">
+                                                            <div className="flex items-center gap-3 min-w-0">
+                                                                <div className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors flex-shrink-0 ${selectedId === el.id ? 'bg-[#7c3aed] text-white' : isDark ? 'bg-gray-800 text-gray-400' : 'bg-gray-100 text-gray-500'}`}>
+                                                                    <Layers size={14} />
+                                                                </div>
+                                                                <div className="flex flex-col min-w-0">
+                                                                    <span className={`text-[13px] font-bold tracking-tight truncate ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                                                                        {el.type.charAt(0).toUpperCase() + el.type.slice(1)}
+                                                                    </span>
+                                                                    <span className={`text-[10px] uppercase font-mono tracking-wider truncate ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
+                                                                        {el.id.slice(-6)}
+                                                                    </span>
+                                                                </div>
+                                                            </div>
+                                                            
+                                                            <div className="relative">
+                                                                <button 
+                                                                    onClick={(e) => { e.stopPropagation(); setActiveMenuId(activeMenuId === el.id ? null : el.id); }}
+                                                                    className={`p-1.5 rounded-md hover:bg-black/5 dark:hover:bg-white/10 transition-all ${isDark ? 'text-gray-400' : 'text-gray-500'}`}
+                                                                    title="More Actions"
+                                                                >
+                                                                    <MoreVertical size={18} />
+                                                                </button>
+
+                                                                {activeMenuId === el.id && (
+                                                                    <>
+                                                                        <div className="fixed inset-0 z-10" onClick={(e) => { e.stopPropagation(); setActiveMenuId(null); }} />
+                                                                        <div className={`absolute right-0 top-full mt-1 w-32 py-1.5 z-20 rounded-lg shadow-xl border animate-in fade-in zoom-in duration-100 origin-top-right ${isDark ? 'bg-[#1e2235] border-[#2a2d45]' : 'bg-white border-gray-100'}`}>
+                                                                            <button 
+                                                                                onClick={(e) => { 
+                                                                                    e.stopPropagation(); 
+                                                                                    removeElement(el.id); 
+                                                                                    getHistoryControls().archive(); 
+                                                                                    window.dispatchEvent(new CustomEvent('history-updated'));
+                                                                                    setActiveMenuId(null);
+                                                                                }}
+                                                                                className={`w-full px-3 py-1.5 text-left text-sm font-bold flex items-center gap-2 transition-colors ${isDark ? 'text-red-400 hover:bg-red-400/10' : 'text-red-500 hover:bg-red-50'}`}
+                                                                            >
+                                                                                <X size={14} />
+                                                                                Delete
+                                                                            </button>
+                                                                        </div>
+                                                                    </>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            />
                                         ) : (
                                             <div className={`text-sm font-medium px-4 pt-4 ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
                                                 {activeTab} content here
@@ -1070,7 +1357,7 @@ const SaasVideoEditor = () => {
                                     if (e.target === e.currentTarget) setSelectedId(null);
                                 }}
                             >
-                                {elementIds.map(id => {
+                                {elementIds.map((id, idx) => {
                                     const el = elements.get(id);
 
                                     if (!el) return null;
@@ -1079,7 +1366,7 @@ const SaasVideoEditor = () => {
                                     return (
                                         <SceneElement 
                                             key={el.id}
-                                            el={el}
+                                            el={{ ...el, zIndex: idx + 1 }}
                                             isDark={isDark}
                                             isSelected={isSelected}
                                             updateElement={updateElement}

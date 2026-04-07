@@ -43,6 +43,7 @@ interface EditorState {
     addElement: (element: CanvasElement) => void;
     updateElement: (id: string, data: Partial<CanvasElement>) => void;
     removeElement: (id: string) => void;
+    reorderElements: (oldIndex: number, newIndex: number) => void;
 }
 
 // ─── Store ───────────────────────────────────────────────────────────────────
@@ -80,6 +81,26 @@ export const useEditorStore = create<EditorState>()(
                     return {
                         elements: newElements,
                         elementIds: state.elementIds.filter((eid) => eid !== id),
+                    };
+                }),
+
+            // Reorders elements
+            reorderElements: (oldIndex, newIndex) =>
+                set((state) => {
+                    const ids = [...state.elementIds];
+                    const [movedId] = ids.splice(oldIndex, 1);
+                    ids.splice(newIndex, 0, movedId);
+                    
+                    // Reconstruct the Map to reflect the new order
+                    const newElements = new Map<string, CanvasElement>();
+                    ids.forEach(id => {
+                        const el = state.elements.get(id);
+                        if (el) newElements.set(id, el);
+                    });
+
+                    return {
+                        elementIds: ids,
+                        elements: newElements
                     };
                 }),
         }),
