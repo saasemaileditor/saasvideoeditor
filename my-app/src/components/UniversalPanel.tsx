@@ -19,6 +19,7 @@ import {
   useSortable
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
+import { snapCenterToCursor } from '@dnd-kit/modifiers';
 
 // ── Smart search helper ──────────────────────────────────────────────────────
 function filterAndSortItems<T>(
@@ -126,7 +127,7 @@ function SortableItem<T>({
       {isDragging ? (
         <div 
           className={`mx-2 mb-1.5 rounded-xl border-2 border-dashed ${isDark ? 'bg-gray-800/30 border-gray-700/50' : 'bg-gray-100 border-gray-200'}`}
-          style={{ height: '52px' }} 
+          style={{ height: '64px' }} 
         />
       ) : (
         renderItem(item, index, isSortable ? listeners : undefined, isSortable ? attributes : undefined)
@@ -332,6 +333,7 @@ export function UniversalPanel<T>({
           {onReorder ? (
             <DndContext 
               sensors={sensors}
+              modifiers={[snapCenterToCursor]}
               collisionDetection={closestCenter}
               onDragStart={handleDragStart}
               onDragEnd={handleDragEnd}

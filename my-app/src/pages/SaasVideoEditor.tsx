@@ -12,6 +12,9 @@ import {
     DragOverlay,
     useDroppable,
     useDraggable,
+    useSensor,
+    useSensors,
+    PointerSensor,
     type DragStartEvent,
     type DragEndEvent,
 } from '@dnd-kit/core';
@@ -23,6 +26,7 @@ import {
     Box, PieChart, AppWindow, Smile, Triangle
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
+import { snapCenterToCursor } from '@dnd-kit/modifiers';
 
 const TABS = [
     { id: 'Elements', icon: Layers, label: 'Elements' },
@@ -499,6 +503,7 @@ const SceneElement = memo(({ el, isDark, isSelected, updateElement, setSelectedI
         <>
             {/* The actual element */}
             <div
+                className={`canvas-element-${el.id}`}
                 onClick={handleClick}
                 style={{
                     position: 'absolute',
@@ -514,6 +519,7 @@ const SceneElement = memo(({ el, isDark, isSelected, updateElement, setSelectedI
                     zIndex: isSelected ? 1000 : (el.zIndex ?? 1),
                     pointerEvents: 'auto',
                     overflow: 'visible',
+                    transform: `rotate(${el.rotation?.[2] ?? 0}deg)`,
                 }}
             >
                 {ElementComponent ? (
@@ -601,6 +607,12 @@ const SaasVideoEditor = () => {
             if (!exists) setSelectedId(null);
         }
     }, [selectedId, setSelectedId]);
+ 
+     const sensors = useSensors(
+         useSensor(PointerSensor, {
+             activationConstraint: { distance: 5 },
+         })
+     );
 
 
     // Undo/redo state — subscribe to store so buttons re-render on history change
@@ -772,9 +784,13 @@ const SaasVideoEditor = () => {
 
     /* ─── @dnd-kit handlers ─── */
     const handleDragStart = useCallback((event: DragStartEvent) => {
-        setActiveDragItem(event.active.id as string);
+        const id = event.active.id as string;
+        
+        // ONLY handle drags that are FROM the sidebar elements
+        if (!id.startsWith('sidebar-')) return;
+        
+        setActiveDragItem(id);
         setSavedActiveTab(activeTab);
-        // Always slide the panel away so the canvas drop-zone is fully visible
         setActiveTab(null);
     }, [activeTab]);
 
@@ -841,7 +857,12 @@ const SaasVideoEditor = () => {
     }, [addElement, savedActiveTab]);
 
     return (
-        <DndContext onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+        <DndContext 
+            sensors={sensors} 
+            modifiers={[snapCenterToCursor]}
+            onDragStart={handleDragStart} 
+            onDragEnd={handleDragEnd}
+        >
             <div className={`fixed inset-0 flex flex-col p-[10px] gap-[10px] overflow-hidden transition-colors duration-200 ${isDark ? 'dark bg-[#080810] text-white' : 'bg-[#f3f4f6] text-gray-900'}`}>
 
                 {/* 2. Top navigation bar */}
@@ -1181,7 +1202,7 @@ const SaasVideoEditor = () => {
                                                 items={positionSubTab === 'Arrange' ? flatPositions : [...Array.from(elements.values()).reverse(), { id: 'canvas-background', type: 'background', label: 'Background' }]}
                                                 width={480}
                                                 height="100%"
-                                                itemHeight={60}
+                                                itemHeight={positionSubTab === 'Arrange' ? 140 : 70}
                                                 columnCount={positionSubTab === 'Arrange' ? 3 : 1}
                                                 searchQuery={positionSearchQuery}
                                                 onSearchChange={setPositionSearchQuery}
@@ -1243,14 +1264,14 @@ const SaasVideoEditor = () => {
                                                 ) : el.id === 'canvas-background' ? (
                                                     <div 
                                                         onClick={() => setSelectedId('canvas-background')}
-                                                        className={`mx-2 mb-1.5 h-[52px] flex items-center transition-all cursor-pointer group select-none border rounded-xl overflow-hidden ${selectedId === 'canvas-background' 
+                                                        className={`mx-2 mb-1.5 h-[64px] flex items-center transition-all cursor-pointer group select-none border rounded-xl overflow-hidden ${selectedId === 'canvas-background' 
                                                             ? isDark ? 'bg-[#2d1f5e] border-[#7c3aed] shadow-[0_0_15px_rgba(124,58,237,0.15)]' : 'bg-[#ede9fe] border-[#7c3aed] shadow-[0_0_15px_rgba(124,58,237,0.1)]'
                                                             : isDark ? 'bg-[#2a2a35] border-[#3a3a45] hover:border-[#7c3aed]/50' : 'bg-gray-100/80 border-gray-200 hover:border-[#7c3aed]/30 hover:shadow-sm'}`}
                                                     >
                                                         <div className="flex-1 flex items-center justify-between min-w-0 px-3 pr-4">
                                                             <div className="flex-1 flex items-center gap-3 min-w-0">
                                                                 <div className={`flex-1 h-8 rounded-lg flex items-center justify-center transition-colors flex-shrink-0 ${isDark ? 'bg-white/10' : 'bg-white shadow-inner border border-gray-200/50'}`}>
-                                                                    <div className="w-full h-full rounded-lg bg-white overflow-hidden" />
+                                                                    <div className="w-full h-full rounded-lg overflow-hidden" style={{ backgroundColor: 'white' }} />
                                                                 </div>
                                                             </div>
 
@@ -1275,38 +1296,50 @@ const SaasVideoEditor = () => {
                                                         onClick={() => setSelectedId(el.id)}
                                                         {...attributes} 
                                                         {...listeners}
-                                                        className={`mx-2 mb-1.5 h-[52px] flex items-center cursor-pointer group select-none border rounded-xl overflow-hidden touch-none ${selectedId === el.id 
+                                                        className={`mx-2 mb-1.5 h-[64px] flex items-center cursor-grab active:cursor-grabbing group select-none border rounded-xl overflow-hidden touch-none ${selectedId === el.id 
                                                             ? isDark ? 'bg-[#2d1f5e] border-[#7c3aed] shadow-[0_0_15px_rgba(124,58,237,0.15)]' : 'bg-[#ede9fe] border-[#7c3aed] shadow-[0_0_15px_rgba(124,58,237,0.1)]'
                                                             : isDark ? 'bg-[#2a2a35] border-[#3a3a45] hover:border-[#7c3aed]/50' : 'bg-gray-100/80 border-gray-200 hover:border-[#7c3aed]/30 hover:shadow-sm'}`}
                                                     >
                                                         <div 
-                                                            className={`flex items-center justify-center w-10 h-full border-r flex-shrink-0 cursor-grab active:cursor-grabbing transition-colors ${isDark ? 'border-r-[#2a2d45] text-gray-600 group-hover:text-gray-400' : 'border-r-gray-100 text-gray-300 group-hover:text-gray-500'}`}
+                                                            className={`flex items-center justify-center w-10 h-full flex-shrink-0 transition-colors ${isDark ? 'text-gray-600 group-hover:text-gray-400' : 'text-gray-300 group-hover:text-gray-500'}`}
                                                         >
-                                                            <GripVertical size={20} strokeWidth={3} />
+                                                            <GripVertical size={22} strokeWidth={3} />
                                                         </div>
 
-                                                        <div className="flex-1 flex items-center justify-between min-w-0 px-3">
-                                                            <div className="flex items-center gap-3 min-w-0">
-                                                                <div className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors flex-shrink-0 ${selectedId === el.id ? 'bg-[#7c3aed] text-white' : isDark ? 'bg-gray-800 text-gray-400' : 'bg-gray-100 text-gray-500'}`}>
-                                                                    <Layers size={14} />
-                                                                </div>
-                                                                <div className="flex flex-col min-w-0">
-                                                                    <span className={`text-[13px] font-bold tracking-tight truncate ${isDark ? 'text-white' : 'text-gray-900'}`}>
-                                                                        {el.type.charAt(0).toUpperCase() + el.type.slice(1)}
-                                                                    </span>
-                                                                    <span className={`text-[10px] uppercase font-mono tracking-wider truncate ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>
-                                                                        {el.id.slice(-6)}
-                                                                    </span>
-                                                                </div>
-                                                            </div>
-                                                            
-                                                            <div className="relative">
+                                                        <div className="flex-1 flex items-center justify-center min-w-0 pr-4 relative overflow-hidden">
+                                                            {/* Element Preview in Middle */}
+                                                            {(() => {
+                                                                const ElementComponent = getElementComponent(el.type) as React.ElementType;
+                                                                if (!ElementComponent) return null;
+                                                                
+                                                                // Extract base size for proportions
+                                                                const [baseW, baseH] = el.boundingSize ?? [200, 60];
+                                                                const ratio = baseH / baseW;
+                                                                
+                                                                return (
+                                                                    <div className="flex items-center justify-center pointer-events-none select-none opacity-90 transition-transform duration-200" style={{ transform: 'scale(0.28)', transformOrigin: 'center center' }}>
+                                                                        <Suspense fallback={null}>
+                                                                            <ElementComponent 
+                                                                                isDark={isDark} 
+                                                                                style={{ 
+                                                                                    width: 140, 
+                                                                                    height: 140 * ratio,
+                                                                                }} 
+                                                                                {...(el.props ?? {})} 
+                                                                            />
+                                                                        </Suspense>
+                                                                    </div>
+                                                                );
+                                                            })()}
+                                                        </div>
+                                                        
+                                                        <div className="pr-3 flex-shrink-0 relative">
                                                                 <button 
                                                                     onClick={(e) => { e.stopPropagation(); setActiveMenuId(activeMenuId === el.id ? null : el.id); }}
                                                                     className={`p-1.5 rounded-md hover:bg-black/5 dark:hover:bg-white/10 transition-all ${isDark ? 'text-gray-400' : 'text-gray-500'}`}
                                                                     title="More Actions"
                                                                 >
-                                                                    <MoreVertical size={18} />
+                                                                    <MoreVertical size={20} />
                                                                 </button>
 
                                                                 {activeMenuId === el.id && (
@@ -1331,7 +1364,6 @@ const SaasVideoEditor = () => {
                                                                 )}
                                                             </div>
                                                         </div>
-                                                    </div>
                                                 )}
                                             />
                                         ) : (
