@@ -1,7 +1,6 @@
 import { create } from 'zustand';
 import { travel } from 'zustand-travel';
 import type { ManualTravelsControls } from 'zustand-travel';
-import { rawReturn } from 'mutative';
 
 // ─── Element type ────────────────────────────────────────────────────────────
 
@@ -56,31 +55,40 @@ export const useEditorStore = create<EditorState>()(
             elementIds: [] as string[],
 
             // Adds a new item to the canvas and selects it
-            addElement: (element) =>
+            addElement: (element) => {
+                console.log('addElement START - element:', element.id);
                 set((state) => {
-                    const newElements = new Map(state.elements);
-                    newElements.set(element.id, element);
-                    const newElementIds = [...state.elementIds, element.id];
-                    return rawReturn({
-                        elements: newElements,
-                        elementIds: newElementIds,
-                    });
-                }),
+                    console.log('addElement set callback - state.elements size:', state.elements.size);
+                    const newState = {
+                        elements: new Map([...state.elements, [element.id, element]]),
+                        elementIds: [...state.elementIds, element.id],
+                    };
+                    console.log('addElement returning new state');
+                    return newState;
+                });
+                console.log('addElement END');
+            },
 
             // Updates an item's fields (position/rotation/scale/etc.)
             updateElement: (id, data) =>
                 set((state) => {
                     const el = state.elements.get(id);
-                    if (el) {
-                        state.elements.set(id, { ...el, ...data });
-                    }
+                    if (!el) return state;
+                    return {
+                        elements: new Map([...state.elements, [id, { ...el, ...data }]]),
+                        elementIds: state.elementIds,
+                    };
                 }),
 
             // Removes an element from the canvas
             removeElement: (id) =>
                 set((state) => {
-                    state.elements.delete(id);
-                    state.elementIds = state.elementIds.filter((eid) => eid !== id);
+                    const newElements = new Map(state.elements);
+                    newElements.delete(id);
+                    return {
+                        elements: newElements,
+                        elementIds: state.elementIds.filter((eid) => eid !== id),
+                    };
                 }),
         }),
         {
