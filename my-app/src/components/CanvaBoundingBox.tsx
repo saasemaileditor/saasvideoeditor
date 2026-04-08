@@ -27,6 +27,7 @@ export function CanvaBoundingBox({ el, updateElement, containerRef }: CanvaBound
     // Keep track of state at the start of a drag/resize/rotate 
     // so we can compute absolute values linearly without React state lag
     const dragStartRef = useRef<{ pos: [number, number]; scale: [number, number]; rot: number } | null>(null);
+    const pendingUpdatesRef = useRef<Partial<CanvasElement> | null>(null);
 
     const handleStart = () => {
         dragStartRef.current = {
@@ -34,45 +35,76 @@ export function CanvaBoundingBox({ el, updateElement, containerRef }: CanvaBound
             scale: [el.scale[0], el.scale[1]],
             rot: el.rotation?.[2] ?? 0
         };
+        pendingUpdatesRef.current = null;
     };
 
     const handleDrag = (e: OnDrag) => {
         if (!dragStartRef.current) return;
         const [startX, startY] = dragStartRef.current.pos;
+        
+        // Direct DOM update to bypass React state cycle (fixes trailing box lag)
+        e.target.style.transform = e.transform;
 
-        updateElement(el.id, {
+        pendingUpdatesRef.current = {
+            ...pendingUpdatesRef.current,
             position: [startX + e.beforeTranslate[0], startY + e.beforeTranslate[1], 0]
-        });
+        };
     };
 
     const handleResize = (e: OnResize) => {
         if (!dragStartRef.current) return;
+        
+        // Direct DOM Update for jitter-free 60FPS resize
+        e.target.style.width = `${e.width}px`;
+        e.target.style.height = `${e.height}px`;
+        e.target.style.transform = e.drag.transform;
 
+        // Compute absolute new center for Zustand using top-left expansion math
         const [BASE_W, BASE_H] = el.boundingSize ?? [200, 60];
-
-        // e.width and e.height are the new absolute pixel sizes
-        const newSx = e.width / BASE_W;
-        const newSy = e.height / BASE_H;
+        const [startSx, startSy] = dragStartRef.current.scale;
+        
+        const oldW = BASE_W * startSx;
+        const oldH = BASE_H * startSy;
+        const newW = e.width;
+        const newH = e.height;
 
         const [startX, startY] = dragStartRef.current.pos;
 
-        updateElement(el.id, {
+        // Moveable shifts the top-left corner by e.drag.beforeTranslate.
+        // And the element expands by (newW - oldW). This shifts the center rightwards.
+        const newCenterX = startX + e.drag.beforeTranslate[0] + (newW - oldW) / 2;
+        const newCenterY = startY + e.drag.beforeTranslate[1] + (newH - oldH) / 2;
+
+        const newSx = newW / BASE_W;
+        const newSy = newH / BASE_H;
+
+        pendingUpdatesRef.current = {
+            ...pendingUpdatesRef.current,
             scale: [newSx, newSy, 1],
-            // e.drag.beforeTranslate captures the offset needed to keep the un-dragged corner pinned
-            position: [startX + e.drag.beforeTranslate[0], startY + e.drag.beforeTranslate[1], 0]
-        });
+            position: [newCenterX, newCenterY, 0]
+        };
     };
 
     const handleRotate = (e: OnRotate) => {
         if (!dragStartRef.current) return;
-        const startRot = dragStartRef.current.rot;
+        
+        // Direct DOM Update
+        e.target.style.transform = e.drag.transform;
 
-        updateElement(el.id, {
+        const startRot = dragStartRef.current.rot;
+        
+        pendingUpdatesRef.current = {
+            ...pendingUpdatesRef.current,
             rotation: [0, 0, startRot + e.beforeRotate]
-        });
+        };
     };
 
     const handleEnd = () => {
+        // "Write to the heavy notebook" ONLY when the mouse releases
+        if (pendingUpdatesRef.current) {
+            updateElement(el.id, pendingUpdatesRef.current);
+            pendingUpdatesRef.current = null;
+        }
         getHistoryControls().archive();
         window.dispatchEvent(new CustomEvent('history-updated'));
     };
