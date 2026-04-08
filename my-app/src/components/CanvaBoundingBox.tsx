@@ -39,7 +39,7 @@ export function CanvaBoundingBox({ el, updateElement, containerRef }: CanvaBound
     const handleDrag = (e: OnDrag) => {
         if (!dragStartRef.current) return;
         const [startX, startY] = dragStartRef.current.pos;
-        
+
         updateElement(el.id, {
             position: [startX + e.beforeTranslate[0], startY + e.beforeTranslate[1], 0]
         });
@@ -47,15 +47,15 @@ export function CanvaBoundingBox({ el, updateElement, containerRef }: CanvaBound
 
     const handleResize = (e: OnResize) => {
         if (!dragStartRef.current) return;
-        
+
         const [BASE_W, BASE_H] = el.boundingSize ?? [200, 60];
-        
+
         // e.width and e.height are the new absolute pixel sizes
         const newSx = e.width / BASE_W;
         const newSy = e.height / BASE_H;
 
         const [startX, startY] = dragStartRef.current.pos;
-        
+
         updateElement(el.id, {
             scale: [newSx, newSy, 1],
             // e.drag.beforeTranslate captures the offset needed to keep the un-dragged corner pinned
@@ -66,7 +66,7 @@ export function CanvaBoundingBox({ el, updateElement, containerRef }: CanvaBound
     const handleRotate = (e: OnRotate) => {
         if (!dragStartRef.current) return;
         const startRot = dragStartRef.current.rot;
-        
+
         updateElement(el.id, {
             rotation: [0, 0, startRot + e.beforeRotate]
         });
@@ -115,7 +115,7 @@ export function CanvaBoundingBox({ el, updateElement, containerRef }: CanvaBound
             <Moveable
                 target={target}
                 container={containerRef.current}
-                
+
                 // Styles
                 className="canva-moveable-style"
                 origin={false}
