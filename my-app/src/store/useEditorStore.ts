@@ -25,11 +25,28 @@ export type CanvasElement = {
 interface UIState {
     selectedId: string | null;
     setSelectedId: (id: string | null) => void;
+    
+    // Timeline state
+    isPlaying: boolean;
+    setIsPlaying: (isPlaying: boolean) => void;
+    currentTime: number;
+    setCurrentTime: (time: number | ((prev: number) => number)) => void;
+    activeScene: number;
+    setActiveScene: (scene: number) => void;
 }
 
 export const useUIStore = create<UIState>((set) => ({
     selectedId: null,
     setSelectedId: (id) => set({ selectedId: id }),
+    
+    isPlaying: false,
+    setIsPlaying: (isPlaying) => set({ isPlaying }),
+    currentTime: 0,
+    setCurrentTime: (time) => set((state) => ({ 
+        currentTime: typeof time === 'function' ? time(state.currentTime) : time 
+    })),
+    activeScene: 1,
+    setActiveScene: (activeScene) => set({ activeScene }),
 }));
 
 // ─── Document State Store (Undoable) ──────────────────────────────────────────
