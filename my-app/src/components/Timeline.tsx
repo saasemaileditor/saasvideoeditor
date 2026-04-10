@@ -1,25 +1,29 @@
-import React, { useRef, useEffect, useState } from 'react';
-import { Play, Pause, Plus, LayoutGrid, Music, Maximize, ChevronLeft, ChevronRight } from 'lucide-react';
-import { useUIStore } from '../store/useEditorStore';
+import React, { useRef, useEffect, useState, useMemo } from 'react';
+import ReactDOM from 'react-dom';
+import { Play, Pause, Plus, LayoutGrid, Music, Maximize, CloudUpload, RectangleHorizontal } from 'lucide-react';
 
 interface TimelineProps {
     currentTime: number;
     setCurrentTime: (time: number | ((prev: number) => number)) => void;
     isPlaying: boolean;
     setIsPlaying: (playing: boolean) => void;
-    activeScene: number;
-    setActiveScene: (scene: number) => void;
     isDark: boolean;
+    onOpenMediaPanel: () => void;
 }
+
+// ─── Constants ───────────────────────────────────────────────────────────────
+const DEFAULT_DURATION = 60;   // 1 minute default
+const SEGMENT_SECONDS = 5;     // Each visual segment = 5 seconds
+const SUB_TICKS_PER_SEGMENT = 5; // 5 sub-ticks per segment (1 per second)
+const AUTO_EXTEND_SECONDS = 15; // Add 15s when auto-extending
 
 export const Timeline = ({
     currentTime,
     setCurrentTime,
     isPlaying,
     setIsPlaying,
-    activeScene,
-    setActiveScene,
     isDark,
+    onOpenMediaPanel,
 }: TimelineProps) => {
     const formatTime = (seconds: number) => {
         const mins = Math.floor(seconds / 60);
@@ -30,36 +34,108 @@ export const Timeline = ({
 
     const [isDraggingPlayhead, setIsDraggingPlayhead] = useState(false);
     const [zoom, setZoom] = useState(380); // 10 to 1000 zoom scale
+    const [duration, setDuration] = useState(DEFAULT_DURATION); // Dynamic, auto-extending
     const timelineRef = useRef<HTMLDivElement>(null);
-    const sceneScrollRef = useRef<HTMLDivElement>(null);
-    const scenes = useUIStore((state) => state.scenes);
-    const addScene = useUIStore((state) => state.addScene);
 
-    const [canScrollLeft, setCanScrollLeft] = useState(false);
-    const [canScrollRight, setCanScrollRight] = useState(false);
+    const [containerWidth, setContainerWidth] = useState(0);
+    const [hoverTime, setHoverTime] = useState<number | null>(null);
+    const [hoverScrubberPos, setHoverScrubberPos] = useState<{ top: number; left: number } | null>(null);
+    const [showPlusDropdown, setShowPlusDropdown] = useState(false);
+    const [dropdownPos, setDropdownPos] = useState<{ top: number; left: number } | null>(null);
+    const [scenes, setScenes] = useState<{ id: string, duration: number }[]>([]);
+    const plusBtnRef = useRef<HTMLButtonElement>(null);
+    const dropdownRef = useRef<HTMLDivElement>(null);
 
-    const checkScroll = () => {
-        if (sceneScrollRef.current) {
-            const { scrollLeft, scrollWidth, clientWidth } = sceneScrollRef.current;
-            setCanScrollLeft(scrollLeft > 0);
-            setCanScrollRight(Math.ceil(scrollLeft + clientWidth) < scrollWidth);
+    // Compute dropdown position when it opens
+    useEffect(() => {
+        if (showPlusDropdown && plusBtnRef.current) {
+            const rect = plusBtnRef.current.getBoundingClientRect();
+            setDropdownPos({
+                top: rect.top - 8, // 8px gap above the button
+                left: rect.left,
+            });
+        } else {
+            setDropdownPos(null);
         }
+    }, [showPlusDropdown]);
+
+    // Close dropdown on click outside
+    useEffect(() => {
+        if (!showPlusDropdown) return;
+        const handleClickOutside = (e: MouseEvent) => {
+            if (
+                dropdownRef.current && !dropdownRef.current.contains(e.target as Node) &&
+                plusBtnRef.current && !plusBtnRef.current.contains(e.target as Node)
+            ) {
+                setShowPlusDropdown(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, [showPlusDropdown]);
+
+    // Track container width for pixel-perfect tick rounding
+    useEffect(() => {
+        if (!timelineRef.current) return;
+        
+        const observer = new ResizeObserver((entries) => {
+            for (let entry of entries) {
+                setContainerWidth(entry.contentRect.width);
+            }
+        });
+        
+        observer.observe(timelineRef.current);
+        return () => observer.disconnect();
+    }, []);
+
+    // Auto-extend duration when currentTime approaches the end
+    useEffect(() => {
+        if (currentTime >= duration - 2) {
+            setDuration((prev) => prev + AUTO_EXTEND_SECONDS);
+        }
+    }, [currentTime, duration]);
+
+    // ─── Ruler tick generation ────────────────────────────────────────────────
+    const rulerTicks = useMemo(() => {
+        const totalSegments = Math.ceil(duration / SEGMENT_SECONDS);
+        const ticks: { time: number; isMajor: boolean }[] = [];
+
+        for (let seg = 0; seg <= totalSegments; seg++) {
+            const majorTime = seg * SEGMENT_SECONDS;
+            ticks.push({ time: majorTime, isMajor: true });
+
+            // Sub-ticks within this segment (skip if last segment boundary)
+            if (seg < totalSegments) {
+                for (let sub = 1; sub < SUB_TICKS_PER_SEGMENT; sub++) {
+                    const subTime = majorTime + sub * (SEGMENT_SECONDS / SUB_TICKS_PER_SEGMENT);
+                    if (subTime <= duration) {
+                        ticks.push({ time: subTime, isMajor: false });
+                    }
+                }
+            }
+        }
+        return ticks;
+    }, [duration]);
+
+    // ─── Time ↔ pixel helpers ─────────────────────────────────────────────────
+    const usableWidth = containerWidth - 8; // 4px padding each side
+    const timeToPixel = (t: number) => Math.round((t / duration) * usableWidth);
+    const pixelToTime = (px: number) => {
+        const clamped = Math.max(0, Math.min(px, usableWidth));
+        return (clamped / usableWidth) * duration;
     };
 
-    useEffect(() => {
-        checkScroll();
-        window.addEventListener('resize', checkScroll);
-        const timer = setTimeout(checkScroll, 50);
-        return () => {
-            window.removeEventListener('resize', checkScroll);
-            clearTimeout(timer);
-        };
-    }, [scenes.length]);
-
-    const scrollScenes = (direction: 'left' | 'right') => {
-        if (sceneScrollRef.current) {
-            const scrollAmount = direction === 'left' ? -200 : 200;
-            sceneScrollRef.current.scrollBy({ left: scrollAmount, behavior: 'smooth' });
+    const handleTimelineMouseMove = (e: React.MouseEvent) => {
+        if (timelineRef.current) {
+            const rect = timelineRef.current.getBoundingClientRect();
+            const x = e.clientX - rect.left - 4;
+            const time = pixelToTime(x);
+            setHoverTime(time);
+            
+            setHoverScrubberPos({
+                top: rect.top, // top of the timeline strip
+                left: rect.left + 4 + timeToPixel(time) // exact screen x of the ghost line
+            });
         }
     };
 
@@ -67,10 +143,8 @@ export const Timeline = ({
         setIsDraggingPlayhead(true);
         if (timelineRef.current) {
             const rect = timelineRef.current.getBoundingClientRect();
-            let x = e.clientX - rect.left;
-            x = Math.max(0, Math.min(x, rect.width));
-            const percentage = x / rect.width;
-            setCurrentTime(percentage * 10);
+            const x = e.clientX - rect.left - 4;
+            setCurrentTime(pixelToTime(x));
         }
     };
 
@@ -78,10 +152,8 @@ export const Timeline = ({
         const handleMouseMove = (e: MouseEvent) => {
             if (isDraggingPlayhead && timelineRef.current) {
                 const rect = timelineRef.current.getBoundingClientRect();
-                let x = e.clientX - rect.left;
-                x = Math.max(0, Math.min(x, rect.width));
-                const percentage = x / rect.width;
-                setCurrentTime(percentage * 10);
+                const x = e.clientX - rect.left - 4;
+                setCurrentTime(pixelToTime(x));
             }
         };
         const handleMouseUp = () => setIsDraggingPlayhead(false);
@@ -94,7 +166,7 @@ export const Timeline = ({
             document.removeEventListener('mousemove', handleMouseMove);
             document.removeEventListener('mouseup', handleMouseUp);
         };
-    }, [isDraggingPlayhead, setCurrentTime]);
+    }, [isDraggingPlayhead, setCurrentTime, duration]);
 
     // Simulated Playback Logic
     useEffect(() => {
@@ -102,34 +174,61 @@ export const Timeline = ({
         if (isPlaying) {
             interval = window.setInterval(() => {
                 setCurrentTime((prev) => {
-                    if (prev >= 10) {
+                    if (prev >= duration) {
                         setIsPlaying(false);
-                        return 10;
+                        return duration;
                     }
                     return prev + 0.1;
                 });
             }, 100);
         }
         return () => window.clearInterval(interval);
-    }, [isPlaying, setIsPlaying, setCurrentTime]);
+    }, [isPlaying, setIsPlaying, setCurrentTime, duration]);
+
+    // ─── Ruler label formatter (smart: shows m:ss for ≥60s) ──────────────────
+    const formatRulerLabel = (seconds: number) => {
+        if (seconds >= 60) {
+            const mins = Math.floor(seconds / 60);
+            const secs = Math.floor(seconds % 60);
+            return `${mins}:${secs.toString().padStart(2, '0')}`;
+        }
+        return `${seconds}s`;
+    };
 
     return (
+        <>
         <div className={`h-[180px] pt-0 pb-2 flex-shrink-0 flex flex-col transition-colors duration-200 overflow-hidden -mx-[10px] -mb-[10px] ${isDark ? 'bg-[#1e1e2e] border-t border-[#2a2d45]' : 'bg-white border-t border-gray-200'}`}>
 
 
             {/* Main Timeline Area */}
             <div className="flex-1 flex overflow-hidden">
                 <div className={`flex-1 overflow-x-auto overflow-y-hidden relative custom-scrollbar ${isDark ? 'bg-[#14141d]' : 'bg-white'}`}>
-                        <div
-                            className="h-full relative transition-all duration-300 ease-out pl-12 pr-12"
-                            style={{ minWidth: `${800 + (zoom * 4)}px` }}
-                            ref={timelineRef}
-                            onMouseDown={handleTimelineMouseDown}
-                        >
+                    <div
+                        className="h-full relative transition-all duration-300 ease-out px-1"
+                        style={{ minWidth: `${800 + (zoom * 4)}px` }}
+                        ref={timelineRef}
+                        onMouseDown={handleTimelineMouseDown}
+                        onMouseMove={handleTimelineMouseMove}
+                        onMouseLeave={() => { setHoverTime(null); setHoverScrubberPos(null); }}
+                    >
+                        {/* Ghost Scrubber (Hover Preview) */}
+                        {hoverTime !== null && !isDraggingPlayhead && (
+                            <div className="absolute top-0 bottom-0 w-[2px] z-40 pointer-events-none left-1"
+                                style={{ 
+                                    transform: `translateX(${timeToPixel(hoverTime)}px)`,
+                                }}
+                            >
+                                <svg width="10" height="8" viewBox="0 0 10 8" className="absolute top-[2px] left-1/2 -translate-x-1/2 text-[#1f2937]" fill="currentColor">
+                                    <path d="M2.5 1h5c1.1 0 1.6 1.3.8 2.1L5.8 5.7c-.4.4-1.1.4-1.5 0L1.7 3.1C.9 2.3 1.4 1 2.5 1z" />
+                                </svg>
+                                <div className="absolute top-[28px] bottom-0 left-0 right-0 bg-gray-800 opacity-60 rounded-full" />
+                            </div>
+                        )}
+
                         {/* Playhead Marker */}
-                        <div className="absolute top-0 bottom-0 w-[2px] z-30 pointer-events-none -translate-x-1/2 left-0"
+                        <div className="absolute top-0 bottom-0 w-[2px] z-40 pointer-events-none left-1"
                             style={{ 
-                                transform: `translateX(${Math.round((currentTime / 10) * (timelineRef.current?.clientWidth || (800 + zoom * 4)))}px)`,
+                                transform: `translateX(${timeToPixel(currentTime)}px)`,
                             }}
                         >
                             {/* Rounded Head triangle */}
@@ -146,54 +245,73 @@ export const Timeline = ({
                         </div>
 
                         {/* Time Ruler */}
-                        <div className="h-[36px] flex relative pointer-events-none z-10 w-full pt-2">
-                            {Array.from({ length: 101 }).map((_, i) => {
-                                const unit = i * 10; // 0, 10, 20... 1000
-                                const isMajor = unit % 50 === 0; // Every 0.5s if 100=1s
-                                const percentage = (unit / 10);
-                                return (
-                                    <div
-                                        key={unit}
-                                        className="absolute top-0 bottom-0 flex flex-row items-start pointer-events-none pt-2 -translate-x-1/2"
-                                        style={{ left: `${percentage}%` }}
-                                    >
-                                        <div className={`w-[1.5px] rounded-full ${isMajor ? 'h-5' : 'h-2.5'} ${isDark ? 'bg-gray-600' : 'bg-gray-300'}`} />
-                                        {isMajor && (
-                                            <span className={`text-[14px] font-medium select-none ml-1.5 whitespace-nowrap -mt-0.5 ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
-                                                {(unit / 100).toFixed(1)}s
-                                            </span>
-                                        )}
-                                    </div>
-                                );
-                            })}
+                        <div className="h-[36px] flex absolute inset-x-1 pointer-events-none z-10 pt-2">
+                            {rulerTicks.map((tick) => (
+                                <div
+                                    key={tick.time}
+                                    className="absolute top-0 bottom-0 flex flex-row items-start pointer-events-none pt-2"
+                                    style={{ 
+                                        left: `${timeToPixel(tick.time)}px` 
+                                    }}
+                                >
+                                    <div className={`w-[2px] rounded-full ${tick.isMajor ? 'h-5' : 'h-2.5'} ${isDark ? 'bg-gray-600' : 'bg-gray-300'}`} />
+                                    {tick.isMajor && (
+                                        <span className={`text-[14px] font-medium select-none ml-1.5 whitespace-nowrap -mt-0.5 ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+                                            {formatRulerLabel(tick.time)}
+                                        </span>
+                                    )}
+                                </div>
+                            ))}
                         </div>
 
-                        {/* Tracks Area Container (Below ruler) */}
-                        <div className="absolute top-[36px] bottom-0 left-0 right-0 flex flex-col justify-center pb-2 gap-2">
+                        {/* Tracks Area Container (Below ruler) — vertical scroll only */}
+                        <div className="absolute top-[30px] bottom-0 left-1 right-1 flex flex-col overflow-y-auto overflow-x-visible gap-[2px] py-0 custom-scrollbar">
                             {/* Row 1: Add Elements */}
-                            <div className="relative h-7 flex items-center">
-                                <button className={`sticky left-4 z-20 flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold shadow-sm transition-colors ${isDark ? 'bg-[#1e1e2e] border border-gray-700 text-gray-300 hover:bg-gray-800' : 'bg-white border border-gray-200 text-gray-700 hover:bg-gray-50'}`}>
-                                    <LayoutGrid size={13} />
+                            <div className="relative h-9 shrink-0 flex items-center">
+                                <button className={`sticky left-0 z-15 flex items-center gap-2.5 px-4 py-1.5 rounded-[10px] text-[13px] font-semibold shadow-sm transition-colors ${isDark ? 'bg-[#1e1e2e] text-gray-300 hover:bg-gray-800' : 'bg-[#e5e7eb] text-gray-700 hover:bg-[#d1d5db]'}`}>
+                                    <LayoutGrid size={15} />
                                     Add elements
                                 </button>
                             </div>
 
-                            {/* Row 2: Main Track (or drag and drop) */}
-                            <div className="relative h-[52px] flex items-center">
-                                <div className={`absolute inset-y-0 left-4 right-4 rounded-xl flex items-center px-2 z-10 ${isDark ? 'bg-[#1e1e2e]' : 'bg-[#e5e7eb]'}`}>
-                                    <div className="sticky left-6 flex items-center gap-3">
-                                        <button className={`w-9 h-9 rounded-lg flex items-center justify-center shadow-sm cursor-pointer ${isDark ? 'bg-[#2a2d45] text-gray-300 hover:bg-[#323652]' : 'bg-[#d1d5db] text-gray-600 hover:bg-[#c2c6cc] transition-colors'}`}>
-                                            <Plus size={16} strokeWidth={2.5} />
-                                        </button>
-                                        <span className={`text-sm font-medium whitespace-nowrap ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>or drag and drop media</span>
+                            <div className="relative h-[62px] shrink-0 flex items-center">
+                                <div className={`absolute inset-y-0 left-0 right-4 rounded-xl flex items-center gap-1.5 z-10 ${isDark ? 'bg-[#1e1e2e]' : 'bg-[#e5e7eb]'}`}>
+                                    
+                                    {scenes.map((scene) => (
+                                        <div
+                                            key={scene.id}
+                                            className="h-full bg-white border-[1.5px] border-[#7c3aed] rounded-md flex items-end p-2 flex-shrink-0 shadow-sm"
+                                            style={{ width: `${timeToPixel(scene.duration)}px` }}
+                                        >
+                                            <span className="text-[12.5px] font-bold text-[#1f2937] leading-none tracking-tight">
+                                                {scene.duration.toFixed(1)}s
+                                            </span>
+                                        </div>
+                                    ))}
+
+                                    <div className="sticky left-0 px-2 pl-2 flex items-center gap-3 h-full py-[8px] flex-shrink-0">
+                                        <div className="relative h-full">
+                                            <button
+                                                ref={plusBtnRef}
+                                                onClick={(e) => { e.stopPropagation(); setShowPlusDropdown(!showPlusDropdown); }}
+                                                className={`h-full aspect-square rounded-lg flex items-center justify-center shadow-sm cursor-pointer ${isDark ? 'bg-[#2a2d45] text-gray-300 hover:bg-[#323652]' : 'bg-[#d1d5db] text-gray-600 hover:bg-[#c2c6cc] transition-colors'}`}
+                                            >
+                                                <Plus size={18} strokeWidth={2.5} />
+                                            </button>
+
+                                            {/* Plus Dropdown Menu — rendered via Portal to escape overflow clipping */}
+                                        </div>
+                                        {scenes.length === 0 && (
+                                            <span className={`text-sm font-medium whitespace-nowrap ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>or drag and drop media</span>
+                                        )}
                                     </div>
                                 </div>
                             </div>
 
                             {/* Row 3: Add Audio */}
-                            <div className="relative h-7 flex items-center">
-                                <button className={`sticky left-4 z-20 flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold shadow-sm transition-colors ${isDark ? 'bg-[#1e1e2e] border border-gray-700 text-gray-300 hover:bg-gray-800' : 'bg-white border border-gray-200 text-gray-700 hover:bg-gray-50'}`}>
-                                    <Music size={13} />
+                            <div className="relative h-9 shrink-0 flex items-center">
+                                <button className={`sticky left-0 z-15 flex items-center gap-2.5 px-4 py-1.5 rounded-[10px] text-[13px] font-semibold shadow-sm transition-colors ${isDark ? 'bg-[#1e1e2e] text-gray-300 hover:bg-gray-800' : 'bg-[#e5e7eb] text-gray-700 hover:bg-[#d1d5db]'}`}>
+                                    <Music size={15} />
                                     Add audio
                                 </button>
                             </div>
@@ -204,62 +322,7 @@ export const Timeline = ({
             </div>
 
             {/* Bottom Row */}
-            <div className="flex-shrink-0 flex items-center justify-between mt-1 pl-0 pr-3">
-                {/* Left Side: Scene Tabs with Scrolling */}
-                <div className="flex items-center gap-0 flex-1 min-w-0 mr-2 relative">
-                    <button
-                        onClick={() => scrollScenes('left')}
-                        className={`absolute left-0 z-20 w-6 h-6 rounded-full flex items-center justify-center shadow-sm transition-all duration-300 ${canScrollLeft ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-4 pointer-events-none'} ${isDark ? 'bg-[#1e1e2e] text-gray-400 border border-gray-700' : 'bg-white text-gray-600 border border-gray-100'}`}
-                    >
-                        <ChevronLeft size={14} />
-                    </button>
-
-                    <div
-                        ref={sceneScrollRef}
-                        onScroll={checkScroll}
-                        className="flex gap-1 items-center overflow-x-auto [&::-webkit-scrollbar]:hidden w-full pl-1 pr-1"
-                        style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
-                    >
-                        {scenes.map((sceneNum) => {
-                            const isActive = activeScene === sceneNum;
-                            return (
-                                <button
-                                    key={sceneNum}
-                                    onClick={() => setActiveScene(sceneNum)}
-                                    className={`flex-shrink-0 px-3 h-6 rounded-md text-xs font-medium cursor-pointer transition-colors flex items-center ${isActive
-                                        ? 'bg-[#7c3aed] text-white'
-                                        : isDark
-                                            ? 'bg-[#1e1e2e] border border-gray-700 text-gray-400 hover:text-gray-200'
-                                            : 'bg-white border border-gray-200 text-gray-500 hover:text-gray-700 hover:bg-gray-50'
-                                        }`}
-                                >
-                                    Scene {sceneNum}
-                                </button>
-                            );
-                        })}
-                        <button
-                            onClick={() => {
-                                addScene();
-                                // Scroll right after scene is added 
-                                setTimeout(() => {
-                                    if (sceneScrollRef.current) {
-                                        sceneScrollRef.current.scrollTo({ left: sceneScrollRef.current.scrollWidth, behavior: 'smooth' });
-                                    }
-                                }, 50);
-                            }}
-                            className={`flex-shrink-0 flex items-center justify-center w-6 h-6 rounded-md transition-colors cursor-pointer ${isDark ? 'bg-[#1e1e2e] border border-gray-700 text-gray-400 hover:text-white' : 'bg-white border border-gray-200 text-gray-500 hover:text-gray-900 hover:bg-gray-50'}`}
-                        >
-                            <Plus size={14} />
-                        </button>
-                    </div>
-
-                    <button
-                        onClick={() => scrollScenes('right')}
-                        className={`absolute right-0 z-20 w-6 h-6 rounded-full flex items-center justify-center shadow-sm transition-all duration-300 ${canScrollRight ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-4 pointer-events-none'} ${isDark ? 'bg-[#1e1e2e] text-gray-400 border border-gray-700' : 'bg-white text-gray-600 border border-gray-100'}`}
-                    >
-                        <ChevronRight size={14} />
-                    </button>
-                </div>
+            <div className="flex-shrink-0 flex items-center justify-end mt-1 pl-3 pr-3">
 
                 {/* Right Side: Canva style controls */}
                 <div className="flex items-center gap-4 text-xs font-medium">
@@ -311,7 +374,7 @@ export const Timeline = ({
                             {isPlaying ? <Pause size={10} fill="currentColor" /> : <Play size={10} fill="currentColor" className="ml-0.5" />}
                         </button>
                         <span className={`font-mono ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
-                            {formatTime(currentTime)} / 16:40
+                            {formatTime(currentTime)} / {formatTime(duration)}
                         </span>
                     </div>
 
@@ -327,5 +390,54 @@ export const Timeline = ({
                 </div>
             </div>
         </div>
+
+            {/* Portal-based dropdown — renders at body level to escape all overflow containers */}
+            {showPlusDropdown && dropdownPos && ReactDOM.createPortal(
+                <div
+                    ref={dropdownRef}
+                    className={`fixed w-44 rounded-xl shadow-lg border py-1.5 z-[9999] ${isDark ? 'bg-[#1e1e2e] border-gray-700' : 'bg-white border-gray-200'}`}
+                    style={{
+                        top: dropdownPos.top,
+                        left: dropdownPos.left,
+                        transform: 'translateY(-100%)',
+                    }}
+                >
+                    <button
+                        onClick={() => { setShowPlusDropdown(false); onOpenMediaPanel(); }}
+                        className={`w-full flex items-center gap-3 px-4 py-2.5 text-[13px] font-medium transition-colors ${isDark ? 'text-gray-300 hover:bg-gray-800' : 'text-gray-700 hover:bg-gray-100'}`}
+                    >
+                        <CloudUpload size={18} /> Uploads
+                    </button>
+                    <button
+                        onClick={() => { 
+                            setShowPlusDropdown(false); 
+                            setScenes(prev => [...prev, { id: Date.now().toString(), duration: 5.0 }]);
+                        }}
+                        className={`w-full flex items-center gap-3 px-4 py-2.5 text-[13px] font-medium transition-colors ${isDark ? 'text-gray-300 hover:bg-gray-800' : 'text-gray-700 hover:bg-gray-100'}`}
+                    >
+                        <RectangleHorizontal size={18} /> Blank
+                    </button>
+                </div>,
+                document.body
+            )}
+
+            {/* Portal-based Ghost Scrubber Tooltip */}
+            {hoverTime !== null && hoverScrubberPos && !isDraggingPlayhead && ReactDOM.createPortal(
+                <div
+                    className="fixed z-[9999] pointer-events-none flex flex-col items-center"
+                    style={{
+                        top: hoverScrubberPos.top,
+                        left: hoverScrubberPos.left,
+                        transform: 'translate(-50%, -100%)',
+                        marginTop: '4px' // Push it down slightly more to close the exact gap
+                    }}
+                >
+                    <div className="bg-[#1f2937] text-white text-[14px] font-semibold px-3 py-1.5 rounded-[8px] shadow-md relative group">
+                        {hoverTime.toFixed(1)}s
+                    </div>
+                </div>,
+                document.body
+            )}
+        </>
     );
 };

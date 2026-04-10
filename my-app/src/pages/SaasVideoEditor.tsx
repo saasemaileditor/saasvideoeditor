@@ -603,7 +603,6 @@ const SaasVideoEditor = () => {
         selectedId, setSelectedId,
         isPlaying, setIsPlaying,
         currentTime, setCurrentTime,
-        activeScene, setActiveScene
     } = useUIStore();
 
     useEffect(() => {
@@ -811,7 +810,7 @@ const SaasVideoEditor = () => {
             <div className={`fixed inset-0 flex flex-col p-[10px] gap-[10px] overflow-hidden transition-colors duration-200 ${isDark ? 'dark bg-[#080810] text-white' : 'bg-[#f3f4f6] text-gray-900'}`}>
 
                 {/* 2. Top navigation bar */}
-                <div className={`h-[56px] rounded-xl shadow-sm flex-shrink-0 flex items-center justify-between px-4 z-[60] transition-colors duration-200 overflow-hidden ${isDark ? 'bg-[#1e2235] border border-[#2a2d45]' : 'bg-white border border-transparent'}`}>
+                <div className={`h-[56px] rounded-b-xl shadow-sm flex-shrink-0 flex items-center justify-between px-4 z-[60] transition-colors duration-200 overflow-hidden -mx-[10px] -mt-[10px] ${isDark ? 'bg-[#1e2235] border-b border-[#2a2d45]' : 'bg-white border-b border-gray-200'}`}>
 
                     {/* LEFT SIDE: Logo & History */}
                     <div className="flex items-center gap-4">
@@ -942,7 +941,7 @@ const SaasVideoEditor = () => {
                     <div className="flex flex-1 min-w-0 min-h-0 gap-[10px]">
 
                         {/* Vertical Toolbar */}
-                        <div className={`w-[52px] flex-shrink-0 ${toolbarShouldCenter ? 'self-center' : ''} flex flex-col items-center gap-3 pt-3 pb-3 z-50 rounded-xl overflow-hidden shadow-sm transition-colors duration-200 ${isDark ? 'bg-[#1e2235] border border-[#2a2d45]' : 'bg-white border border-transparent'}`}>
+                        <div className={`w-[52px] flex-shrink-0 ${toolbarShouldCenter ? 'self-center' : ''} flex flex-col items-center gap-3 pt-3 pb-3 z-50 rounded-r-xl overflow-hidden shadow-sm transition-colors duration-200 -ml-[10px] ${isDark ? 'bg-[#1e2235] border border-[#2a2d45]' : 'bg-white border border-transparent'}`}>
                             {TABS.map((tab) => {
                                 const isActive = activeTab === tab.id;
                                 return (
@@ -1403,7 +1402,7 @@ const SaasVideoEditor = () => {
                         </div>
 
                         {/* 6. Main Right static panel */}
-                        <div className={`w-[280px] p-4 flex flex-col gap-4 flex-shrink-0 overflow-y-auto rounded-xl shadow-sm transition-colors duration-200 z-10 relative ${isDark ? 'bg-[#1e2235] border border-[#2a2d45]' : 'bg-white border border-transparent'}`}>
+                        <div className={`w-[280px] p-4 flex flex-col gap-4 flex-shrink-0 overflow-y-auto rounded-l-xl shadow-sm transition-colors duration-200 z-10 relative -mr-[10px] ${isDark ? 'bg-[#1e2235] border border-[#2a2d45]' : 'bg-white border border-transparent'}`}>
                             <span className={`font-semibold text-sm ${isDark ? 'text-white' : 'text-gray-800'}`}>
                                 Properties
                             </span>
@@ -1436,9 +1435,8 @@ const SaasVideoEditor = () => {
                         setCurrentTime={setCurrentTime}
                         isPlaying={isPlaying}
                         setIsPlaying={setIsPlaying}
-                        activeScene={activeScene}
-                        setActiveScene={setActiveScene}
                         isDark={isDark}
+                        onOpenMediaPanel={() => setActiveTab('Media')}
                     />
 
                 </div>

@@ -31,10 +31,7 @@ interface UIState {
     setIsPlaying: (isPlaying: boolean) => void;
     currentTime: number;
     setCurrentTime: (time: number | ((prev: number) => number)) => void;
-    activeScene: number;
-    setActiveScene: (scene: number) => void;
-    scenes: number[];
-    addScene: () => void;
+
 }
 
 export const useUIStore = create<UIState>((set) => ({
@@ -47,16 +44,7 @@ export const useUIStore = create<UIState>((set) => ({
     setCurrentTime: (time) => set((state) => ({ 
         currentTime: typeof time === 'function' ? time(state.currentTime) : time 
     })),
-    activeScene: 1,
-    setActiveScene: (activeScene) => set({ activeScene }),
-    scenes: [1, 2],
-    addScene: () => set((state) => {
-        const nextSceneNum = state.scenes.length > 0 ? Math.max(...state.scenes) + 1 : 1;
-        return {
-            scenes: [...state.scenes, nextSceneNum],
-            activeScene: nextSceneNum,
-        };
-    }),
+
 }));
 
 // ─── Document State Store (Undoable) ──────────────────────────────────────────
