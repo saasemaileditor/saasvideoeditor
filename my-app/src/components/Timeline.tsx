@@ -43,6 +43,7 @@ export const Timeline = ({
     const [showPlusDropdown, setShowPlusDropdown] = useState(false);
     const [dropdownPos, setDropdownPos] = useState<{ top: number; left: number } | null>(null);
     const [scenes, setScenes] = useState<{ id: string, duration: number }[]>([]);
+    const [selectedSceneId, setSelectedSceneId] = useState<string | null>(null);
     const plusBtnRef = useRef<HTMLButtonElement>(null);
     const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -275,21 +276,58 @@ export const Timeline = ({
                             </div>
 
                             <div className="relative h-[62px] shrink-0 flex items-center">
-                                <div className={`absolute inset-y-0 left-0 right-4 rounded-xl flex items-center gap-1.5 z-10 ${isDark ? 'bg-[#1e1e2e]' : 'bg-[#e5e7eb]'}`}>
+                                <div className={`absolute inset-y-0 left-0 right-4 rounded-xl flex items-center z-10 ${isDark ? 'bg-[#1e1e2e]' : 'bg-[#e5e7eb]'}`}>
                                     
-                                    {scenes.map((scene) => (
-                                        <div
-                                            key={scene.id}
-                                            className="h-full bg-white border-[1.5px] border-[#7c3aed] rounded-md flex items-end p-2 flex-shrink-0 shadow-sm"
-                                            style={{ width: `${timeToPixel(scene.duration)}px` }}
-                                        >
-                                            <span className="text-[12.5px] font-bold text-[#1f2937] leading-none tracking-tight">
-                                                {scene.duration.toFixed(1)}s
-                                            </span>
-                                        </div>
-                                    ))}
+                                    {scenes.map((scene) => {
+                                        const isSelected = selectedSceneId === scene.id;
+                                        return (
+                                            <div
+                                                key={scene.id}
+                                                onClick={() => setSelectedSceneId(isSelected ? null : scene.id)}
+                                                className={`relative h-full bg-white rounded-md flex items-end p-2 flex-shrink-0 cursor-pointer border-[1.5px] group/scene ${
+                                                    isSelected
+                                                        ? 'border-[#7c3aed]'
+                                                        : 'border-[#d1d5db]'
+                                                }`}
+                                                style={{ width: `${timeToPixel(scene.duration)}px` }}
+                                            >
+                                                {/* Duration label — only when selected, hides on hover */}
+                                                {isSelected && (
+                                                    <span className="text-[12.5px] font-bold text-[#1f2937] leading-none tracking-tight transition-opacity group-hover/scene:opacity-0">
+                                                        {scene.duration.toFixed(1)}s
+                                                    </span>
+                                                )}
 
-                                    <div className="sticky left-0 px-2 pl-2 flex items-center gap-3 h-full py-[8px] flex-shrink-0">
+                                                {/* Resize Handles — on ALL blanks, visible only on hover */}
+                                                <>
+                                                    {/* Left Handle */}
+                                                    <div className="absolute left-[1.5px] top-[1.5px] bottom-[1.5px] w-[32px] bg-gradient-to-r from-black/18 to-transparent flex items-center justify-start pl-[5px] cursor-ew-resize rounded-l-[5px] opacity-0 group-hover/scene:opacity-100 transition-opacity">
+                                                        <div className="w-[3px] h-[26px] bg-white rounded-full shadow-sm" />
+                                                    </div>
+                                                    {/* Right Handle */}
+                                                    <div className="absolute right-[1.5px] top-[1.5px] bottom-[1.5px] w-[32px] bg-gradient-to-l from-black/18 to-transparent flex items-center justify-end pr-[5px] cursor-ew-resize rounded-r-[5px] opacity-0 group-hover/scene:opacity-100 transition-opacity">
+                                                        <div className="w-[3px] h-[26px] bg-white rounded-full shadow-sm" />
+                                                    </div>
+                                                </>
+
+                                                {/* 3-dot pill — only when selected AND hovered */}
+                                                {isSelected && (
+                                                    <div className="absolute top-1.5 right-1.5 opacity-0 group-hover/scene:opacity-100 transition-opacity z-20">
+                                                        <div 
+                                                            onClick={(e) => e.stopPropagation()}
+                                                            className="bg-[#6b7280] hover:bg-[#7c3aed] rounded-full px-[6px] py-[5px] flex items-center gap-[2.5px] transition-colors cursor-pointer"
+                                                        >
+                                                            <span className="w-[3px] h-[3px] rounded-full bg-white block" />
+                                                            <span className="w-[3px] h-[3px] rounded-full bg-white block" />
+                                                            <span className="w-[3px] h-[3px] rounded-full bg-white block" />
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        );
+                                    })}
+
+                                    <div className="sticky left-0 px-2 pl-2 flex items-center gap-3 h-full py-[8px] flex-shrink-0 ml-[2px]">
                                         <div className="relative h-full">
                                             <button
                                                 ref={plusBtnRef}
@@ -410,8 +448,10 @@ export const Timeline = ({
                     </button>
                     <button
                         onClick={() => { 
-                            setShowPlusDropdown(false); 
-                            setScenes(prev => [...prev, { id: Date.now().toString(), duration: 5.0 }]);
+                            setShowPlusDropdown(false);
+                            const newId = Date.now().toString();
+                            setScenes(prev => [...prev, { id: newId, duration: 5.0 }]);
+                            setSelectedSceneId(newId);
                         }}
                         className={`w-full flex items-center gap-3 px-4 py-2.5 text-[13px] font-medium transition-colors ${isDark ? 'text-gray-300 hover:bg-gray-800' : 'text-gray-700 hover:bg-gray-100'}`}
                     >
