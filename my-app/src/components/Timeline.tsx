@@ -307,12 +307,19 @@ export const Timeline = ({
                 const finalDuration = liveRightDrag.current.sceneId === resizingScene.id
                     ? liveRightDrag.current.duration
                     : resizingScene.startDuration;
+                // Update scenes with new duration
                 setScenes(prev =>
                     prev.map(s => s.id === resizingScene.id
                         ? { ...s, duration: parseFloat(finalDuration.toFixed(2)) }
                         : s
                     )
                 );
+                // Calculate new right edge position for scrubber (sum of prior durations + new duration)
+                const sceneIdx = scenes.findIndex(s => s.id === resizingScene.id);
+                const priorDuration = scenes.slice(0, sceneIdx).reduce((sum, s) => sum + s.duration, 0);
+                const newEdgePosition = priorDuration + parseFloat(finalDuration.toFixed(2));
+                setScrubberTime(newEdgePosition);
+                setCurrentTime(newEdgePosition);
                 liveRightDrag.current = { sceneId: null, scenePx: 0, duration: 0 };
             } else {
                 // Commit final left-handle duration, reset leadingGap to 0 — scenes snap back
@@ -329,11 +336,11 @@ export const Timeline = ({
                 const sceneIdx = scenes.findIndex(s => s.id === resizingScene.id);
                 const priorDuration = scenes.slice(0, sceneIdx).reduce((sum, s) => sum + s.duration, 0);
                 setScrubberTime(priorDuration);
+                setCurrentTime(priorDuration);
                 liveLeftDrag.current = { sceneId: null, spacerPx: 0, scenePx: 0, duration: 0 };
             }
-            // End of resize: stop fading and sync scrubber to final position
+            // End of resize: stop fading
             setScrubberFaded(false);
-            setCurrentTime(scrubberTime);
             setResizingScene(null);
             setResizeTooltip(null);
         };
