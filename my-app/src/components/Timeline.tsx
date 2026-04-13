@@ -1,6 +1,6 @@
 import React, { useRef, useEffect, useState, useMemo } from 'react';
 import ReactDOM from 'react-dom';
-import { Play, Pause, Plus, LayoutGrid, Music, Maximize, CloudUpload, RectangleHorizontal } from 'lucide-react';
+import { Play, Pause, Plus, LayoutGrid, Music, Maximize, CloudUpload, RectangleHorizontal, StepForward } from 'lucide-react';
 
 interface TimelineProps {
     currentTime: number;
@@ -39,12 +39,28 @@ export const Timeline = ({
     // New state: scrubber follows resize handle and fades while dragging
     const [scrubberTime, setScrubberTime] = useState(currentTime);
     const [scrubberFaded, setScrubberFaded] = useState(false);
+    const [scrubberSnapped, setScrubberSnapped] = useState(false); // true when resize handle snaps to scrubber
+
+    // Click vs Drag detection for resize handles
+    const [pendingResizeClick, setPendingResizeClick] = useState<{
+        sceneId: string;
+        side: 'left' | 'right';
+        startX: number;
+        startY: number;
+        clickTime: number;
+        startDuration: number;
+        startLeadingGap: number;
+    } | null>(null);
+    const RESIZE_DRAG_THRESHOLD = 5; // pixels - must move more than this to be considered a drag
 
     const [containerWidth, setContainerWidth] = useState(0);
     const [hoverTime, setHoverTime] = useState<number | null>(null);
     const [hoverScrubberPos, setHoverScrubberPos] = useState<{ top: number; left: number } | null>(null);
     const [showPlusDropdown, setShowPlusDropdown] = useState(false);
     const [dropdownPos, setDropdownPos] = useState<{ top: number; left: number } | null>(null);
+    const [showGapDropdown, setShowGapDropdown] = useState(false);
+    const [gapDropdownPos, setGapDropdownPos] = useState<{ top: number; left: number } | null>(null);
+    const [activeGapIndex, setActiveGapIndex] = useState<number | null>(null);
     const [scenes, setScenes] = useState<{ id: string, duration: number, leadingGap?: number }[]>([]);
     const [selectedSceneId, setSelectedSceneId] = useState<string | null>(null);
     const [resizingScene, setResizingScene] = useState<{
@@ -56,8 +72,10 @@ export const Timeline = ({
     } | null>(null);
     const [resizeTooltip, setResizeTooltip] = useState<{ x: number; y: number } | null>(null);
     const [hoveredHandleSceneId, setHoveredHandleSceneId] = useState<string | null>(null);
+    const [hoveredGapIndex, setHoveredGapIndex] = useState<number | null>(null);
     const plusBtnRef = useRef<HTMLButtonElement>(null);
     const dropdownRef = useRef<HTMLDivElement>(null);
+    const gapDropdownRef = useRef<HTMLDivElement>(null);
     // Refs for left-handle DOM-direct updates — no React re-renders during drag = zero shake
     const spacerRefs = useRef<Map<string, HTMLDivElement | null>>(new Map());
     const sceneRefs = useRef<Map<string, HTMLDivElement | null>>(new Map());
@@ -81,7 +99,19 @@ export const Timeline = ({
         }
     }, [showPlusDropdown]);
 
-    // Close dropdown on click outside
+    // Close gap dropdown on click outside
+    useEffect(() => {
+        if (!showGapDropdown) return;
+        const handleClickOutside = (e: MouseEvent) => {
+            if (gapDropdownRef.current && !gapDropdownRef.current.contains(e.target as Node)) {
+                setShowGapDropdown(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, [showGapDropdown]);
+
+    // Close main dropdown on click outside
     useEffect(() => {
         if (!showPlusDropdown) return;
         const handleClickOutside = (e: MouseEvent) => {
@@ -164,6 +194,16 @@ export const Timeline = ({
     };
 
     const handleTimelineMouseDown = (e: React.MouseEvent) => {
+        // Check if click came from resize handle
+        const target = e.target as HTMLElement;
+        const isResizeHandle = target.closest('[data-resize-handle]') !== null;
+        
+        if (isResizeHandle) {
+            // Don't start timeline drag - resize handle will handle this
+            // The resize handle's onMouseDown will determine click vs drag
+            return;
+        }
+        
         setIsDraggingPlayhead(true);
         if (timelineRef.current) {
             const rect = timelineRef.current.getBoundingClientRect();
@@ -229,15 +269,23 @@ export const Timeline = ({
         e.stopPropagation();
         e.preventDefault();
         const scene = scenes.find(s => s.id === sceneId);
-        setResizingScene({ id: sceneId, side, startX: e.clientX, startDuration: currentDuration, startLeadingGap: scene?.leadingGap || 0 });
-        setResizeTooltip({ x: e.clientX, y: e.clientY });
-        // Start fading the scrubber and set its initial position
+        
+        // Set up pending click - we don't know yet if this is a click or drag
+        setPendingResizeClick({
+            sceneId,
+            side,
+            startX: e.clientX,
+            startY: e.clientY,
+            clickTime: Date.now(),
+            startDuration: currentDuration,
+            startLeadingGap: scene?.leadingGap || 0
+        });
+        
+        // Don't start resize yet - wait to see if user drags
+        // Scrubber stays at current position for now
         setScrubberFaded(true);
-        // For right handle we start at the end of the scene, for left at the start
-        const sceneStart = scenes.find(s => s.id === sceneId);
-        const startTime = sceneStart ? (sceneStart.leadingGap || 0) + scenes.slice(0, scenes.findIndex(s => s.id === sceneId)).reduce((sum, s) => sum + s.duration, 0) : 0;
-        const initialScrubber = side === 'right' ? startTime + currentDuration : startTime;
-        setScrubberTime(initialScrubber);
+        setScrubberTime(currentTime);
+        setScrubberSnapped(false);
     };
 
     useEffect(() => {
@@ -246,12 +294,55 @@ export const Timeline = ({
 
         const handleMouseMove = (e: MouseEvent) => {
             const deltaX = e.clientX - resizingScene.startX;
+            
+            // Calculate current resize handle position in time
+            const sceneIdx = scenes.findIndex(s => s.id === resizingScene.id);
+            const priorDuration = scenes.slice(0, sceneIdx).reduce((sum, s) => sum + s.duration, 0);
+            const sceneStartTime = priorDuration + (scenes[sceneIdx].leadingGap || 0);
+            
+            // Calculate where the resize edge currently is (in time)
+            let currentEdgeTime: number;
+            if (resizingScene.side === 'right') {
+                const startScenePx = Math.round(resizingScene.startDuration * pixelsPerSecond);
+                const minScenePx = Math.round(0.3 * pixelsPerSecond);
+                const newScenePxRaw = Math.max(minScenePx, startScenePx + deltaX);
+                currentEdgeTime = sceneStartTime + (newScenePxRaw / pixelsPerSecond);
+            } else {
+                const startLeadingPx = Math.round(resizingScene.startLeadingGap * pixelsPerSecond);
+                const startScenePx = Math.round(resizingScene.startDuration * pixelsPerSecond);
+                const rightEdge = startLeadingPx + startScenePx;
+                const minScenePx = Math.round(0.3 * pixelsPerSecond);
+                
+                let newSpacerPxRaw = startLeadingPx + deltaX;
+                if (newSpacerPxRaw < 0) {
+                    newSpacerPxRaw = 0;
+                } else {
+                    const newScenePxCheck = rightEdge - newSpacerPxRaw;
+                    if (newScenePxCheck < minScenePx) {
+                        newSpacerPxRaw = rightEdge - minScenePx;
+                    }
+                }
+                currentEdgeTime = priorDuration + (newSpacerPxRaw / pixelsPerSecond);
+            }
+            
+            // SNAP LOGIC: Check if within 10 pixels of scrubber (in time)
+            const snapThresholdPx = 5; // 5 pixels threshold
+            const snapThresholdTime = snapThresholdPx / pixelsPerSecond; // convert to time
+            const distanceToScrubber = Math.abs(currentEdgeTime - scrubberTime);
+            const isNearScrubber = distanceToScrubber <= snapThresholdTime;
 
             if (resizingScene.side === 'right') {
                 // Right handle: pure DOM update — same pattern as left, zero shake
                 const startScenePx = Math.round(resizingScene.startDuration * pixelsPerSecond);
                 const minScenePx = Math.round(0.3 * pixelsPerSecond);
-                const newScenePx = Math.max(minScenePx, startScenePx + deltaX);
+                let newScenePx = Math.max(minScenePx, startScenePx + deltaX);
+                
+                // Apply MAGNETIC SNAP if near scrubber - edge JUMPS to scrubber position
+                if (isNearScrubber) {
+                    const targetScenePx = (scrubberTime - sceneStartTime) * pixelsPerSecond;
+                    newScenePx = Math.max(minScenePx, targetScenePx);
+                    // When snapped, edge is now exactly at scrubber position
+                }
 
                 liveRightDrag.current = {
                     sceneId: resizingScene.id,
@@ -283,6 +374,18 @@ export const Timeline = ({
                         newSpacerPx = rightEdge - minScenePx;
                     }
                 }
+                
+                // Apply MAGNETIC SNAP if near scrubber - edge JUMPS to scrubber position
+                if (isNearScrubber) {
+                    const targetSpacerPx = (scrubberTime - priorDuration) * pixelsPerSecond;
+                    newSpacerPx = Math.max(0, targetSpacerPx);
+                    newScenePx = rightEdge - newSpacerPx;
+                    if (newScenePx < minScenePx) {
+                        newScenePx = minScenePx;
+                        newSpacerPx = rightEdge - minScenePx;
+                    }
+                    // When snapped, edge is now exactly at scrubber position
+                }
 
                 liveLeftDrag.current = {
                     sceneId: resizingScene.id,
@@ -295,6 +398,11 @@ export const Timeline = ({
                 const sceneEl = sceneRefs.current.get(resizingScene.id);
                 if (spacerEl) spacerEl.style.width = newSpacerPx + 'px';
                 if (sceneEl) sceneEl.style.width = newScenePx + 'px';
+            }
+
+            // Turn scrubber purple ONLY when magnetically snapped
+            if (isNearScrubber !== scrubberSnapped) {
+                setScrubberSnapped(isNearScrubber);
             }
 
             // Small tooltip re-render; React reads liveLeftDrag.current for widths → no conflict
@@ -339,10 +447,12 @@ export const Timeline = ({
                 setCurrentTime(priorDuration);
                 liveLeftDrag.current = { sceneId: null, spacerPx: 0, scenePx: 0, duration: 0 };
             }
-            // End of resize: stop fading
+            // End of resize: stop fading and reset snap
             setScrubberFaded(false);
+            setScrubberSnapped(false);
             setResizingScene(null);
             setResizeTooltip(null);
+            setPendingResizeClick(null); // Also clear any pending click
         };
 
         document.addEventListener('mousemove', handleMouseMove);
@@ -351,7 +461,68 @@ export const Timeline = ({
             document.removeEventListener('mousemove', handleMouseMove);
             document.removeEventListener('mouseup', handleMouseUp);
         };
-    }, [resizingScene, usableWidth, duration]);
+    }, [resizingScene, usableWidth, duration, scrubberSnapped, scrubberTime]);
+
+    // Click vs Drag detection for resize handles
+    useEffect(() => {
+        if (!pendingResizeClick) return;
+        
+        let hasDragged = false;
+        const startX = pendingResizeClick.startX;
+        const startY = pendingResizeClick.startY;
+        
+        const handleMouseMove = (e: MouseEvent) => {
+            const deltaX = Math.abs(e.clientX - startX);
+            const deltaY = Math.abs(e.clientY - startY);
+            const totalDelta = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+            
+            // If moved more than threshold, this is a drag - start actual resize
+            if (totalDelta > RESIZE_DRAG_THRESHOLD && !hasDragged) {
+                hasDragged = true;
+                
+                // Convert pending click to actual resize
+                setResizingScene({
+                    id: pendingResizeClick.sceneId,
+                    side: pendingResizeClick.side,
+                    startX: pendingResizeClick.startX,
+                    startDuration: pendingResizeClick.startDuration,
+                    startLeadingGap: pendingResizeClick.startLeadingGap
+                });
+                setResizeTooltip({ x: e.clientX, y: e.clientY });
+                
+                // Clear pending click
+                setPendingResizeClick(null);
+            }
+        };
+        
+        const handleMouseUp = () => {
+            if (!hasDragged) {
+                // This was a simple click - move scrubber to actual click position
+                // Use the actual X coordinate where user clicked, converted to time
+                if (timelineRef.current) {
+                    const rect = timelineRef.current.getBoundingClientRect();
+                    const clickX = pendingResizeClick.startX - rect.left - 4; // 4px padding
+                    const clickTimePosition = pixelToTime(clickX);
+                    
+                    // Move scrubber to actual click position
+                    setScrubberTime(clickTimePosition);
+                    setCurrentTime(clickTimePosition);
+                }
+            }
+            
+            // Clean up
+            setPendingResizeClick(null);
+            setScrubberFaded(false);
+        };
+        
+        document.addEventListener('mousemove', handleMouseMove);
+        document.addEventListener('mouseup', handleMouseUp);
+        
+        return () => {
+            document.removeEventListener('mousemove', handleMouseMove);
+            document.removeEventListener('mouseup', handleMouseUp);
+        };
+    }, [pendingResizeClick, usableWidth, duration, scenes]);
 
     return (
         <>
@@ -371,7 +542,7 @@ export const Timeline = ({
                         >
                             {/* Ghost Scrubber (Hover Preview) */}
                             {hoverTime !== null && !isDraggingPlayhead && hoveredHandleSceneId === null && resizingScene === null && (
-                                <div className="absolute top-0 bottom-0 w-[2px] z-40 pointer-events-none left-1"
+                                <div className="absolute top-0 bottom-0 w-[2px] z-35 pointer-events-none left-1"
                                     style={{
                                         transform: `translateX(${timeToPixel(hoverTime)}px)`,
                                     }}
@@ -384,21 +555,22 @@ export const Timeline = ({
                             )}
 
                             {/* Playhead Marker */}
-                            <div className="absolute top-0 bottom-0 w-[2px] z-40 pointer-events-none left-1"
+                            <div className="absolute top-0 bottom-0 w-[2px] z-35 pointer-events-none left-1"
                                 style={{
                                     transform: `translateX(${timeToPixel(scrubberFaded ? scrubberTime : currentTime)}px)`,
-                                    opacity: scrubberFaded ? 0.5 : 1
+                                    opacity: scrubberSnapped ? 1 : (scrubberFaded ? 0.5 : 1)
                                 }}
                             >
-                                {/* Rounded Head triangle */}
-                                <svg width="10" height="8" viewBox="0 0 10 8" className="absolute top-[2px] left-1/2 -translate-x-1/2 text-gray-800" fill="currentColor">
+                                {/* Rounded Head triangle - purple when snapped */}
+                                <svg width="10" height="8" viewBox="0 0 10 8" className={`absolute top-[2px] left-1/2 -translate-x-1/2 transition-colors duration-150 ${scrubberSnapped ? 'text-[#7c3aed]' : 'text-gray-800'}`} fill="currentColor">
                                     <path d="M2.5 1h5c1.1 0 1.6 1.3.8 2.1L5.8 5.7c-.4.4-1.1.4-1.5 0L1.7 3.1C.9 2.3 1.4 1 2.5 1z" />
                                 </svg>
 
-                                {/* Scrubber line starting below major ticks */}
-                                <div className="absolute top-[28px] bottom-0 left-0 right-0 bg-gray-800 rounded-full" />
+                                {/* Scrubber line - purple when snapped */}
+                                <div className={`absolute top-[28px] bottom-0 left-0 right-0 rounded-full transition-colors duration-150 ${scrubberSnapped ? 'bg-[#7c3aed]' : 'bg-gray-800'}`} />
 
-                                <div className="absolute -top-[22px] left-1/2 -translate-x-1/2 bg-gray-800 text-white text-[10px] font-mono px-1.5 py-0.5 rounded shadow-sm whitespace-nowrap">
+                                {/* Time label - purple background when snapped */}
+                                <div className={`absolute -top-[22px] left-1/2 -translate-x-1/2 text-white text-[10px] font-mono px-1.5 py-0.5 rounded shadow-sm whitespace-nowrap transition-colors duration-150 ${scrubberSnapped ? 'bg-[#7c3aed]' : 'bg-gray-800'}`}>
                                     {formatTime(scrubberFaded ? scrubberTime : currentTime)}
                                 </div>
                             </div>
@@ -436,7 +608,7 @@ export const Timeline = ({
                                 <div className="relative h-[62px] shrink-0 flex items-center">
                                     <div className={`absolute inset-y-0 left-0 right-4 rounded-xl flex items-center z-10 ${isDark ? 'bg-[#1e1e2e]' : 'bg-[#e5e7eb]'}`}>
 
-                                        {scenes.map((scene) => {
+                                        {scenes.map((scene, sceneIndex) => {
                                             const isSelected = selectedSceneId === scene.id;
                                             // During left drag: use live ref values so React render matches DOM → no reconciler conflict
                                             const isLiveLeftDrag = liveLeftDrag.current.sceneId === scene.id;
@@ -483,6 +655,7 @@ export const Timeline = ({
                                                         <>
                                                             {/* Left: darker at left edge, fades inward to transparent */}
                                                             <div
+                                                                data-resize-handle="left"
                                                                 className={`absolute left-0 top-0 bottom-0 w-[40px] flex items-center justify-start pl-[9px] cursor-ew-resize transition-opacity z-10 ${hoveredHandleSceneId === scene.id ? 'opacity-100' : 'opacity-0'
                                                                     }`}
                                                                 style={{ background: 'linear-gradient(to right, rgba(0,0,0,0.22) 0%, rgba(0,0,0,0.07) 55%, transparent 100%)' }}
@@ -494,6 +667,7 @@ export const Timeline = ({
                                                             </div>
                                                             {/* Right: darker at right edge, fades inward to transparent */}
                                                             <div
+                                                                data-resize-handle="right"
                                                                 className={`absolute right-0 top-0 bottom-0 w-[40px] flex items-center justify-end pr-[9px] cursor-ew-resize transition-opacity z-10 ${hoveredHandleSceneId === scene.id ? 'opacity-100' : 'opacity-0'
                                                                     }`}
                                                                 style={{ background: 'linear-gradient(to left, rgba(0,0,0,0.22) 0%, rgba(0,0,0,0.07) 55%, transparent 100%)' }}
@@ -519,6 +693,71 @@ export const Timeline = ({
                                                             </div>
                                                         )}
                                                     </div>
+
+                                                    {/* Gap indicator between clips — two circles on hover at the thin seam */}
+                                                    {sceneIndex < scenes.length - 1 && (
+                                                        <div
+                                                            className="relative flex-shrink-0 self-stretch"
+                                                            style={{ width: '0px', zIndex: 25 }}
+                                                        >
+                                                            {/* Thin hover strip — only triggers at the exact edge between clips */}
+                                                            <div
+                                                                className="absolute inset-y-0 flex items-center justify-center"
+                                                                style={{ width: '8px', left: '-4px', cursor: 'default' }}
+                                                                onMouseEnter={() => setHoveredGapIndex(sceneIndex)}
+                                                                onMouseLeave={() => setHoveredGapIndex(null)}
+                                                            >
+                                                                {/* Two stacked circles — pop in when hovering the seam */}
+                                                                <div
+                                                                    className="flex flex-col items-center gap-[6px] transition-all duration-150"
+                                                                    style={{
+                                                                        opacity: hoveredGapIndex === sceneIndex ? 1 : 0,
+                                                                        transform: hoveredGapIndex === sceneIndex ? 'scale(1)' : 'scale(0.7)',
+                                                                        pointerEvents: hoveredGapIndex === sceneIndex ? 'auto' : 'none',
+                                                                    }}
+                                                                >
+                                                                    {/* Plus circle (top) — tooltip: "Add media / blank" */}
+                                                                    <div className="relative group/plus">
+                                                                        <div
+                                                                            className="w-[24px] h-[24px] rounded-full bg-white border border-gray-300 shadow-sm flex items-center justify-center cursor-pointer hover:bg-gray-100 hover:border-gray-400 transition-colors"
+                                                                            onClick={(e) => {
+                                                                                e.stopPropagation();
+                                                                                const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                                                                                setGapDropdownPos({ top: rect.top, left: rect.left + rect.width / 2 });
+                                                                                setActiveGapIndex(sceneIndex);
+                                                                                setShowGapDropdown(prev => !prev);
+                                                                            }}
+                                                                        >
+                                                                            <Plus size={13} strokeWidth={2.5} className="text-gray-600" />
+                                                                        </div>
+                                                                        {/* Tooltip */}
+                                                                        <div className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-[6px] opacity-0 group-hover/plus:opacity-100 transition-opacity duration-150 whitespace-nowrap">
+                                                                            <div className="bg-[#1f2937] text-white text-[11px] font-medium px-2 py-1 rounded-md shadow-lg">
+                                                                                Add media / blank
+                                                                            </div>
+                                                                            <div className="w-0 h-0 border-l-[4px] border-r-[4px] border-t-[4px] border-l-transparent border-r-transparent border-t-[#1f2937] mx-auto" />
+                                                                        </div>
+                                                                    </div>
+                                                                    {/* Transition circle (bottom) — tooltip: "Add transition" */}
+                                                                    <div className="relative group/trans">
+                                                                        <div
+                                                                            className="w-[24px] h-[24px] rounded-full bg-white border border-gray-300 shadow-sm flex items-center justify-center cursor-pointer hover:bg-gray-100 hover:border-gray-400 transition-colors"
+                                                                            onClick={(e) => { e.stopPropagation(); }}
+                                                                        >
+                                                                            <StepForward size={12} strokeWidth={2} className="text-gray-600" />
+                                                                        </div>
+                                                                        {/* Tooltip */}
+                                                                        <div className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-[6px] opacity-0 group-hover/trans:opacity-100 transition-opacity duration-150 whitespace-nowrap">
+                                                                            <div className="bg-[#1f2937] text-white text-[11px] font-medium px-2 py-1 rounded-md shadow-lg">
+                                                                                Add transition
+                                                                            </div>
+                                                                            <div className="w-0 h-0 border-l-[4px] border-r-[4px] border-t-[4px] border-l-transparent border-r-transparent border-t-[#1f2937] mx-auto" />
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    )}
                                                 </React.Fragment>
                                             );
                                         })}
@@ -650,6 +889,49 @@ export const Timeline = ({
                             setScenes(prev => [...prev, { id: newId, duration: 5.0 }]);
                             setSelectedSceneId(newId);
                             setCurrentTime(newBlankEnd);
+                        }}
+                        className={`w-full flex items-center gap-3 px-4 py-2.5 text-[13px] font-medium transition-colors ${isDark ? 'text-gray-300 hover:bg-gray-800' : 'text-gray-700 hover:bg-gray-100'}`}
+                    >
+                        <RectangleHorizontal size={18} /> Blank
+                    </button>
+                </div>,
+                document.body
+            )}
+
+            {/* Portal-based Gap Dropdown — same style as main plus dropdown */}
+            {showGapDropdown && gapDropdownPos && ReactDOM.createPortal(
+                <div
+                    ref={gapDropdownRef}
+                    className={`fixed w-44 rounded-xl shadow-lg border py-1.5 z-[9999] ${isDark ? 'bg-[#1e1e2e] border-gray-700' : 'bg-white border-gray-200'}`}
+                    style={{
+                        top: gapDropdownPos.top,
+                        left: gapDropdownPos.left,
+                        transform: 'translate(-50%, -100%) translateY(-8px)',
+                    }}
+                >
+                    <button
+                        onClick={() => {
+                            setShowGapDropdown(false);
+                            onOpenMediaPanel();
+                        }}
+                        className={`w-full flex items-center gap-3 px-4 py-2.5 text-[13px] font-medium transition-colors ${isDark ? 'text-gray-300 hover:bg-gray-800' : 'text-gray-700 hover:bg-gray-100'}`}
+                    >
+                        <CloudUpload size={18} /> Uploads
+                    </button>
+                    <button
+                        onClick={() => {
+                            setShowGapDropdown(false);
+                            if (activeGapIndex === null) return;
+                            const newId = Date.now().toString();
+                            setScenes(prev => {
+                                const updated = [...prev];
+                                updated.splice(activeGapIndex + 1, 0, { id: newId, duration: 5.0 });
+                                return updated;
+                            });
+                            setSelectedSceneId(newId);
+                            // move scrubber to end of new blank
+                            const priorDuration = scenes.slice(0, activeGapIndex + 1).reduce((sum, s) => sum + s.duration, 0);
+                            setCurrentTime(priorDuration + 5.0);
                         }}
                         className={`w-full flex items-center gap-3 px-4 py-2.5 text-[13px] font-medium transition-colors ${isDark ? 'text-gray-300 hover:bg-gray-800' : 'text-gray-700 hover:bg-gray-100'}`}
                     >
