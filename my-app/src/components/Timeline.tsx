@@ -13,8 +13,7 @@ interface TimelineProps {
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 const DEFAULT_DURATION = 60;   // 1 minute default
-const SEGMENT_SECONDS = 5;     // Each visual segment = 5 seconds
-const SUB_TICKS_PER_SEGMENT = 5; // 5 sub-ticks per segment (1 per second)
+
 const AUTO_EXTEND_SECONDS = 15; // Add 15s when auto-extending
 
 export const Timeline = ({
@@ -147,30 +146,66 @@ export const Timeline = ({
         }
     }, [currentTime, duration]);
 
-    // ─── Ruler tick generation ────────────────────────────────────────────────
-    const rulerTicks = useMemo(() => {
-        const totalSegments = Math.ceil(duration / SEGMENT_SECONDS);
-        const ticks: { time: number; isMajor: boolean }[] = [];
 
-        for (let seg = 0; seg <= totalSegments; seg++) {
-            const majorTime = seg * SEGMENT_SECONDS;
+    // ─── Pixel helpers ────────────────────────────────────────────────────────
+    const usableWidth = containerWidth - 8; // 4px padding each side
+
+    // ─── Adaptive ruler tick generation (industry-standard: intervals adapt to zoom) ──
+    const rulerTicks = useMemo(() => {
+        const pixelsPerSecond = usableWidth > 0 ? usableWidth / duration : 1;
+        const MIN_MAJOR_TICK_SPACING = 100; // minimum pixels between major tick labels
+
+        // "Nice" time intervals in seconds — from finest to coarsest
+        const NICE_INTERVALS = [0.1, 0.25, 0.5, 1, 2, 5, 10, 15, 30, 60, 120, 300, 600];
+
+        // Pick the smallest interval that keeps labels from overlapping
+        let majorInterval = NICE_INTERVALS[NICE_INTERVALS.length - 1];
+        for (const interval of NICE_INTERVALS) {
+            if (interval * pixelsPerSecond >= MIN_MAJOR_TICK_SPACING) {
+                majorInterval = interval;
+                break;
+            }
+        }
+
+        // Sub-divisions per major interval (Canva-style: ~5-6 sub-ticks)
+        const getSubDivisions = (interval: number): number => {
+            if (interval <= 0.25) return 5;
+            if (interval <= 0.5) return 5;
+            if (interval <= 1) return 5;
+            if (interval <= 2) return 4;
+            if (interval <= 5) return 5;
+            if (interval <= 10) return 5;
+            if (interval <= 15) return 3;
+            if (interval <= 30) return 6;
+            if (interval <= 60) return 6;
+            if (interval <= 120) return 4;
+            if (interval <= 300) return 5;
+            return 6;
+        };
+        const subDivisions = getSubDivisions(majorInterval);
+
+        const ticks: { time: number; isMajor: boolean }[] = [];
+        const totalMajor = Math.ceil(duration / majorInterval);
+
+        for (let i = 0; i <= totalMajor; i++) {
+            const majorTime = parseFloat((i * majorInterval).toFixed(4));
+            if (majorTime > duration) break;
             ticks.push({ time: majorTime, isMajor: true });
 
-            // Sub-ticks within this segment (skip if last segment boundary)
-            if (seg < totalSegments) {
-                for (let sub = 1; sub < SUB_TICKS_PER_SEGMENT; sub++) {
-                    const subTime = majorTime + sub * (SEGMENT_SECONDS / SUB_TICKS_PER_SEGMENT);
-                    if (subTime <= duration) {
+            // Sub-ticks within this segment
+            if (i < totalMajor) {
+                for (let sub = 1; sub < subDivisions; sub++) {
+                    const subTime = parseFloat((majorTime + sub * (majorInterval / subDivisions)).toFixed(4));
+                    if (subTime <= duration && subTime < parseFloat(((i + 1) * majorInterval).toFixed(4))) {
                         ticks.push({ time: subTime, isMajor: false });
                     }
                 }
             }
         }
         return ticks;
-    }, [duration]);
+    }, [duration, usableWidth]);
 
     // ─── Time ↔ pixel helpers ─────────────────────────────────────────────────
-    const usableWidth = containerWidth - 8; // 4px padding each side
     const timeToPixel = (t: number) => Math.round((t / duration) * usableWidth);
     const pixelToTime = (px: number) => {
         const clamped = Math.max(0, Math.min(px, usableWidth));
@@ -569,14 +604,11 @@ export const Timeline = ({
                                 {/* Scrubber line - purple when snapped */}
                                 <div className={`absolute top-[28px] bottom-0 left-0 right-0 rounded-full transition-colors duration-150 ${scrubberSnapped ? 'bg-[#7c3aed]' : 'bg-gray-800'}`} />
 
-                                {/* Time label - purple background when snapped */}
-                                <div className={`absolute -top-[22px] left-1/2 -translate-x-1/2 text-white text-[10px] font-mono px-1.5 py-0.5 rounded shadow-sm whitespace-nowrap transition-colors duration-150 ${scrubberSnapped ? 'bg-[#7c3aed]' : 'bg-gray-800'}`}>
-                                    {formatTime(scrubberFaded ? scrubberTime : currentTime)}
-                                </div>
+
                             </div>
 
                             {/* Time Ruler */}
-                            <div className="h-[36px] flex absolute inset-x-1 pointer-events-none z-10 pt-2">
+                            <div className="h-[36px] flex absolute inset-x-1 z-10 pt-2 cursor-col-resize">
                                 {rulerTicks.map((tick) => (
                                     <div
                                         key={tick.time}
@@ -585,7 +617,7 @@ export const Timeline = ({
                                             left: `${timeToPixel(tick.time)}px`
                                         }}
                                     >
-                                        <div className={`w-[2px] rounded-full ${tick.isMajor ? 'h-5' : 'h-2.5'} ${isDark ? 'bg-gray-600' : 'bg-gray-300'}`} />
+                                        <div className={`w-[2px] rounded-full ${tick.isMajor ? 'h-5' : 'h-2.5 mt-[5px]'} ${isDark ? 'bg-gray-600' : 'bg-gray-300'}`} />
                                         {tick.isMajor && (
                                             <span className={`text-[14px] font-medium select-none ml-1.5 whitespace-nowrap -mt-0.5 ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
                                                 {formatRulerLabel(tick.time)}
@@ -958,6 +990,27 @@ export const Timeline = ({
                 </div>,
                 document.body
             )}
+
+            {/* Portal-based Real Scrubber Timer Tooltip — shown only while dragging the playhead */}
+            {isDraggingPlayhead && timelineRef.current && (() => {
+                const rect = timelineRef.current!.getBoundingClientRect();
+                return ReactDOM.createPortal(
+                    <div
+                        className="fixed z-[9999] pointer-events-none flex flex-col items-center"
+                        style={{
+                            top: rect.top,
+                            left: rect.left + 4 + timeToPixel(currentTime),
+                            transform: 'translate(-50%, -100%)',
+                            marginTop: '4px'
+                        }}
+                    >
+                        <div className="bg-[#1f2937] text-white text-[14px] font-semibold px-3 py-1.5 rounded-[8px] shadow-md">
+                            {currentTime.toFixed(1)}s
+                        </div>
+                    </div>,
+                    document.body
+                );
+            })()}
 
             {/* Portal-based Resize Tooltip — appears above blank while dragging resize handle */}
             {resizingScene && resizeTooltip && (() => {
