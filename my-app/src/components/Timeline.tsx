@@ -53,6 +53,7 @@ export const Timeline = ({
     const RESIZE_DRAG_THRESHOLD = 5; // pixels - must move more than this to be considered a drag
 
     const [containerWidth, setContainerWidth] = useState(0);
+    const scrollParentRef = useRef<HTMLDivElement>(null);
     const [hoverTime, setHoverTime] = useState<number | null>(null);
     const [hoverScrubberPos, setHoverScrubberPos] = useState<{ top: number; left: number } | null>(null);
     const [showPlusDropdown, setShowPlusDropdown] = useState(false);
@@ -125,19 +126,6 @@ export const Timeline = ({
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, [showPlusDropdown]);
 
-    // Track container width for pixel-perfect tick rounding
-    useEffect(() => {
-        if (!timelineRef.current) return;
-
-        const observer = new ResizeObserver((entries) => {
-            for (let entry of entries) {
-                setContainerWidth(entry.contentRect.width);
-            }
-        });
-
-        observer.observe(timelineRef.current);
-        return () => observer.disconnect();
-    }, []);
 
     // Auto-extend duration when currentTime approaches the end
     useEffect(() => {
@@ -146,19 +134,54 @@ export const Timeline = ({
         }
     }, [currentTime, duration]);
 
+    // Track scroll-parent (visible) width so we can enforce "fit to view" at low zoom
+    useEffect(() => {
+        if (!scrollParentRef.current) return;
+        const observer = new ResizeObserver((entries) => {
+            for (let entry of entries) {
+                setContainerWidth(entry.contentRect.width);
+            }
+        });
+        observer.observe(scrollParentRef.current);
+        return () => observer.disconnect();
+    }, []);
 
-    // ─── Pixel helpers ────────────────────────────────────────────────────────
-    const usableWidth = containerWidth - 8; // 4px padding each side
+    // ─── Industry-standard: pixelsPerSecond driven by zoom, NOT by container width ──
+    // Piecewise-linear curve calibrated so that at each zoom boundary,
+    // the ruler transitions to the next interval tier (matching the user's table).
+    // At lowest zoom, content fills the visible area (never empty space beyond content).
+    // At each tier boundary: interval × pps = 120px (MIN_MAJOR_TICK_SPACING).
+    //   zoom=10  → pps=8   →  15s×8=120px   (15s tier)
+    //   zoom=100 → pps=12  →  10s×12=120px  (10s tier)
+    //   zoom=200 → pps=24  →   5s×24=120px  (5s tier)
+    //   zoom=400 → pps=60  →   2s×60=120px  (2s tier)
+    //   zoom=600 → pps=120 →   1s×120=120px (1s tier)
+    //   zoom=800 → pps=240 → 0.5s×240=120px (0.5s tier)
+    //   zoom=1000→ pps=400
+    const pixelsPerSecond = (() => {
+        const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
+        // Zoom-driven pps
+        let zoomPPS: number;
+        if (zoom <= 100) zoomPPS = lerp(8, 12, (zoom - 10) / 90);
+        else if (zoom <= 200) zoomPPS = lerp(12, 24, (zoom - 100) / 100);
+        else if (zoom <= 400) zoomPPS = lerp(24, 60, (zoom - 200) / 200);
+        else if (zoom <= 600) zoomPPS = lerp(60, 120, (zoom - 400) / 200);
+        else if (zoom <= 800) zoomPPS = lerp(120, 240, (zoom - 600) / 200);
+        else zoomPPS = lerp(240, 400, (zoom - 800) / 200);
+        // "Fit to view" floor: content always fills visible container (never zoom past content)
+        const fitPPS = containerWidth > 16 && duration > 0 ? (containerWidth - 16) / duration : 0;
+        return Math.max(zoomPPS, fitPPS);
+    })();
+    const timelineWidth = Math.ceil(duration * pixelsPerSecond) + 16;
 
     // ─── Adaptive ruler tick generation (industry-standard: intervals adapt to zoom) ──
     const rulerTicks = useMemo(() => {
-        const pixelsPerSecond = usableWidth > 0 ? usableWidth / duration : 1;
-        const MIN_MAJOR_TICK_SPACING = 100; // minimum pixels between major tick labels
+        const MIN_MAJOR_TICK_SPACING = 120; // minimum pixels between major tick labels
 
-        // "Nice" time intervals in seconds — from finest to coarsest
-        const NICE_INTERVALS = [0.1, 0.25, 0.5, 1, 2, 5, 10, 15, 30, 60, 120, 300, 600];
+        // User-requested progression: 0.5, 1, 2, 5, 10, 15, 30, 60...
+        const NICE_INTERVALS = [0.5, 1, 2, 5, 10, 15, 30, 60, 120, 300, 600];
 
-        // Pick the smallest interval that keeps labels from overlapping
+        // Pick the smallest interval that keeps labels from overlapping based on actual screen pixels
         let majorInterval = NICE_INTERVALS[NICE_INTERVALS.length - 1];
         for (const interval of NICE_INTERVALS) {
             if (interval * pixelsPerSecond >= MIN_MAJOR_TICK_SPACING) {
@@ -167,19 +190,18 @@ export const Timeline = ({
             }
         }
 
-        // Sub-divisions per major interval (Canva-style: ~5-6 sub-ticks)
+        // Sub-divisions per major interval
         const getSubDivisions = (interval: number): number => {
-            if (interval <= 0.25) return 5;
-            if (interval <= 0.5) return 5;
-            if (interval <= 1) return 5;
-            if (interval <= 2) return 4;
-            if (interval <= 5) return 5;
-            if (interval <= 10) return 5;
-            if (interval <= 15) return 3;
-            if (interval <= 30) return 6;
-            if (interval <= 60) return 6;
-            if (interval <= 120) return 4;
-            if (interval <= 300) return 5;
+            if (interval <= 0.5) return 5; // 0.1 gap
+            if (interval <= 1) return 5;   // 0.2 gap
+            if (interval <= 2) return 4;   // 0.5 gap
+            if (interval <= 5) return 5;   // 1 gap
+            if (interval <= 10) return 5;  // 2 gap
+            if (interval <= 15) return 3;  // 5 gap
+            if (interval <= 30) return 6;  // 5 gap
+            if (interval <= 60) return 6;  // 10 gap
+            if (interval <= 120) return 4; // 30 gap
+            if (interval <= 300) return 5; // 60 gap
             return 6;
         };
         const subDivisions = getSubDivisions(majorInterval);
@@ -203,13 +225,13 @@ export const Timeline = ({
             }
         }
         return ticks;
-    }, [duration, usableWidth]);
+    }, [duration, pixelsPerSecond]);
 
     // ─── Time ↔ pixel helpers ─────────────────────────────────────────────────
-    const timeToPixel = (t: number) => Math.round((t / duration) * usableWidth);
+    const timeToPixel = (t: number) => Math.round(t * pixelsPerSecond);
     const pixelToTime = (px: number) => {
-        const clamped = Math.max(0, Math.min(px, usableWidth));
-        return (clamped / usableWidth) * duration;
+        const clamped = Math.max(0, px);
+        return Math.min(clamped / pixelsPerSecond, duration);
     };
 
     const handleTimelineMouseMove = (e: React.MouseEvent) => {
@@ -325,7 +347,6 @@ export const Timeline = ({
 
     useEffect(() => {
         if (!resizingScene) return;
-        const pixelsPerSecond = usableWidth / duration;
 
         const handleMouseMove = (e: MouseEvent) => {
             const deltaX = e.clientX - resizingScene.startX;
@@ -496,7 +517,7 @@ export const Timeline = ({
             document.removeEventListener('mousemove', handleMouseMove);
             document.removeEventListener('mouseup', handleMouseUp);
         };
-    }, [resizingScene, usableWidth, duration, scrubberSnapped, scrubberTime]);
+    }, [resizingScene, pixelsPerSecond, duration, scrubberSnapped, scrubberTime]);
 
     // Click vs Drag detection for resize handles
     useEffect(() => {
@@ -557,7 +578,7 @@ export const Timeline = ({
             document.removeEventListener('mousemove', handleMouseMove);
             document.removeEventListener('mouseup', handleMouseUp);
         };
-    }, [pendingResizeClick, usableWidth, duration, scenes]);
+    }, [pendingResizeClick, pixelsPerSecond, duration, scenes]);
 
     return (
         <>
@@ -566,10 +587,10 @@ export const Timeline = ({
 
                 {/* Main Timeline Area */}
                 <div className="flex-1 flex overflow-hidden">
-                    <div className={`flex-1 overflow-x-auto overflow-y-hidden relative custom-scrollbar ${isDark ? 'bg-[#14141d]' : 'bg-white'}`}>
+                    <div ref={scrollParentRef} className={`flex-1 overflow-x-auto overflow-y-hidden relative custom-scrollbar ${isDark ? 'bg-[#14141d]' : 'bg-white'}`}>
                         <div
                             className="h-full relative transition-all duration-300 ease-out px-1"
-                            style={{ minWidth: `${800 + (zoom * 4)}px` }}
+                            style={{ minWidth: `${timelineWidth}px` }}
                             ref={timelineRef}
                             onMouseDown={handleTimelineMouseDown}
                             onMouseMove={handleTimelineMouseMove}
@@ -647,7 +668,7 @@ export const Timeline = ({
                                             const isLiveRightDrag = liveRightDrag.current.sceneId === scene.id;
                                             const spacerPx = isLiveLeftDrag
                                                 ? liveLeftDrag.current.spacerPx
-                                                : Math.round((scene.leadingGap || 0) * (usableWidth / duration));
+                                                : Math.round((scene.leadingGap || 0) * pixelsPerSecond);
                                             const scenePx = isLiveLeftDrag
                                                 ? liveLeftDrag.current.scenePx
                                                 : isLiveRightDrag
