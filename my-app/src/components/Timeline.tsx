@@ -49,11 +49,11 @@ export const Timeline = ({
     const [scrubberTime, setScrubberTime] = useState(currentTime);
     const [scrubberFaded, setScrubberFaded] = useState(false);
     const [scrubberSnapped, setScrubberSnapped] = useState(false); // true when resize handle snaps to scrubber
-    const [showTimecode, setShowTimecode] = useState(false); // Toggle between simple/timecode display
+
 
     // ─── Global Scene State (shared undo/redo via zustand-travel) ──────────────
     const scenes = useEditorStore((state) => state.scenes);
-    const { setScenes, addScene, updateScene, removeScene } = useEditorStore();
+    const { addScene, updateScene, removeScene } = useEditorStore();
 
     // Click vs Drag detection for resize handles
     const [pendingResizeClick, setPendingResizeClick] = useState<{
@@ -237,28 +237,16 @@ export const Timeline = ({
     }, [isPlaying, setIsPlaying, setCurrentTime, duration, setZoom, selectedSceneId, removeScene]);
 
     // ─── Industry-standard: pixelsPerSecond driven by zoom, NOT by container width ──
-    // Piecewise-linear curve calibrated so that at each zoom boundary,
-    // the ruler transitions to the next interval tier (matching the user's table).
-    // At lowest zoom, content fills the visible area (never empty space beyond content).
-    // At each tier boundary: interval × pps = 120px (MIN_MAJOR_TICK_SPACING).
-    //   zoom=10  → pps=8   →  15s×8=120px   (15s tier)
-    //   zoom=100 → pps=12  →  10s×12=120px  (10s tier)
-    //   zoom=200 → pps=24  →   5s×24=120px  (5s tier)
-    //   zoom=400 → pps=60  →   2s×60=120px  (2s tier)
-    //   zoom=600 → pps=120 →   1s×120=120px (1s tier)
-    //   zoom=800 → pps=240 → 0.5s×240=120px (0.5s tier)
-    //   zoom=1000→ pps=400
+    // The true industry standard for zoom sliders is an exponential (logarithmic) curve.
+    // Instead of uneven intervals, dragging the slider smoothly multiplies the scale mathematically.
+    // This perfectly maps zoom ratio [10, 1000] to our target pixelsPerSecond range [12, 1800].
     const pixelsPerSecond = (() => {
-        const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
-        // Zoom-driven pps
-        let zoomPPS: number;
-        if (zoom <= 100) zoomPPS = lerp(8, 12, (zoom - 10) / 90);
-        else if (zoom <= 200) zoomPPS = lerp(12, 24, (zoom - 100) / 100);
-        else if (zoom <= 400) zoomPPS = lerp(24, 60, (zoom - 200) / 200);
-        else if (zoom <= 600) zoomPPS = lerp(60, 120, (zoom - 400) / 200);
-        else if (zoom <= 800) zoomPPS = lerp(120, 240, (zoom - 600) / 200);
-        else zoomPPS = lerp(240, 400, (zoom - 800) / 200);
-        // "Fit to view" floor: content always fills visible container (never zoom past content)
+        // Map 10-1000 zoom range to a 0.0 -> 1.0 slider ratio
+        const zoomRatio = (zoom - 10) / 990;
+        // Exponentially scale up to exactly 150x the power (12 * 150 = 1800 max pps)
+        const zoomPPS = 12 * Math.pow(150, zoomRatio);
+
+        // "Fit to view" floor: content always fills visible container (never empty space beyond content)
         const fitPPS = containerWidth > 16 && duration > 0 ? (containerWidth - 16) / duration : 0;
         return Math.max(zoomPPS, fitPPS);
     })();
@@ -266,10 +254,10 @@ export const Timeline = ({
 
     // ─── Adaptive ruler tick generation (industry-standard: intervals adapt to zoom) ──
     const rulerTicks = useMemo(() => {
-        const MIN_MAJOR_TICK_SPACING = 120; // minimum pixels between major tick labels
+        const MIN_MAJOR_TICK_SPACING = 180; // minimum pixels between major tick labels
 
-        // User-requested progression: 0.5, 1, 2, 5, 10, 15, 30, 60...
-        const NICE_INTERVALS = [0.5, 1, 2, 5, 10, 15, 30, 60, 120, 300, 600];
+        // User-requested progression: 0.1, 0.2, 0.5, 1, 2, 5, 10, 15, 30, 60...
+        const NICE_INTERVALS = [0.1, 0.2, 0.5, 1, 2, 5, 10, 15, 30, 60, 120, 300, 600];
 
         // Pick the smallest interval that keeps labels from overlapping based on actual screen pixels
         let majorInterval = NICE_INTERVALS[NICE_INTERVALS.length - 1];
@@ -282,6 +270,8 @@ export const Timeline = ({
 
         // Sub-divisions per major interval
         const getSubDivisions = (interval: number): number => {
+            if (interval <= 0.1) return 5; // 0.02 gap
+            if (interval <= 0.2) return 4; // 0.05 gap
             if (interval <= 0.5) return 5; // 0.1 gap
             if (interval <= 1) return 5;   // 0.2 gap
             if (interval <= 2) return 4;   // 0.5 gap
@@ -324,13 +314,39 @@ export const Timeline = ({
         return Math.min(clamped / pixelsPerSecond, duration);
     };
 
+    const formatTooltipTime = (t: number) => {
+        const decimals = zoom >= 400 ? 2 : 1;
+        const factor = Math.pow(10, decimals);
+        // Truncate cleanly while avoiding strict floating-point underflow (e.g. 0.19999->0.19)
+        return (Math.floor(t * factor + 1e-6) / factor).toFixed(decimals);
+    };
+
+    // Magnetic Snapping Utility (4 pixels pull radius)
+    const getSnappedTime = (rawTime: number) => {
+        if (!rulerTicks || rulerTicks.length === 0) return rawTime;
+        const timeSnapThreshold = 4 / pixelsPerSecond;
+        let closestTick = rulerTicks[0];
+        let minDiff = Infinity;
+        for (const tick of rulerTicks) {
+            const diff = Math.abs(tick.time - rawTime);
+            if (diff < minDiff) {
+                minDiff = diff;
+                closestTick = tick;
+            }
+        }
+        if (minDiff <= timeSnapThreshold) {
+            return closestTick.time;
+        }
+        return rawTime;
+    };
+
     const handleTimelineMouseMove = (e: React.MouseEvent) => {
         // Don't update hover state during an active resize drag
         if (resizingScene !== null) return;
         if (timelineRef.current) {
             const rect = timelineRef.current.getBoundingClientRect();
             const x = e.clientX - rect.left - 4;
-            const time = pixelToTime(x);
+            const time = getSnappedTime(pixelToTime(x));
             setHoverTime(time);
 
             setHoverScrubberPos({
@@ -355,7 +371,7 @@ export const Timeline = ({
         if (timelineRef.current) {
             const rect = timelineRef.current.getBoundingClientRect();
             const x = e.clientX - rect.left - 4;
-            setCurrentTime(pixelToTime(x));
+            setCurrentTime(getSnappedTime(pixelToTime(x)));
         }
     };
 
@@ -364,7 +380,7 @@ export const Timeline = ({
             if (isDraggingPlayhead && timelineRef.current) {
                 const rect = timelineRef.current.getBoundingClientRect();
                 const x = e.clientX - rect.left - 4;
-                setCurrentTime(pixelToTime(x));
+                setCurrentTime(getSnappedTime(pixelToTime(x)));
             }
         };
         const handleMouseUp = () => setIsDraggingPlayhead(false);
@@ -396,15 +412,8 @@ export const Timeline = ({
         return () => window.clearInterval(interval);
     }, [isPlaying, setIsPlaying, setCurrentTime, duration]);
 
-    // ─── Ruler label formatter (smart: shows m:ss for ≥60s, timecode at high zoom) ──
+    // ─── Ruler label formatter (smart: shows m:ss for ≥60s) ──
     const formatRulerLabel = (seconds: number) => {
-        if (zoom > 600) {
-            // Show M:SS:FF timecode at high zoom levels
-            const mins = Math.floor(seconds / 60);
-            const secs = Math.floor(seconds % 60);
-            const frames = Math.floor((seconds % 1) * PROJECT_FPS);
-            return `${mins}:${secs.toString().padStart(2, '0')}:${frames.toString().padStart(2, '0')}`;
-        }
         if (seconds >= 60) {
             const mins = Math.floor(seconds / 60);
             const secs = Math.floor(seconds % 60);
@@ -653,7 +662,7 @@ export const Timeline = ({
                 if (timelineRef.current) {
                     const rect = timelineRef.current.getBoundingClientRect();
                     const clickX = pendingResizeClick.startX - rect.left - 4; // 4px padding
-                    const clickTimePosition = pixelToTime(clickX);
+                    const clickTimePosition = getSnappedTime(pixelToTime(clickX));
 
                     // Move scrubber to actual click position
                     setScrubberTime(clickTimePosition);
@@ -956,67 +965,75 @@ export const Timeline = ({
                                     max="1000"
                                     value={zoom}
                                     onChange={(e) => setZoom(parseInt(e.target.value))}
-                                    className={`w-48 h-1 rounded-full appearance-none cursor-pointer outline-none ${isDark ? 'bg-gray-800' : 'bg-gray-200'}`}
+                                    className={`w-48 h-1.5 rounded-full appearance-none cursor-pointer outline-none transition-colors ${isDark ? 'bg-gray-800' : 'bg-gray-200'}`}
                                     style={{
-                                        backgroundImage: `linear-gradient(to right, #3b82f6 0%, #3b82f6 ${(zoom / 1000) * 100}%, transparent ${(zoom / 1000) * 100}%, transparent 100%)`,
+                                        backgroundImage: `linear-gradient(to right, #8b5cf6 0%, #8b5cf6 ${(zoom / 1000) * 100}%, transparent ${(zoom / 1000) * 100}%, transparent 100%)`,
                                     }}
                                 />
                                 <style>{`
                                 input[type='range']::-webkit-slider-thumb {
                                     -webkit-appearance: none;
                                     appearance: none;
-                                    width: 10px;
-                                    height: 10px;
-                                    background: #3b82f6;
+                                    width: 14px;
+                                    height: 14px;
+                                    background: #8b5cf6;
                                     border-radius: 50%;
                                     cursor: pointer;
-                                    box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+                                    box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+                                    transition: transform 0.15s ease, box-shadow 0.15s ease;
+                                }
+                                input[type='range']::-webkit-slider-thumb:hover {
+                                    transform: scale(1.25);
+                                    box-shadow: 0 0 0 5px rgba(139, 92, 246, 0.2);
+                                }
+                                input[type='range']:active::-webkit-slider-thumb {
+                                    transform: scale(1.25);
+                                    box-shadow: 0 0 0 6px rgba(139, 92, 246, 0.35);
                                 }
                                 input[type='range']::-moz-range-thumb {
-                                    width: 10px;
-                                    height: 10px;
-                                    background: #3b82f6;
+                                    width: 14px;
+                                    height: 14px;
+                                    background: #8b5cf6;
                                     border-radius: 50%;
                                     cursor: pointer;
                                     border: none;
+                                    box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+                                    transition: transform 0.15s ease, box-shadow 0.15s ease;
+                                }
+                                input[type='range']::-moz-range-thumb:hover {
+                                    transform: scale(1.25);
+                                    box-shadow: 0 0 0 5px rgba(139, 92, 246, 0.2);
+                                }
+                                input[type='range']:active::-moz-range-thumb {
+                                    transform: scale(1.25);
+                                    box-shadow: 0 0 0 6px rgba(139, 92, 246, 0.35);
                                 }
                             `}</style>
                             </div>
-                            <span className={`text-[11px] font-medium w-10 text-center ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+                            <span className={`text-[13px] font-medium w-12 text-center ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
                                 {zoom}%
                             </span>
                         </div>
 
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-3">
                             <button
                                 onClick={() => setIsPlaying(!isPlaying)}
-                                className={`w-6 h-6 rounded-full border transition-colors cursor-pointer flex items-center justify-center ${isDark ? 'border-gray-700 hover:bg-gray-800 text-gray-300' : 'border-gray-300 hover:bg-gray-100 text-gray-700'}`}
+                                className={`w-7 h-7 rounded-full border transition-colors cursor-pointer flex items-center justify-center ${isDark ? 'border-gray-700 hover:bg-gray-800 text-gray-300' : 'border-gray-300 hover:bg-gray-100 text-gray-700'}`}
                             >
-                                {isPlaying ? <Pause size={10} fill="currentColor" /> : <Play size={10} fill="currentColor" className="ml-0.5" />}
+                                {isPlaying ? <Pause size={12} fill="currentColor" /> : <Play size={12} fill="currentColor" className="ml-0.5" />}
                             </button>
-                            <span className={`font-mono text-[11px] ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
-                                {showTimecode
-                                    ? `${formatTimecode(currentTime)} / ${formatTimecode(duration)}`
-                                    : `${formatTime(currentTime)} / ${formatTime(duration)}`
-                                }
+                            <span className={`text-[13px] font-medium tracking-[0.02em] ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+                                {`${formatTime(currentTime)} / ${formatTime(duration)}`}
                             </span>
                         </div>
 
                         {/* Icons */}
-                        <div className="flex items-center gap-0.5 border-l pl-2 ml-0.5 border-gray-300 dark:border-gray-700">
-                            {/* Timecode Toggle */}
-                            <button
-                                onClick={() => setShowTimecode(prev => !prev)}
-                                title={showTimecode ? 'Switch to simple time' : 'Switch to timecode (HH:MM:SS:FF)'}
-                                className={`w-6 h-6 flex items-center justify-center rounded-md transition-colors cursor-pointer text-[9px] font-bold ${showTimecode ? (isDark ? 'text-white bg-gray-700' : 'text-gray-900 bg-gray-200') : (isDark ? 'text-gray-400 hover:text-white hover:bg-gray-800' : 'text-gray-500 hover:text-gray-900 hover:bg-gray-100')}`}
-                            >
-                                {showTimecode ? 'S' : 'TC'}
+                        <div className="flex items-center gap-1 border-l pl-3 ml-1 border-gray-300 dark:border-gray-700">
+                            <button className={`w-7 h-7 flex items-center justify-center rounded-md transition-colors cursor-pointer ${isDark ? 'text-gray-400 hover:text-white hover:bg-gray-800' : 'text-gray-500 hover:text-gray-900 hover:bg-gray-100'}`}>
+                                <LayoutGrid size={16} />
                             </button>
-                            <button className={`w-6 h-6 flex items-center justify-center rounded-md transition-colors cursor-pointer ${isDark ? 'text-gray-400 hover:text-white hover:bg-gray-800' : 'text-gray-500 hover:text-gray-900 hover:bg-gray-100'}`}>
-                                <LayoutGrid size={14} />
-                            </button>
-                            <button className={`w-6 h-6 flex items-center justify-center rounded-md transition-colors cursor-pointer ${isDark ? 'text-gray-400 hover:text-white hover:bg-gray-800' : 'text-gray-500 hover:text-gray-900 hover:bg-gray-100'}`}>
-                                <Maximize size={14} />
+                            <button className={`w-7 h-7 flex items-center justify-center rounded-md transition-colors cursor-pointer ${isDark ? 'text-gray-400 hover:text-white hover:bg-gray-800' : 'text-gray-500 hover:text-gray-900 hover:bg-gray-100'}`}>
+                                <Maximize size={16} />
                             </button>
                         </div>
                     </div>
@@ -1114,7 +1131,7 @@ export const Timeline = ({
                     }}
                 >
                     <div className="bg-[#1f2937] text-white text-[14px] font-semibold px-3 py-1.5 rounded-[8px] shadow-md">
-                        {hoverTime.toFixed(1)}s
+                        {formatTooltipTime(hoverTime)}s
                     </div>
                 </div>,
                 document.body
@@ -1134,7 +1151,7 @@ export const Timeline = ({
                         }}
                     >
                         <div className="bg-[#1f2937] text-white text-[14px] font-semibold px-3 py-1.5 rounded-[8px] shadow-md">
-                            {currentTime.toFixed(1)}s
+                            {formatTooltipTime(currentTime)}s
                         </div>
                     </div>,
                     document.body
