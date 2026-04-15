@@ -15,6 +15,7 @@ interface TimelineProps {
 const DEFAULT_DURATION = 60;   // 1 minute default
 
 const AUTO_EXTEND_SECONDS = 15; // Add 15s when auto-extending
+const PROJECT_FPS = 30; // Default FPS for timecode display
 
 export const Timeline = ({
     currentTime,
@@ -31,6 +32,14 @@ export const Timeline = ({
         return `${mins}:${secs.toString().padStart(2, '0')}.${ms}`;
     };
 
+    const formatTimecode = (seconds: number, fps: number = PROJECT_FPS) => {
+        const hrs = Math.floor(seconds / 3600);
+        const mins = Math.floor((seconds % 3600) / 60);
+        const secs = Math.floor(seconds % 60);
+        const frames = Math.floor((seconds % 1) * fps);
+        return `${hrs.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}:${frames.toString().padStart(2, '0')}`;
+    };
+
     const [isDraggingPlayhead, setIsDraggingPlayhead] = useState(false);
     const [zoom, setZoom] = useState(380); // 10 to 1000 zoom scale
     const [duration, setDuration] = useState(DEFAULT_DURATION); // Dynamic, auto-extending
@@ -39,6 +48,12 @@ export const Timeline = ({
     const [scrubberTime, setScrubberTime] = useState(currentTime);
     const [scrubberFaded, setScrubberFaded] = useState(false);
     const [scrubberSnapped, setScrubberSnapped] = useState(false); // true when resize handle snaps to scrubber
+    const [showTimecode, setShowTimecode] = useState(false); // Toggle between simple/timecode display
+
+    // ─── Local Scene Undo/Redo History ───────────────────────────────────────────
+    type SceneState = { id: string; duration: number; leadingGap?: number }[];
+    const [pastScenes, setPastScenes] = useState<SceneState[]>([]);
+    const [futureScenes, setFutureScenes] = useState<SceneState[]>([]);
 
     // Click vs Drag detection for resize handles
     const [pendingResizeClick, setPendingResizeClick] = useState<{
@@ -63,6 +78,32 @@ export const Timeline = ({
     const [activeGapIndex, setActiveGapIndex] = useState<number | null>(null);
     const [scenes, setScenes] = useState<{ id: string, duration: number, leadingGap?: number }[]>([]);
     const [selectedSceneId, setSelectedSceneId] = useState<string | null>(null);
+
+    // Save current scenes to history before a mutation
+    const saveHistory = (currentScenes: SceneState) => {
+        setPastScenes(prev => [...prev.slice(-49), currentScenes]); // cap at 50
+        setFutureScenes([]);
+    };
+
+    const undoScenes = () => {
+        setPastScenes(prev => {
+            if (prev.length === 0) return prev;
+            const previous = prev[prev.length - 1];
+            setFutureScenes(f => [scenes, ...f.slice(0, 49)]);
+            setScenes(previous);
+            return prev.slice(0, -1);
+        });
+    };
+
+    const redoScenes = () => {
+        setFutureScenes(prev => {
+            if (prev.length === 0) return prev;
+            const next = prev[0];
+            setPastScenes(p => [...p.slice(-49), scenes]);
+            setScenes(next);
+            return prev.slice(1);
+        });
+    };
     const [resizingScene, setResizingScene] = useState<{
         id: string;
         side: 'left' | 'right';
@@ -145,6 +186,92 @@ export const Timeline = ({
         observer.observe(scrollParentRef.current);
         return () => observer.disconnect();
     }, []);
+
+    // ─── Timeline Keyboard Shortcuts ──────────────────────────────────────────────
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            // Don't trigger shortcuts when typing in inputs
+            if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement ||
+                (e.target as HTMLElement).isContentEditable) return;
+
+            const frameDuration = 1 / PROJECT_FPS;
+
+            switch (e.key) {
+                case ' ':
+                    e.preventDefault();
+                    setIsPlaying(!isPlaying);
+                    break;
+
+                case 'ArrowLeft':
+                    e.preventDefault();
+                    if (e.shiftKey) {
+                        setCurrentTime((prev: number) => Math.max(0, prev - 1));
+                    } else {
+                        setCurrentTime((prev: number) => Math.max(0, prev - frameDuration));
+                    }
+                    break;
+
+                case 'ArrowRight':
+                    e.preventDefault();
+                    if (e.shiftKey) {
+                        setCurrentTime((prev: number) => Math.min(duration, prev + 1));
+                    } else {
+                        setCurrentTime((prev: number) => Math.min(duration, prev + frameDuration));
+                    }
+                    break;
+
+                case 'Home':
+                    e.preventDefault();
+                    setCurrentTime(0);
+                    break;
+
+                case 'End':
+                    e.preventDefault();
+                    setCurrentTime(duration);
+                    break;
+
+                case '+':
+                case '=':
+                    e.preventDefault();
+                    setZoom(prev => Math.min(1000, prev + 100));
+                    break;
+
+                case '-':
+                    e.preventDefault();
+                    setZoom(prev => Math.max(10, prev - 100));
+                    break;
+
+                case 'Delete':
+                case 'Backspace':
+                    if (selectedSceneId) {
+                        e.preventDefault();
+                        saveHistory(scenes);
+                        setScenes(prev => prev.filter(s => s.id !== selectedSceneId));
+                        setSelectedSceneId(null);
+                    }
+                    break;
+
+                case 'z':
+                case 'Z':
+                    if (e.ctrlKey || e.metaKey) {
+                        e.preventDefault();
+                        if (e.shiftKey) { redoScenes(); } else { undoScenes(); }
+                    }
+                    break;
+
+                case 'y':
+                case 'Y':
+                    if (e.ctrlKey || e.metaKey) {
+                        e.preventDefault();
+                        redoScenes();
+                    }
+                    break;
+            }
+        };
+
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [isPlaying, setIsPlaying, setCurrentTime, duration, setZoom, selectedSceneId, scenes, pastScenes, futureScenes]);
 
     // ─── Industry-standard: pixelsPerSecond driven by zoom, NOT by container width ──
     // Piecewise-linear curve calibrated so that at each zoom boundary,
@@ -254,13 +381,13 @@ export const Timeline = ({
         // Check if click came from resize handle
         const target = e.target as HTMLElement;
         const isResizeHandle = target.closest('[data-resize-handle]') !== null;
-        
+
         if (isResizeHandle) {
             // Don't start timeline drag - resize handle will handle this
             // The resize handle's onMouseDown will determine click vs drag
             return;
         }
-        
+
         setIsDraggingPlayhead(true);
         if (timelineRef.current) {
             const rect = timelineRef.current.getBoundingClientRect();
@@ -306,8 +433,15 @@ export const Timeline = ({
         return () => window.clearInterval(interval);
     }, [isPlaying, setIsPlaying, setCurrentTime, duration]);
 
-    // ─── Ruler label formatter (smart: shows m:ss for ≥60s) ──────────────────
+    // ─── Ruler label formatter (smart: shows m:ss for ≥60s, timecode at high zoom) ──
     const formatRulerLabel = (seconds: number) => {
+        if (zoom > 600) {
+            // Show M:SS:FF timecode at high zoom levels
+            const mins = Math.floor(seconds / 60);
+            const secs = Math.floor(seconds % 60);
+            const frames = Math.floor((seconds % 1) * PROJECT_FPS);
+            return `${mins}:${secs.toString().padStart(2, '0')}:${frames.toString().padStart(2, '0')}`;
+        }
         if (seconds >= 60) {
             const mins = Math.floor(seconds / 60);
             const secs = Math.floor(seconds % 60);
@@ -326,7 +460,7 @@ export const Timeline = ({
         e.stopPropagation();
         e.preventDefault();
         const scene = scenes.find(s => s.id === sceneId);
-        
+
         // Set up pending click - we don't know yet if this is a click or drag
         setPendingResizeClick({
             sceneId,
@@ -337,7 +471,7 @@ export const Timeline = ({
             startDuration: currentDuration,
             startLeadingGap: scene?.leadingGap || 0
         });
-        
+
         // Don't start resize yet - wait to see if user drags
         // Scrubber stays at current position for now
         setScrubberFaded(true);
@@ -350,12 +484,12 @@ export const Timeline = ({
 
         const handleMouseMove = (e: MouseEvent) => {
             const deltaX = e.clientX - resizingScene.startX;
-            
+
             // Calculate current resize handle position in time
             const sceneIdx = scenes.findIndex(s => s.id === resizingScene.id);
             const priorDuration = scenes.slice(0, sceneIdx).reduce((sum, s) => sum + s.duration, 0);
             const sceneStartTime = priorDuration + (scenes[sceneIdx].leadingGap || 0);
-            
+
             // Calculate where the resize edge currently is (in time)
             let currentEdgeTime: number;
             if (resizingScene.side === 'right') {
@@ -368,7 +502,7 @@ export const Timeline = ({
                 const startScenePx = Math.round(resizingScene.startDuration * pixelsPerSecond);
                 const rightEdge = startLeadingPx + startScenePx;
                 const minScenePx = Math.round(0.3 * pixelsPerSecond);
-                
+
                 let newSpacerPxRaw = startLeadingPx + deltaX;
                 if (newSpacerPxRaw < 0) {
                     newSpacerPxRaw = 0;
@@ -380,7 +514,7 @@ export const Timeline = ({
                 }
                 currentEdgeTime = priorDuration + (newSpacerPxRaw / pixelsPerSecond);
             }
-            
+
             // SNAP LOGIC: Check if within 10 pixels of scrubber (in time)
             const snapThresholdPx = 5; // 5 pixels threshold
             const snapThresholdTime = snapThresholdPx / pixelsPerSecond; // convert to time
@@ -392,7 +526,7 @@ export const Timeline = ({
                 const startScenePx = Math.round(resizingScene.startDuration * pixelsPerSecond);
                 const minScenePx = Math.round(0.3 * pixelsPerSecond);
                 let newScenePx = Math.max(minScenePx, startScenePx + deltaX);
-                
+
                 // Apply MAGNETIC SNAP if near scrubber - edge JUMPS to scrubber position
                 if (isNearScrubber) {
                     const targetScenePx = (scrubberTime - sceneStartTime) * pixelsPerSecond;
@@ -430,7 +564,7 @@ export const Timeline = ({
                         newSpacerPx = rightEdge - minScenePx;
                     }
                 }
-                
+
                 // Apply MAGNETIC SNAP if near scrubber - edge JUMPS to scrubber position
                 if (isNearScrubber) {
                     const targetSpacerPx = (scrubberTime - priorDuration) * pixelsPerSecond;
@@ -466,6 +600,8 @@ export const Timeline = ({
         };
 
         const handleMouseUp = () => {
+            // Save history before committing resize (makes resize undoable)
+            saveHistory(scenes);
             if (resizingScene.side === 'right') {
                 // Commit final right-handle duration from DOM to React state
                 const finalDuration = liveRightDrag.current.sceneId === resizingScene.id
@@ -522,20 +658,20 @@ export const Timeline = ({
     // Click vs Drag detection for resize handles
     useEffect(() => {
         if (!pendingResizeClick) return;
-        
+
         let hasDragged = false;
         const startX = pendingResizeClick.startX;
         const startY = pendingResizeClick.startY;
-        
+
         const handleMouseMove = (e: MouseEvent) => {
             const deltaX = Math.abs(e.clientX - startX);
             const deltaY = Math.abs(e.clientY - startY);
             const totalDelta = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
-            
+
             // If moved more than threshold, this is a drag - start actual resize
             if (totalDelta > RESIZE_DRAG_THRESHOLD && !hasDragged) {
                 hasDragged = true;
-                
+
                 // Convert pending click to actual resize
                 setResizingScene({
                     id: pendingResizeClick.sceneId,
@@ -545,12 +681,12 @@ export const Timeline = ({
                     startLeadingGap: pendingResizeClick.startLeadingGap
                 });
                 setResizeTooltip({ x: e.clientX, y: e.clientY });
-                
+
                 // Clear pending click
                 setPendingResizeClick(null);
             }
         };
-        
+
         const handleMouseUp = () => {
             if (!hasDragged) {
                 // This was a simple click - move scrubber to actual click position
@@ -559,21 +695,21 @@ export const Timeline = ({
                     const rect = timelineRef.current.getBoundingClientRect();
                     const clickX = pendingResizeClick.startX - rect.left - 4; // 4px padding
                     const clickTimePosition = pixelToTime(clickX);
-                    
+
                     // Move scrubber to actual click position
                     setScrubberTime(clickTimePosition);
                     setCurrentTime(clickTimePosition);
                 }
             }
-            
+
             // Clean up
             setPendingResizeClick(null);
             setScrubberFaded(false);
         };
-        
+
         document.addEventListener('mousemove', handleMouseMove);
         document.addEventListener('mouseup', handleMouseUp);
-        
+
         return () => {
             document.removeEventListener('mousemove', handleMouseMove);
             document.removeEventListener('mouseup', handleMouseUp);
@@ -686,8 +822,8 @@ export const Timeline = ({
                                                         ref={(el) => { sceneRefs.current.set(scene.id, el); }}
                                                         onClick={() => setSelectedSceneId(isSelected ? null : scene.id)}
                                                         className={`relative h-full bg-white rounded-md overflow-hidden flex items-end p-2 flex-shrink-0 cursor-pointer border-[1.5px] group/scene ${isSelected
-                                                                ? 'border-[#7c3aed]'
-                                                                : 'border-[#d1d5db]'
+                                                            ? 'border-[#7c3aed]'
+                                                            : 'border-[#d1d5db]'
                                                             }`}
                                                         style={{ width: `${scenePx}px` }}
                                                     >
@@ -899,13 +1035,42 @@ export const Timeline = ({
                             >
                                 {isPlaying ? <Pause size={10} fill="currentColor" /> : <Play size={10} fill="currentColor" className="ml-0.5" />}
                             </button>
-                            <span className={`font-mono ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
-                                {formatTime(currentTime)} / {formatTime(duration)}
+                            <span className={`font-mono text-[11px] ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+                                {showTimecode
+                                    ? `${formatTimecode(currentTime)} / ${formatTimecode(duration)}`
+                                    : `${formatTime(currentTime)} / ${formatTime(duration)}`
+                                }
                             </span>
                         </div>
 
                         {/* Icons */}
                         <div className="flex items-center gap-0.5 border-l pl-2 ml-0.5 border-gray-300 dark:border-gray-700">
+                            {/* Undo */}
+                            <button
+                                onClick={undoScenes}
+                                disabled={pastScenes.length === 0}
+                                title="Undo scene edit (Ctrl+Z)"
+                                className={`w-6 h-6 flex items-center justify-center rounded-md transition-colors cursor-pointer text-[13px] ${pastScenes.length === 0 ? 'opacity-25 cursor-not-allowed' : ''} ${isDark ? 'text-gray-400 hover:text-white hover:bg-gray-800' : 'text-gray-500 hover:text-gray-900 hover:bg-gray-100'}`}
+                            >
+                                ↶
+                            </button>
+                            {/* Redo */}
+                            <button
+                                onClick={redoScenes}
+                                disabled={futureScenes.length === 0}
+                                title="Redo scene edit (Ctrl+Shift+Z)"
+                                className={`w-6 h-6 flex items-center justify-center rounded-md transition-colors cursor-pointer text-[13px] ${futureScenes.length === 0 ? 'opacity-25 cursor-not-allowed' : ''} ${isDark ? 'text-gray-400 hover:text-white hover:bg-gray-800' : 'text-gray-500 hover:text-gray-900 hover:bg-gray-100'}`}
+                            >
+                                ↷
+                            </button>
+                            {/* Timecode Toggle */}
+                            <button
+                                onClick={() => setShowTimecode(prev => !prev)}
+                                title={showTimecode ? 'Switch to simple time' : 'Switch to timecode (HH:MM:SS:FF)'}
+                                className={`w-6 h-6 flex items-center justify-center rounded-md transition-colors cursor-pointer text-[9px] font-bold ${showTimecode ? (isDark ? 'text-white bg-gray-700' : 'text-gray-900 bg-gray-200') : (isDark ? 'text-gray-400 hover:text-white hover:bg-gray-800' : 'text-gray-500 hover:text-gray-900 hover:bg-gray-100')}`}
+                            >
+                                {showTimecode ? 'S' : 'TC'}
+                            </button>
                             <button className={`w-6 h-6 flex items-center justify-center rounded-md transition-colors cursor-pointer ${isDark ? 'text-gray-400 hover:text-white hover:bg-gray-800' : 'text-gray-500 hover:text-gray-900 hover:bg-gray-100'}`}>
                                 <LayoutGrid size={14} />
                             </button>
@@ -939,6 +1104,7 @@ export const Timeline = ({
                             setShowPlusDropdown(false);
                             const newId = Date.now().toString();
                             const newBlankEnd = scenes.reduce((sum, s) => sum + s.duration, 0) + 5.0;
+                            saveHistory(scenes);
                             setScenes(prev => [...prev, { id: newId, duration: 5.0 }]);
                             setSelectedSceneId(newId);
                             setCurrentTime(newBlankEnd);
@@ -976,6 +1142,7 @@ export const Timeline = ({
                             setShowGapDropdown(false);
                             if (activeGapIndex === null) return;
                             const newId = Date.now().toString();
+                            saveHistory(scenes);
                             setScenes(prev => {
                                 const updated = [...prev];
                                 updated.splice(activeGapIndex + 1, 0, { id: newId, duration: 5.0 });
