@@ -977,7 +977,7 @@ export const Timeline = ({
                                     max="1000"
                                     value={zoom}
                                     onChange={(e) => setZoom(parseInt(e.target.value))}
-                                    className={`w-48 h-1.5 rounded-full appearance-none cursor-pointer outline-none transition-colors ${isDark ? 'bg-gray-800' : 'bg-gray-200'}`}
+                                    className={`w-48 h-1 rounded-full appearance-none cursor-pointer outline-none transition-colors ${isDark ? 'bg-gray-800' : 'bg-gray-200'}`}
                                     style={{
                                         backgroundImage: `linear-gradient(to right, #8b5cf6 0%, #8b5cf6 ${(zoom / 1000) * 100}%, transparent ${(zoom / 1000) * 100}%, transparent 100%)`,
                                     }}
@@ -986,65 +986,46 @@ export const Timeline = ({
                                 input[type='range']::-webkit-slider-thumb {
                                     -webkit-appearance: none;
                                     appearance: none;
-                                    width: 14px;
-                                    height: 14px;
+                                    width: 10px;
+                                    height: 10px;
                                     background: #8b5cf6;
                                     border-radius: 50%;
                                     cursor: pointer;
-                                    box-shadow: 0 1px 3px rgba(0,0,0,0.3);
-                                    transition: transform 0.15s ease, box-shadow 0.15s ease;
-                                }
-                                input[type='range']::-webkit-slider-thumb:hover {
-                                    transform: scale(1.25);
-                                    box-shadow: 0 0 0 5px rgba(139, 92, 246, 0.2);
-                                }
-                                input[type='range']:active::-webkit-slider-thumb {
-                                    transform: scale(1.25);
-                                    box-shadow: 0 0 0 6px rgba(139, 92, 246, 0.35);
+                                    box-shadow: 0 1px 3px rgba(0,0,0,0.2);
                                 }
                                 input[type='range']::-moz-range-thumb {
-                                    width: 14px;
-                                    height: 14px;
+                                    width: 10px;
+                                    height: 10px;
                                     background: #8b5cf6;
                                     border-radius: 50%;
                                     cursor: pointer;
                                     border: none;
-                                    box-shadow: 0 1px 3px rgba(0,0,0,0.3);
-                                    transition: transform 0.15s ease, box-shadow 0.15s ease;
-                                }
-                                input[type='range']::-moz-range-thumb:hover {
-                                    transform: scale(1.25);
-                                    box-shadow: 0 0 0 5px rgba(139, 92, 246, 0.2);
-                                }
-                                input[type='range']:active::-moz-range-thumb {
-                                    transform: scale(1.25);
-                                    box-shadow: 0 0 0 6px rgba(139, 92, 246, 0.35);
                                 }
                             `}</style>
                             </div>
-                            <span className={`text-[13px] font-medium w-12 text-center ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+                            <span className={`text-[11px] font-medium w-10 text-center ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
                                 {zoom}%
                             </span>
                         </div>
 
-                        <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-2">
                             <button
                                 onClick={() => setIsPlaying(!isPlaying)}
-                                className={`w-7 h-7 rounded-full border transition-colors cursor-pointer flex items-center justify-center ${isDark ? 'border-gray-700 hover:bg-gray-800 text-gray-300' : 'border-gray-300 hover:bg-gray-100 text-gray-700'}`}
+                                className={`w-6 h-6 rounded-full border transition-colors cursor-pointer flex items-center justify-center ${isDark ? 'border-gray-700 hover:bg-gray-800 text-gray-300' : 'border-gray-300 hover:bg-gray-100 text-gray-700'}`}
                             >
-                                {isPlaying ? <Pause size={12} fill="currentColor" /> : <Play size={12} fill="currentColor" className="ml-0.5" />}
+                                {isPlaying ? <Pause size={10} fill="currentColor" /> : <Play size={10} fill="currentColor" className="ml-0.5" />}
                             </button>
-                            <span className={`text-[13px] font-medium tracking-[0.02em] ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+                            <span className={`text-[11px] font-medium tracking-[0.02em] ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
                                 {`${formatTime(currentTime)} / ${formatTime(duration)}`}
                             </span>
                         </div>
 
                         {/* Icons */}
-                        <div className="flex items-center gap-1 border-l pl-3 ml-1 border-gray-300 dark:border-gray-700">
-                            <button className={`w-7 h-7 flex items-center justify-center rounded-md transition-colors cursor-pointer ${isDark ? 'text-gray-400 hover:text-white hover:bg-gray-800' : 'text-gray-500 hover:text-gray-900 hover:bg-gray-100'}`}>
+                        <div className="flex items-center gap-0.5 border-l pl-2 ml-0.5 border-gray-300 dark:border-gray-700">
+                            <button className={`w-6 h-6 flex items-center justify-center rounded-md transition-colors cursor-pointer ${isDark ? 'text-gray-400 hover:text-white hover:bg-gray-800' : 'text-gray-500 hover:text-gray-900 hover:bg-gray-100'}`}>
                                 <LayoutGrid size={16} />
                             </button>
-                            <button className={`w-7 h-7 flex items-center justify-center rounded-md transition-colors cursor-pointer ${isDark ? 'text-gray-400 hover:text-white hover:bg-gray-800' : 'text-gray-500 hover:text-gray-900 hover:bg-gray-100'}`}>
+                            <button className={`w-6 h-6 flex items-center justify-center rounded-md transition-colors cursor-pointer ${isDark ? 'text-gray-400 hover:text-white hover:bg-gray-800' : 'text-gray-500 hover:text-gray-900 hover:bg-gray-100'}`}>
                                 <Maximize size={16} />
                             </button>
                         </div>
