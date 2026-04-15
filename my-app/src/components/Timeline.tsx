@@ -33,13 +33,8 @@ export const Timeline = ({
         return `${mins}:${secs.toString().padStart(2, '0')}.${ms}`;
     };
 
-    const formatTimecode = (seconds: number, fps: number = PROJECT_FPS) => {
-        const hrs = Math.floor(seconds / 3600);
-        const mins = Math.floor((seconds % 3600) / 60);
-        const secs = Math.floor(seconds % 60);
-        const frames = Math.floor((seconds % 1) * fps);
-        return `${hrs.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}:${frames.toString().padStart(2, '0')}`;
-    };
+
+
 
     const [isDraggingPlayhead, setIsDraggingPlayhead] = useState(false);
     const [zoom, setZoom] = useState(380); // 10 to 1000 zoom scale
@@ -69,6 +64,7 @@ export const Timeline = ({
 
     const [containerWidth, setContainerWidth] = useState(0);
     const scrollParentRef = useRef<HTMLDivElement>(null);
+    const tracksScrollRef = useRef<HTMLDivElement>(null);
     const [hoverTime, setHoverTime] = useState<number | null>(null);
     const [hoverScrubberPos, setHoverScrubberPos] = useState<{ top: number; left: number } | null>(null);
     const [showPlusDropdown, setShowPlusDropdown] = useState(false);
@@ -350,7 +346,7 @@ export const Timeline = ({
             setHoverTime(time);
 
             setHoverScrubberPos({
-                top: rect.top,
+                top: scrollParentRef.current ? scrollParentRef.current.getBoundingClientRect().top : rect.top,
                 left: rect.left + 4 + timeToPixel(time)
             });
         }
@@ -362,9 +358,13 @@ export const Timeline = ({
         const isResizeHandle = target.closest('[data-resize-handle]') !== null;
 
         if (isResizeHandle) {
-            // Don't start timeline drag - resize handle will handle this
-            // The resize handle's onMouseDown will determine click vs drag
             return;
+        }
+
+        // Guard: ignore clicks on the native vertical scrollbar (right edge of tracks container)
+        if (tracksScrollRef.current) {
+            const scrollRect = tracksScrollRef.current.getBoundingClientRect();
+            if (e.clientX > scrollRect.right - 20) return;
         }
 
         setIsDraggingPlayhead(true);
@@ -689,58 +689,51 @@ export const Timeline = ({
             <div className={`h-[180px] pt-0 pb-2 flex-shrink-0 flex flex-col transition-colors duration-200 overflow-hidden -mx-[10px] -mb-[10px] ${isDark ? 'bg-[#1e1e2e] border-t border-[#2a2d45]' : 'bg-white border-t border-gray-200'}`}>
 
 
-                {/* Main Timeline Area */}
-                <div className="flex-1 flex overflow-hidden">
-                    <div ref={scrollParentRef} className={`flex-1 overflow-x-auto overflow-y-hidden relative custom-scrollbar ${isDark ? 'bg-[#14141d]' : 'bg-white'}`}>
+                {/* Main Timeline Area — ruler and tracks are SEPARATE scroll containers */}
+                <div className="flex-1 flex flex-col overflow-hidden">
+
+                    {/* ── Ruler Row ── horizontal scroll synced to tracks, scrollbar hidden */}
+                    <div
+                        ref={scrollParentRef}
+                        className={`flex-shrink-0 overflow-x-hidden ${isDark ? 'bg-[#14141d]' : 'bg-white'}`}
+                    >
                         <div
-                            className="h-full relative transition-all duration-300 ease-out px-1"
+                            className="h-[36px] relative px-1"
                             style={{ minWidth: `${timelineWidth}px` }}
-                            ref={timelineRef}
                             onMouseDown={handleTimelineMouseDown}
                             onMouseMove={handleTimelineMouseMove}
                             onMouseLeave={() => { setHoverTime(null); setHoverScrubberPos(null); }}
                         >
-                            {/* Ghost Scrubber (Hover Preview) */}
+                            {/* Ghost scrubber triangle (ruler only) */}
                             {hoverTime !== null && !isDraggingPlayhead && hoveredHandleSceneId === null && resizingScene === null && (
                                 <div className="absolute top-0 bottom-0 w-[2px] z-35 pointer-events-none left-1"
-                                    style={{
-                                        transform: `translateX(${timeToPixel(hoverTime)}px)`,
-                                    }}
+                                    style={{ transform: `translateX(${timeToPixel(hoverTime)}px)` }}
                                 >
                                     <svg width="10" height="8" viewBox="0 0 10 8" className="absolute top-[2px] left-1/2 -translate-x-1/2 text-[#1f2937]" fill="currentColor">
                                         <path d="M2.5 1h5c1.1 0 1.6 1.3.8 2.1L5.8 5.7c-.4.4-1.1.4-1.5 0L1.7 3.1C.9 2.3 1.4 1 2.5 1z" />
                                     </svg>
-                                    <div className="absolute top-[28px] bottom-0 left-0 right-0 bg-gray-800 opacity-60 rounded-full" />
                                 </div>
                             )}
 
-                            {/* Playhead Marker */}
+                            {/* Playhead triangle (ruler only) */}
                             <div className="absolute top-0 bottom-0 w-[2px] z-35 pointer-events-none left-1"
                                 style={{
                                     transform: `translateX(${timeToPixel(scrubberFaded ? scrubberTime : currentTime)}px)`,
                                     opacity: scrubberSnapped ? 1 : (scrubberFaded ? 0.5 : 1)
                                 }}
                             >
-                                {/* Rounded Head triangle - purple when snapped */}
                                 <svg width="10" height="8" viewBox="0 0 10 8" className={`absolute top-[2px] left-1/2 -translate-x-1/2 transition-colors duration-150 ${scrubberSnapped ? 'text-[#7c3aed]' : 'text-gray-800'}`} fill="currentColor">
                                     <path d="M2.5 1h5c1.1 0 1.6 1.3.8 2.1L5.8 5.7c-.4.4-1.1.4-1.5 0L1.7 3.1C.9 2.3 1.4 1 2.5 1z" />
                                 </svg>
-
-                                {/* Scrubber line - purple when snapped */}
-                                <div className={`absolute top-[28px] bottom-0 left-0 right-0 rounded-full transition-colors duration-150 ${scrubberSnapped ? 'bg-[#7c3aed]' : 'bg-gray-800'}`} />
-
-
                             </div>
 
-                            {/* Time Ruler */}
+                            {/* Ruler ticks */}
                             <div className="h-[36px] flex absolute inset-x-1 z-10 pt-2 cursor-col-resize">
                                 {rulerTicks.map((tick) => (
                                     <div
                                         key={tick.time}
                                         className="absolute top-0 bottom-0 flex flex-row items-start pointer-events-none pt-2"
-                                        style={{
-                                            left: `${timeToPixel(tick.time)}px`
-                                        }}
+                                        style={{ left: `${timeToPixel(tick.time)}px` }}
                                     >
                                         <div className={`w-[2px] rounded-full ${tick.isMajor ? 'h-5' : 'h-2.5 mt-[5px]'} ${isDark ? 'bg-gray-600' : 'bg-gray-300'}`} />
                                         {tick.isMajor && (
@@ -751,9 +744,49 @@ export const Timeline = ({
                                     </div>
                                 ))}
                             </div>
+                        </div>
+                    </div>
 
-                            {/* Tracks Area Container (Below ruler) — vertical scroll only */}
-                            <div className="absolute top-[30px] bottom-0 left-1 right-1 flex flex-col overflow-y-auto overflow-x-visible gap-[2px] py-0 custom-scrollbar">
+                    {/* ── Tracks Row ── synced horizontally + vertical scrollbar always pinned to right edge */}
+                    <div
+                        ref={tracksScrollRef}
+                        className={`flex-1 overflow-x-auto overflow-y-auto custom-scrollbar relative ${isDark ? 'bg-[#14141d]' : 'bg-white'}`}
+                        onScroll={() => {
+                            if (tracksScrollRef.current && scrollParentRef.current) {
+                                scrollParentRef.current.scrollLeft = tracksScrollRef.current.scrollLeft;
+                            }
+                        }}
+                    >
+                        <div
+                            className="relative transition-all duration-300 ease-out px-1"
+                            style={{ minWidth: `${timelineWidth}px` }}
+                            ref={timelineRef}
+                            onMouseDown={handleTimelineMouseDown}
+                            onMouseMove={handleTimelineMouseMove}
+                            onMouseLeave={() => { setHoverTime(null); setHoverScrubberPos(null); }}
+                        >
+                            {/* Ghost scrubber line (tracks only) */}
+                            {hoverTime !== null && !isDraggingPlayhead && hoveredHandleSceneId === null && resizingScene === null && (
+                                <div className="absolute top-0 bottom-0 w-[2px] z-35 pointer-events-none left-1"
+                                    style={{ transform: `translateX(${timeToPixel(hoverTime)}px)` }}
+                                >
+                                    <div className="absolute top-0 bottom-0 left-0 right-0 bg-gray-800 opacity-60 rounded-full" />
+                                </div>
+                            )}
+
+                            {/* Playhead line (tracks only) */}
+                            <div className="absolute top-0 bottom-0 w-[2px] z-35 pointer-events-none left-1"
+                                style={{
+                                    transform: `translateX(${timeToPixel(scrubberFaded ? scrubberTime : currentTime)}px)`,
+                                    opacity: scrubberSnapped ? 1 : (scrubberFaded ? 0.5 : 1)
+                                }}
+                            >
+                                <div className={`absolute top-0 bottom-0 left-0 right-0 rounded-full transition-colors duration-150 ${scrubberSnapped ? 'bg-[#7c3aed]' : 'bg-gray-800'}`} />
+                            </div>
+
+                            {/* Tracks content */}
+                            <div className="flex flex-col gap-[2px] py-0">
+
                                 {/* Row 1: Add Elements */}
                                 <div className="relative h-9 shrink-0 flex items-center">
                                     <button className={`sticky left-0 z-15 flex items-center gap-2.5 px-4 py-1.5 rounded-[10px] text-[13px] font-semibold shadow-sm transition-colors ${isDark ? 'bg-[#1e1e2e] text-gray-300 hover:bg-gray-800' : 'bg-[#e5e7eb] text-gray-700 hover:bg-[#d1d5db]'}`}>
@@ -767,7 +800,6 @@ export const Timeline = ({
 
                                         {scenes.map((scene, sceneIndex) => {
                                             const isSelected = selectedSceneId === scene.id;
-                                            // During left drag: use live ref values so React render matches DOM → no reconciler conflict
                                             const isLiveLeftDrag = liveLeftDrag.current.sceneId === scene.id;
                                             const isLiveRightDrag = liveRightDrag.current.sceneId === scene.id;
                                             const spacerPx = isLiveLeftDrag
@@ -780,7 +812,7 @@ export const Timeline = ({
                                                     : timeToPixel(scene.duration);
                                             return (
                                                 <React.Fragment key={scene.id}>
-                                                    {/* Leading gap spacer — width set by DOM ref during drag, React state at rest */}
+                                                    {/* Leading gap spacer */}
                                                     <div
                                                         ref={(el) => { spacerRefs.current.set(scene.id, el); }}
                                                         className="h-full flex-shrink-0 pointer-events-none"
@@ -789,32 +821,19 @@ export const Timeline = ({
                                                     <div
                                                         ref={(el) => { sceneRefs.current.set(scene.id, el); }}
                                                         onClick={() => setSelectedSceneId(isSelected ? null : scene.id)}
-                                                        className={`relative h-full bg-white rounded-md overflow-hidden flex items-end p-2 flex-shrink-0 cursor-pointer border-[1.5px] group/scene ${isSelected
-                                                            ? 'border-[#7c3aed]'
-                                                            : 'border-[#d1d5db]'
-                                                            }`}
+                                                        className={`relative h-full bg-white rounded-md overflow-hidden flex items-end p-2 flex-shrink-0 cursor-pointer border-[1.5px] group/scene ${isSelected ? 'border-[#7c3aed]' : 'border-[#d1d5db]'}`}
                                                         style={{ width: `${scenePx}px` }}
                                                     >
-                                                        {/* Duration label:
-                                                    - Not selected → never shows
-                                                    - Selected + hovering handle zone → hidden (handles are visible instead)
-                                                    - Selected + hovering anywhere else → visible
-                                                    - During active resize → hidden (tooltip takes over)
-                                                */}
                                                         {isSelected && resizingScene?.id !== scene.id && (
-                                                            <span className={`text-[12.5px] font-bold text-[#1f2937] leading-none tracking-tight transition-opacity ${hoveredHandleSceneId === scene.id ? 'opacity-0' : 'opacity-100'
-                                                                }`}>
+                                                            <span className={`text-[12.5px] font-bold text-[#1f2937] leading-none tracking-tight transition-opacity ${hoveredHandleSceneId === scene.id ? 'opacity-0' : 'opacity-100'}`}>
                                                                 {scene.duration.toFixed(1)}s
                                                             </span>
                                                         )}
 
-                                                        {/* Unified resize handles: gradient shadow + white bar + resize logic — single element per side */}
                                                         <>
-                                                            {/* Left: darker at left edge, fades inward to transparent */}
                                                             <div
                                                                 data-resize-handle="left"
-                                                                className={`absolute left-0 top-0 bottom-0 w-[40px] flex items-center justify-start pl-[9px] cursor-ew-resize transition-opacity z-10 ${hoveredHandleSceneId === scene.id ? 'opacity-100' : 'opacity-0'
-                                                                    }`}
+                                                                className={`absolute left-0 top-0 bottom-0 w-[40px] flex items-center justify-start pl-[9px] cursor-ew-resize transition-opacity z-10 ${hoveredHandleSceneId === scene.id ? 'opacity-100' : 'opacity-0'}`}
                                                                 style={{ background: 'linear-gradient(to right, rgba(0,0,0,0.22) 0%, rgba(0,0,0,0.07) 55%, transparent 100%)' }}
                                                                 onMouseEnter={() => setHoveredHandleSceneId(scene.id)}
                                                                 onMouseLeave={() => setHoveredHandleSceneId(null)}
@@ -822,11 +841,9 @@ export const Timeline = ({
                                                             >
                                                                 <div className="w-[3px] h-[26px] bg-white rounded-full shadow-md flex-shrink-0" />
                                                             </div>
-                                                            {/* Right: darker at right edge, fades inward to transparent */}
                                                             <div
                                                                 data-resize-handle="right"
-                                                                className={`absolute right-0 top-0 bottom-0 w-[40px] flex items-center justify-end pr-[9px] cursor-ew-resize transition-opacity z-10 ${hoveredHandleSceneId === scene.id ? 'opacity-100' : 'opacity-0'
-                                                                    }`}
+                                                                className={`absolute right-0 top-0 bottom-0 w-[40px] flex items-center justify-end pr-[9px] cursor-ew-resize transition-opacity z-10 ${hoveredHandleSceneId === scene.id ? 'opacity-100' : 'opacity-0'}`}
                                                                 style={{ background: 'linear-gradient(to left, rgba(0,0,0,0.22) 0%, rgba(0,0,0,0.07) 55%, transparent 100%)' }}
                                                                 onMouseEnter={() => setHoveredHandleSceneId(scene.id)}
                                                                 onMouseLeave={() => setHoveredHandleSceneId(null)}
@@ -836,7 +853,6 @@ export const Timeline = ({
                                                             </div>
                                                         </>
 
-                                                        {/* 3-dot pill — only when selected AND hovered */}
                                                         {isSelected && (
                                                             <div className="absolute top-1.5 right-1.5 opacity-0 group-hover/scene:opacity-100 transition-opacity z-20">
                                                                 <div
@@ -851,20 +867,17 @@ export const Timeline = ({
                                                         )}
                                                     </div>
 
-                                                    {/* Gap indicator between clips — two circles on hover at the thin seam */}
                                                     {sceneIndex < scenes.length - 1 && (
                                                         <div
                                                             className="relative flex-shrink-0 self-stretch"
                                                             style={{ width: '0px', zIndex: 25 }}
                                                         >
-                                                            {/* Thin hover strip — only triggers at the exact edge between clips */}
                                                             <div
                                                                 className="absolute inset-y-0 flex items-center justify-center"
                                                                 style={{ width: '8px', left: '-4px', cursor: 'default' }}
                                                                 onMouseEnter={() => setHoveredGapIndex(sceneIndex)}
                                                                 onMouseLeave={() => setHoveredGapIndex(null)}
                                                             >
-                                                                {/* Two stacked circles — pop in when hovering the seam */}
                                                                 <div
                                                                     className="flex flex-col items-center gap-[6px] transition-all duration-150"
                                                                     style={{
@@ -873,7 +886,6 @@ export const Timeline = ({
                                                                         pointerEvents: hoveredGapIndex === sceneIndex ? 'auto' : 'none',
                                                                     }}
                                                                 >
-                                                                    {/* Plus circle (top) — tooltip: "Add media / blank" */}
                                                                     <div className="relative group/plus">
                                                                         <div
                                                                             className="w-[24px] h-[24px] rounded-full bg-white border border-gray-300 shadow-sm flex items-center justify-center cursor-pointer hover:bg-gray-100 hover:border-gray-400 transition-colors"
@@ -887,15 +899,11 @@ export const Timeline = ({
                                                                         >
                                                                             <Plus size={13} strokeWidth={2.5} className="text-gray-600" />
                                                                         </div>
-                                                                        {/* Tooltip */}
                                                                         <div className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-[6px] opacity-0 group-hover/plus:opacity-100 transition-opacity duration-150 whitespace-nowrap">
-                                                                            <div className="bg-[#1f2937] text-white text-[11px] font-medium px-2 py-1 rounded-md shadow-lg">
-                                                                                Add media / blank
-                                                                            </div>
+                                                                            <div className="bg-[#1f2937] text-white text-[11px] font-medium px-2 py-1 rounded-md shadow-lg">Add media / blank</div>
                                                                             <div className="w-0 h-0 border-l-[4px] border-r-[4px] border-t-[4px] border-l-transparent border-r-transparent border-t-[#1f2937] mx-auto" />
                                                                         </div>
                                                                     </div>
-                                                                    {/* Transition circle (bottom) — tooltip: "Add transition" */}
                                                                     <div className="relative group/trans">
                                                                         <div
                                                                             className="w-[24px] h-[24px] rounded-full bg-white border border-gray-300 shadow-sm flex items-center justify-center cursor-pointer hover:bg-gray-100 hover:border-gray-400 transition-colors"
@@ -903,11 +911,8 @@ export const Timeline = ({
                                                                         >
                                                                             <StepForward size={12} strokeWidth={2} className="text-gray-600" />
                                                                         </div>
-                                                                        {/* Tooltip */}
                                                                         <div className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-[6px] opacity-0 group-hover/trans:opacity-100 transition-opacity duration-150 whitespace-nowrap">
-                                                                            <div className="bg-[#1f2937] text-white text-[11px] font-medium px-2 py-1 rounded-md shadow-lg">
-                                                                                Add transition
-                                                                            </div>
+                                                                            <div className="bg-[#1f2937] text-white text-[11px] font-medium px-2 py-1 rounded-md shadow-lg">Add transition</div>
                                                                             <div className="w-0 h-0 border-l-[4px] border-r-[4px] border-t-[4px] border-l-transparent border-r-transparent border-t-[#1f2937] mx-auto" />
                                                                         </div>
                                                                     </div>
@@ -945,11 +950,18 @@ export const Timeline = ({
                                         Add audio
                                     </button>
                                 </div>
-                            </div>
 
+                            </div>
                         </div>
                     </div>
+
                 </div>
+
+
+
+
+
+
 
                 {/* Bottom Row */}
                 <div className="flex-shrink-0 flex items-center justify-end mt-1 pl-3 pr-3">
@@ -1144,7 +1156,7 @@ export const Timeline = ({
                     <div
                         className="fixed z-[9999] pointer-events-none flex flex-col items-center"
                         style={{
-                            top: rect.top,
+                            top: scrollParentRef.current ? scrollParentRef.current.getBoundingClientRect().top : rect.top,
                             left: rect.left + 4 + timeToPixel(currentTime),
                             transform: 'translate(-50%, -100%)',
                             marginTop: '4px'
