@@ -1,6 +1,7 @@
 import React, { useRef, useEffect, useState, useMemo } from 'react';
 import ReactDOM from 'react-dom';
 import { Play, Pause, Plus, LayoutGrid, Music, Maximize, CloudUpload, RectangleHorizontal, StepForward } from 'lucide-react';
+import { useEditorStore, getHistoryControls } from '../store/useEditorStore';
 
 interface TimelineProps {
     currentTime: number;
@@ -50,10 +51,9 @@ export const Timeline = ({
     const [scrubberSnapped, setScrubberSnapped] = useState(false); // true when resize handle snaps to scrubber
     const [showTimecode, setShowTimecode] = useState(false); // Toggle between simple/timecode display
 
-    // ─── Local Scene Undo/Redo History ───────────────────────────────────────────
-    type SceneState = { id: string; duration: number; leadingGap?: number }[];
-    const [pastScenes, setPastScenes] = useState<SceneState[]>([]);
-    const [futureScenes, setFutureScenes] = useState<SceneState[]>([]);
+    // ─── Global Scene State (shared undo/redo via zustand-travel) ──────────────
+    const scenes = useEditorStore((state) => state.scenes);
+    const { setScenes, addScene, updateScene, removeScene } = useEditorStore();
 
     // Click vs Drag detection for resize handles
     const [pendingResizeClick, setPendingResizeClick] = useState<{
@@ -76,34 +76,9 @@ export const Timeline = ({
     const [showGapDropdown, setShowGapDropdown] = useState(false);
     const [gapDropdownPos, setGapDropdownPos] = useState<{ top: number; left: number } | null>(null);
     const [activeGapIndex, setActiveGapIndex] = useState<number | null>(null);
-    const [scenes, setScenes] = useState<{ id: string, duration: number, leadingGap?: number }[]>([]);
     const [selectedSceneId, setSelectedSceneId] = useState<string | null>(null);
 
-    // Save current scenes to history before a mutation
-    const saveHistory = (currentScenes: SceneState) => {
-        setPastScenes(prev => [...prev.slice(-49), currentScenes]); // cap at 50
-        setFutureScenes([]);
-    };
 
-    const undoScenes = () => {
-        setPastScenes(prev => {
-            if (prev.length === 0) return prev;
-            const previous = prev[prev.length - 1];
-            setFutureScenes(f => [scenes, ...f.slice(0, 49)]);
-            setScenes(previous);
-            return prev.slice(0, -1);
-        });
-    };
-
-    const redoScenes = () => {
-        setFutureScenes(prev => {
-            if (prev.length === 0) return prev;
-            const next = prev[0];
-            setPastScenes(p => [...p.slice(-49), scenes]);
-            setScenes(next);
-            return prev.slice(1);
-        });
-    };
     const [resizingScene, setResizingScene] = useState<{
         id: string;
         side: 'left' | 'right';
@@ -245,33 +220,21 @@ export const Timeline = ({
                 case 'Backspace':
                     if (selectedSceneId) {
                         e.preventDefault();
-                        saveHistory(scenes);
-                        setScenes(prev => prev.filter(s => s.id !== selectedSceneId));
+                        removeScene(selectedSceneId);
+                        getHistoryControls().archive();
+                        window.dispatchEvent(new CustomEvent('history-updated'));
                         setSelectedSceneId(null);
                     }
                     break;
 
-                case 'z':
-                case 'Z':
-                    if (e.ctrlKey || e.metaKey) {
-                        e.preventDefault();
-                        if (e.shiftKey) { redoScenes(); } else { undoScenes(); }
-                    }
-                    break;
-
-                case 'y':
-                case 'Y':
-                    if (e.ctrlKey || e.metaKey) {
-                        e.preventDefault();
-                        redoScenes();
-                    }
-                    break;
+                // Ctrl+Z / Ctrl+Shift+Z / Ctrl+Y are handled globally in SaasVideoEditor
+                // via getHistoryControls().back() / .forward() which now covers scenes too.
             }
         };
 
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [isPlaying, setIsPlaying, setCurrentTime, duration, setZoom, selectedSceneId, scenes, pastScenes, futureScenes]);
+    }, [isPlaying, setIsPlaying, setCurrentTime, duration, setZoom, selectedSceneId, removeScene]);
 
     // ─── Industry-standard: pixelsPerSecond driven by zoom, NOT by container width ──
     // Piecewise-linear curve calibrated so that at each zoom boundary,
@@ -486,9 +449,11 @@ export const Timeline = ({
             const deltaX = e.clientX - resizingScene.startX;
 
             // Calculate current resize handle position in time
-            const sceneIdx = scenes.findIndex(s => s.id === resizingScene.id);
-            const priorDuration = scenes.slice(0, sceneIdx).reduce((sum, s) => sum + s.duration, 0);
-            const sceneStartTime = priorDuration + (scenes[sceneIdx].leadingGap || 0);
+            // Read scenes imperatively to avoid stale closure during drag
+            const currentScenes = useEditorStore.getState().scenes;
+            const sceneIdx = currentScenes.findIndex(s => s.id === resizingScene.id);
+            const priorDuration = currentScenes.slice(0, sceneIdx).reduce((sum, s) => sum + s.duration, 0);
+            const sceneStartTime = priorDuration + (currentScenes[sceneIdx].leadingGap || 0);
 
             // Calculate where the resize edge currently is (in time)
             let currentEdgeTime: number;
@@ -600,23 +565,20 @@ export const Timeline = ({
         };
 
         const handleMouseUp = () => {
-            // Save history before committing resize (makes resize undoable)
-            saveHistory(scenes);
+            // Read scenes imperatively to avoid stale closure
+            const currentScenes = useEditorStore.getState().scenes;
             if (resizingScene.side === 'right') {
                 // Commit final right-handle duration from DOM to React state
                 const finalDuration = liveRightDrag.current.sceneId === resizingScene.id
                     ? liveRightDrag.current.duration
                     : resizingScene.startDuration;
-                // Update scenes with new duration
-                setScenes(prev =>
-                    prev.map(s => s.id === resizingScene.id
-                        ? { ...s, duration: parseFloat(finalDuration.toFixed(2)) }
-                        : s
-                    )
-                );
+                // Update scene via global store
+                updateScene(resizingScene.id, { duration: parseFloat(finalDuration.toFixed(2)) });
+                getHistoryControls().archive();
+                window.dispatchEvent(new CustomEvent('history-updated'));
                 // Calculate new right edge position for scrubber (sum of prior durations + new duration)
-                const sceneIdx = scenes.findIndex(s => s.id === resizingScene.id);
-                const priorDuration = scenes.slice(0, sceneIdx).reduce((sum, s) => sum + s.duration, 0);
+                const sceneIdx = currentScenes.findIndex(s => s.id === resizingScene.id);
+                const priorDuration = currentScenes.slice(0, sceneIdx).reduce((sum, s) => sum + s.duration, 0);
                 const newEdgePosition = priorDuration + parseFloat(finalDuration.toFixed(2));
                 setScrubberTime(newEdgePosition);
                 setCurrentTime(newEdgePosition);
@@ -626,15 +588,12 @@ export const Timeline = ({
                 const finalDuration = liveLeftDrag.current.sceneId === resizingScene.id
                     ? liveLeftDrag.current.duration
                     : resizingScene.startDuration;
-                setScenes(prev =>
-                    prev.map(s => s.id === resizingScene.id
-                        ? { ...s, duration: parseFloat(finalDuration.toFixed(2)), leadingGap: 0 }
-                        : s
-                    )
-                );
+                updateScene(resizingScene.id, { duration: parseFloat(finalDuration.toFixed(2)), leadingGap: 0 });
+                getHistoryControls().archive();
+                window.dispatchEvent(new CustomEvent('history-updated'));
                 // Update scrubber position to the new start of the scene (left handle)
-                const sceneIdx = scenes.findIndex(s => s.id === resizingScene.id);
-                const priorDuration = scenes.slice(0, sceneIdx).reduce((sum, s) => sum + s.duration, 0);
+                const sceneIdx = currentScenes.findIndex(s => s.id === resizingScene.id);
+                const priorDuration = currentScenes.slice(0, sceneIdx).reduce((sum, s) => sum + s.duration, 0);
                 setScrubberTime(priorDuration);
                 setCurrentTime(priorDuration);
                 liveLeftDrag.current = { sceneId: null, spacerPx: 0, scenePx: 0, duration: 0 };
@@ -1045,24 +1004,6 @@ export const Timeline = ({
 
                         {/* Icons */}
                         <div className="flex items-center gap-0.5 border-l pl-2 ml-0.5 border-gray-300 dark:border-gray-700">
-                            {/* Undo */}
-                            <button
-                                onClick={undoScenes}
-                                disabled={pastScenes.length === 0}
-                                title="Undo scene edit (Ctrl+Z)"
-                                className={`w-6 h-6 flex items-center justify-center rounded-md transition-colors cursor-pointer text-[13px] ${pastScenes.length === 0 ? 'opacity-25 cursor-not-allowed' : ''} ${isDark ? 'text-gray-400 hover:text-white hover:bg-gray-800' : 'text-gray-500 hover:text-gray-900 hover:bg-gray-100'}`}
-                            >
-                                ↶
-                            </button>
-                            {/* Redo */}
-                            <button
-                                onClick={redoScenes}
-                                disabled={futureScenes.length === 0}
-                                title="Redo scene edit (Ctrl+Shift+Z)"
-                                className={`w-6 h-6 flex items-center justify-center rounded-md transition-colors cursor-pointer text-[13px] ${futureScenes.length === 0 ? 'opacity-25 cursor-not-allowed' : ''} ${isDark ? 'text-gray-400 hover:text-white hover:bg-gray-800' : 'text-gray-500 hover:text-gray-900 hover:bg-gray-100'}`}
-                            >
-                                ↷
-                            </button>
                             {/* Timecode Toggle */}
                             <button
                                 onClick={() => setShowTimecode(prev => !prev)}
@@ -1103,9 +1044,11 @@ export const Timeline = ({
                         onClick={() => {
                             setShowPlusDropdown(false);
                             const newId = Date.now().toString();
-                            const newBlankEnd = scenes.reduce((sum, s) => sum + s.duration, 0) + 5.0;
-                            saveHistory(scenes);
-                            setScenes(prev => [...prev, { id: newId, duration: 5.0 }]);
+                            const currentScenes = useEditorStore.getState().scenes;
+                            const newBlankEnd = currentScenes.reduce((sum, s) => sum + s.duration, 0) + 5.0;
+                            addScene({ id: newId, duration: 5.0 });
+                            getHistoryControls().archive();
+                            window.dispatchEvent(new CustomEvent('history-updated'));
                             setSelectedSceneId(newId);
                             setCurrentTime(newBlankEnd);
                         }}
@@ -1142,15 +1085,13 @@ export const Timeline = ({
                             setShowGapDropdown(false);
                             if (activeGapIndex === null) return;
                             const newId = Date.now().toString();
-                            saveHistory(scenes);
-                            setScenes(prev => {
-                                const updated = [...prev];
-                                updated.splice(activeGapIndex + 1, 0, { id: newId, duration: 5.0 });
-                                return updated;
-                            });
+                            const currentScenes = useEditorStore.getState().scenes;
+                            addScene({ id: newId, duration: 5.0 }, activeGapIndex + 1);
+                            getHistoryControls().archive();
+                            window.dispatchEvent(new CustomEvent('history-updated'));
                             setSelectedSceneId(newId);
                             // move scrubber to end of new blank
-                            const priorDuration = scenes.slice(0, activeGapIndex + 1).reduce((sum, s) => sum + s.duration, 0);
+                            const priorDuration = currentScenes.slice(0, activeGapIndex + 1).reduce((sum, s) => sum + s.duration, 0);
                             setCurrentTime(priorDuration + 5.0);
                         }}
                         className={`w-full flex items-center gap-3 px-4 py-2.5 text-[13px] font-medium transition-colors ${isDark ? 'text-gray-300 hover:bg-gray-800' : 'text-gray-700 hover:bg-gray-100'}`}

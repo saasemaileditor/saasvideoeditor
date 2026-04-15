@@ -2,6 +2,14 @@ import { create } from 'zustand';
 import { travel } from 'zustand-travel';
 import type { ManualTravelsControls } from 'zustand-travel';
 
+// ─── Types ───────────────────────────────────────────────────────────────────
+
+export type TimelineScene = {
+    id: string;
+    duration: number;
+    leadingGap?: number;
+};
+
 // ─── Element type ────────────────────────────────────────────────────────────
 
 export type CanvasElement = {
@@ -54,11 +62,20 @@ interface EditorState {
     elements: Map<string, CanvasElement>;
     elementIds: string[];
 
-    // Actions
+    // UNDOABLE — timeline scenes (shared undo/redo with elements)
+    scenes: TimelineScene[];
+
+    // Element Actions
     addElement: (element: CanvasElement) => void;
     updateElement: (id: string, data: Partial<CanvasElement>) => void;
     removeElement: (id: string) => void;
     reorderElements: (oldIndex: number, newIndex: number) => void;
+
+    // Scene Actions
+    setScenes: (scenes: TimelineScene[] | ((prev: TimelineScene[]) => TimelineScene[])) => void;
+    addScene: (scene: TimelineScene, atIndex?: number) => void;
+    updateScene: (id: string, data: Partial<Omit<TimelineScene, 'id'>>) => void;
+    removeScene: (id: string) => void;
 }
 
 // ─── Store ───────────────────────────────────────────────────────────────────
@@ -69,12 +86,14 @@ export const useEditorStore = create<EditorState>()(
             // Undoable state
             elements: new Map<string, CanvasElement>(),
             elementIds: [] as string[],
+            scenes: [] as TimelineScene[],
 
             // Adds a new item to the canvas and selects it
             addElement: (element) =>
                 set((state) => ({
                     elements: new Map([...state.elements, [element.id, element]]),
                     elementIds: [...state.elementIds, element.id],
+                    scenes: state.scenes,
                 })),
 
             // Updates an item's fields (position/rotation/scale/etc.)
@@ -85,6 +104,7 @@ export const useEditorStore = create<EditorState>()(
                     return {
                         elements: new Map([...state.elements, [id, { ...el, ...data }]]),
                         elementIds: state.elementIds,
+                        scenes: state.scenes,
                     };
                 }),
 
@@ -96,6 +116,7 @@ export const useEditorStore = create<EditorState>()(
                     return {
                         elements: newElements,
                         elementIds: state.elementIds.filter((eid) => eid !== id),
+                        scenes: state.scenes,
                     };
                 }),
 
@@ -115,9 +136,50 @@ export const useEditorStore = create<EditorState>()(
 
                     return {
                         elementIds: ids,
-                        elements: newElements
+                        elements: newElements,
+                        scenes: state.scenes,
                     };
                 }),
+
+            // ─── Scene actions ────────────────────────────────────────────────
+
+            // Replaces the entire scenes array (supports updater function)
+            setScenes: (scenesOrFn) =>
+                set((state) => ({
+                    elements: state.elements,
+                    elementIds: state.elementIds,
+                    scenes: typeof scenesOrFn === 'function' ? scenesOrFn(state.scenes) : scenesOrFn,
+                })),
+
+            // Adds a scene at the end, or at a specific index
+            addScene: (scene, atIndex) =>
+                set((state) => {
+                    const updated = [...state.scenes];
+                    if (atIndex !== undefined) {
+                        updated.splice(atIndex, 0, scene);
+                    } else {
+                        updated.push(scene);
+                    }
+                    return { elements: state.elements, elementIds: state.elementIds, scenes: updated };
+                }),
+
+            // Updates a single scene's fields by id
+            updateScene: (id, data) =>
+                set((state) => ({
+                    elements: state.elements,
+                    elementIds: state.elementIds,
+                    scenes: state.scenes.map((s) =>
+                        s.id === id ? { ...s, ...data } : s
+                    ),
+                })),
+
+            // Removes a scene by id
+            removeScene: (id) =>
+                set((state) => ({
+                    elements: state.elements,
+                    elementIds: state.elementIds,
+                    scenes: state.scenes.filter((s) => s.id !== id),
+                })),
         }),
         {
             // Manual archive: we call controls.archive() ourselves on drag/scale end.
