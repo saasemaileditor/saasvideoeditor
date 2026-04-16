@@ -142,13 +142,13 @@ export const Timeline = ({
 
     // Track scroll-parent (visible) width so we can enforce "fit to view" at low zoom
     useEffect(() => {
-        if (!scrollParentRef.current) return;
+        if (!tracksScrollRef.current) return;
         const observer = new ResizeObserver((entries) => {
             for (let entry of entries) {
                 setContainerWidth(entry.contentRect.width);
             }
         });
-        observer.observe(scrollParentRef.current);
+        observer.observe(tracksScrollRef.current);
         return () => observer.disconnect();
     }, []);
 
@@ -741,15 +741,9 @@ export const Timeline = ({
                     <div
                         ref={tracksScrollRef}
                         className={`flex-1 overflow-x-auto overflow-y-auto custom-scrollbar relative ${isDark ? 'bg-[#14141d]' : 'bg-white'}`}
-                        onScroll={(e) => {
+                        onScroll={() => {
                             if (tracksScrollRef.current && scrollParentRef.current) {
-                                const currentScrollLeft = tracksScrollRef.current.scrollLeft;
-                                console.log(
-                                    `DEBUG SCROLL: Scroll thumb moved. New scrollLeft is ${currentScrollLeft}px. ` +
-                                    `Because scrollLeft changed, the physical content inside visually pans to the *${currentScrollLeft > 0 ? "LEFT" : "RIGHT"}* compared to its origin. ` +
-                                    `This is native browser layout: pulling the thumb RIGHT reveals content on the right by sliding the track LEFT.`
-                                );
-                                scrollParentRef.current.scrollLeft = currentScrollLeft;
+                                scrollParentRef.current.scrollLeft = tracksScrollRef.current.scrollLeft;
                             }
                         }}
                     >
