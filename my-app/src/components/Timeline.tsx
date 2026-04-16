@@ -64,6 +64,7 @@ export const Timeline = ({
     const RESIZE_DRAG_THRESHOLD = 5; // pixels - must move more than this to be considered a drag
 
     const [containerWidth, setContainerWidth] = useState(0);
+    const [vertSBWidth, setVertSBWidth] = useState(0); // vertical scrollbar width of tracks area
     const scrollParentRef = useRef<HTMLDivElement>(null);
     const tracksScrollRef = useRef<HTMLDivElement>(null);
     const [hoverTime, setHoverTime] = useState<number | null>(null);
@@ -86,6 +87,7 @@ export const Timeline = ({
     const [resizeTooltip, setResizeTooltip] = useState<{ x: number; y: number } | null>(null);
     const [hoveredHandleSceneId, setHoveredHandleSceneId] = useState<string | null>(null);
     const [hoveredGapIndex, setHoveredGapIndex] = useState<number | null>(null);
+    const [isHoveringVertSB, setIsHoveringVertSB] = useState(false); // tracks hover on vertical scrollbar strip
     const plusBtnRef = useRef<HTMLButtonElement>(null);
     const dropdownRef = useRef<HTMLDivElement>(null);
     const gapDropdownRef = useRef<HTMLDivElement>(null);
@@ -140,12 +142,14 @@ export const Timeline = ({
     }, [showPlusDropdown]);
 
 
-    // Track scroll-parent (visible) width so we can enforce "fit to view" at low zoom
+    // Track the tracks scroll area's width and vertical scrollbar width
     useEffect(() => {
         if (!tracksScrollRef.current) return;
-        const observer = new ResizeObserver((entries) => {
-            for (let entry of entries) {
-                setContainerWidth(entry.contentRect.width);
+        const observer = new ResizeObserver(() => {
+            if (tracksScrollRef.current) {
+                setContainerWidth(tracksScrollRef.current.clientWidth);
+                // vertical scrollbar width = offsetWidth - clientWidth
+                setVertSBWidth(tracksScrollRef.current.offsetWidth - tracksScrollRef.current.clientWidth);
             }
         });
         observer.observe(tracksScrollRef.current);
@@ -159,9 +163,16 @@ export const Timeline = ({
         return 12 * Math.pow(150, zoomRatio);
     })();
 
-    // How far the ruler should draw to ensure it fills the viewport (like Canva)
-    const rulerDuration = Math.max(duration, containerWidth > 16 ? (containerWidth - 16) / pixelsPerSecond : 0);
-    const timelineWidth = Math.ceil(rulerDuration * pixelsPerSecond) + 16;
+    // Actual pixel width of the video content at current zoom
+    const contentWidth = Math.ceil(duration * pixelsPerSecond);
+    // True when content is wider than the visible tracks container → real horizontal scrollbar appears
+    const hasHorizontalOverflow = contentWidth > containerWidth;
+    // timelineWidth: equals containerWidth when content fits (zero overflow = no scrollbar),
+    // equals contentWidth when zoomed in (overflow = real scrollbar appears),
+    // equals containerWidth+1 when hovering vertical scrollbar (triggers real scrollbar as a peek hint)
+    const timelineWidth = hasHorizontalOverflow ? contentWidth + 32 : (isHoveringVertSB ? containerWidth + 1 : containerWidth);
+    // rulerDuration: how many seconds the visible ruler covers
+    const rulerDuration = timelineWidth / pixelsPerSecond;
 
     // ─── Timeline Keyboard Shortcuts ──────────────────────────────────────────────
     useEffect(() => {
@@ -689,7 +700,7 @@ export const Timeline = ({
                     >
                         <div
                             className="h-[36px] relative px-1"
-                            style={{ minWidth: `${timelineWidth}px` }}
+                            style={{ minWidth: `${timelineWidth + vertSBWidth}px` }}
                             onMouseDown={handleTimelineMouseDown}
                             onMouseMove={handleTimelineMouseMove}
                             onMouseLeave={() => { setHoverTime(null); setHoverScrubberPos(null); }}
@@ -746,6 +757,15 @@ export const Timeline = ({
                                 scrollParentRef.current.scrollLeft = tracksScrollRef.current.scrollLeft;
                             }
                         }}
+                        onMouseMove={(e) => {
+                            if (tracksScrollRef.current && !hasHorizontalOverflow) {
+                                const rect = tracksScrollRef.current.getBoundingClientRect();
+                                // Vertical scrollbar strip is the rightmost ~12px of the element
+                                const inVertSBStrip = e.clientX >= rect.right - 12;
+                                setIsHoveringVertSB(inVertSBStrip);
+                            }
+                        }}
+                        onMouseLeave={() => setIsHoveringVertSB(false)}
                     >
                         <div
                             className="relative transition-all duration-300 ease-out px-1"
