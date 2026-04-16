@@ -88,6 +88,7 @@ export const Timeline = ({
     const [hoveredHandleSceneId, setHoveredHandleSceneId] = useState<string | null>(null);
     const [hoveredGapIndex, setHoveredGapIndex] = useState<number | null>(null);
     const [isHoveringVertSB, setIsHoveringVertSB] = useState(false); // tracks hover on vertical scrollbar strip
+    const [isHoveringTimelineArea, setIsHoveringTimelineArea] = useState(false); // true only when mouse is over ruler or tracks (not bottom row)
     const plusBtnRef = useRef<HTMLButtonElement>(null);
     const dropdownRef = useRef<HTMLDivElement>(null);
     const gapDropdownRef = useRef<HTMLDivElement>(null);
@@ -170,7 +171,9 @@ export const Timeline = ({
     // timelineWidth: equals containerWidth when content fits (zero overflow = no scrollbar),
     // equals contentWidth when zoomed in (overflow = real scrollbar appears),
     // equals containerWidth+1 when hovering vertical scrollbar (triggers real scrollbar as a peek hint)
-    const timelineWidth = hasHorizontalOverflow ? contentWidth + 32 : (isHoveringVertSB ? containerWidth + 1 : containerWidth);
+    const timelineWidth = (hasHorizontalOverflow && isHoveringTimelineArea)
+        ? contentWidth + 32
+        : (isHoveringVertSB && isHoveringTimelineArea ? containerWidth + 1 : containerWidth);
     // rulerDuration: how many seconds the visible ruler covers
     const rulerDuration = timelineWidth / pixelsPerSecond;
 
@@ -691,7 +694,11 @@ export const Timeline = ({
 
 
                 {/* Main Timeline Area — ruler and tracks are SEPARATE scroll containers */}
-                <div className="flex-1 flex flex-col overflow-hidden">
+                <div
+                    className="flex-1 flex flex-col overflow-hidden"
+                    onMouseEnter={() => setIsHoveringTimelineArea(true)}
+                    onMouseLeave={() => setIsHoveringTimelineArea(false)}
+                >
 
                     {/* ── Ruler Row ── horizontal scroll synced to tracks, scrollbar hidden */}
                     <div
@@ -768,7 +775,7 @@ export const Timeline = ({
                         onMouseLeave={() => setIsHoveringVertSB(false)}
                     >
                         <div
-                            className="relative transition-all duration-300 ease-out px-1"
+                            className="relative px-1"
                             style={{ minWidth: `${timelineWidth}px` }}
                             ref={timelineRef}
                             onMouseDown={handleTimelineMouseDown}
