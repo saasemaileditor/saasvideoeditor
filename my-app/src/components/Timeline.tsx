@@ -12,10 +12,6 @@ interface TimelineProps {
     onOpenMediaPanel: () => void;
 }
 
-// ─── Constants ───────────────────────────────────────────────────────────────
-const DEFAULT_DURATION = 60;   // 1 minute default
-
-const AUTO_EXTEND_SECONDS = 15; // Add 15s when auto-extending
 const PROJECT_FPS = 30; // Default FPS for timecode display
 
 export const Timeline = ({
@@ -38,7 +34,6 @@ export const Timeline = ({
 
     const [isDraggingPlayhead, setIsDraggingPlayhead] = useState(false);
     const [zoom, setZoom] = useState(380); // 10 to 1000 zoom scale
-    const [duration, setDuration] = useState(DEFAULT_DURATION); // Dynamic, auto-extending
     const timelineRef = useRef<HTMLDivElement>(null);
     // New state: scrubber follows resize handle and fades while dragging
     const [scrubberTime, setScrubberTime] = useState(currentTime);
@@ -49,6 +44,12 @@ export const Timeline = ({
     // ─── Global Scene State (shared undo/redo via zustand-travel) ──────────────
     const scenes = useEditorStore((state) => state.scenes);
     const { addScene, updateScene, removeScene } = useEditorStore();
+
+    // Derived duration from scenes (minimum 5s, like Canva)
+    const duration = useMemo(() => {
+        const contentDuration = scenes.reduce((sum, s) => sum + s.duration, 0);
+        return Math.max(contentDuration, 5.0);
+    }, [scenes]);
 
     // Click vs Drag detection for resize handles
     const [pendingResizeClick, setPendingResizeClick] = useState<{
@@ -139,13 +140,6 @@ export const Timeline = ({
     }, [showPlusDropdown]);
 
 
-    // Auto-extend duration when currentTime approaches the end
-    useEffect(() => {
-        if (currentTime >= duration - 2) {
-            setDuration((prev) => prev + AUTO_EXTEND_SECONDS);
-        }
-    }, [currentTime, duration]);
-
     // Track scroll-parent (visible) width so we can enforce "fit to view" at low zoom
     useEffect(() => {
         if (!scrollParentRef.current) return;
@@ -157,6 +151,17 @@ export const Timeline = ({
         observer.observe(scrollParentRef.current);
         return () => observer.disconnect();
     }, []);
+
+    const pixelsPerSecond = (() => {
+        // Map 10-1000 zoom range to a 0.0 -> 1.0 slider ratio
+        const zoomRatio = (zoom - 10) / 990;
+        // Exponentially scale up to exactly 150x the power (12 * 150 = 1800 max pps)
+        return 12 * Math.pow(150, zoomRatio);
+    })();
+
+    // How far the ruler should draw to ensure it fills the viewport (like Canva)
+    const rulerDuration = Math.max(duration, containerWidth > 16 ? (containerWidth - 16) / pixelsPerSecond : 0);
+    const timelineWidth = Math.ceil(rulerDuration * pixelsPerSecond) + 16;
 
     // ─── Timeline Keyboard Shortcuts ──────────────────────────────────────────────
     useEffect(() => {
@@ -185,9 +190,9 @@ export const Timeline = ({
                 case 'ArrowRight':
                     e.preventDefault();
                     if (e.shiftKey) {
-                        setCurrentTime((prev: number) => Math.min(duration, prev + 1));
+                        setCurrentTime((prev: number) => Math.min(rulerDuration, prev + 1));
                     } else {
-                        setCurrentTime((prev: number) => Math.min(duration, prev + frameDuration));
+                        setCurrentTime((prev: number) => Math.min(rulerDuration, prev + frameDuration));
                     }
                     break;
 
@@ -198,7 +203,7 @@ export const Timeline = ({
 
                 case 'End':
                     e.preventDefault();
-                    setCurrentTime(duration);
+                    setCurrentTime(rulerDuration);
                     break;
 
                 case '+':
@@ -230,23 +235,8 @@ export const Timeline = ({
 
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [isPlaying, setIsPlaying, setCurrentTime, duration, setZoom, selectedSceneId, removeScene]);
+    }, [isPlaying, setIsPlaying, setCurrentTime, rulerDuration, setZoom, selectedSceneId, removeScene]);
 
-    // ─── Industry-standard: pixelsPerSecond driven by zoom, NOT by container width ──
-    // The true industry standard for zoom sliders is an exponential (logarithmic) curve.
-    // Instead of uneven intervals, dragging the slider smoothly multiplies the scale mathematically.
-    // This perfectly maps zoom ratio [10, 1000] to our target pixelsPerSecond range [12, 1800].
-    const pixelsPerSecond = (() => {
-        // Map 10-1000 zoom range to a 0.0 -> 1.0 slider ratio
-        const zoomRatio = (zoom - 10) / 990;
-        // Exponentially scale up to exactly 150x the power (12 * 150 = 1800 max pps)
-        const zoomPPS = 12 * Math.pow(150, zoomRatio);
-
-        // "Fit to view" floor: content always fills visible container (never empty space beyond content)
-        const fitPPS = containerWidth > 16 && duration > 0 ? (containerWidth - 16) / duration : 0;
-        return Math.max(zoomPPS, fitPPS);
-    })();
-    const timelineWidth = Math.ceil(duration * pixelsPerSecond) + 16;
 
     // ─── Adaptive ruler tick generation (industry-standard: intervals adapt to zoom) ──
     const rulerTicks = useMemo(() => {
@@ -283,31 +273,31 @@ export const Timeline = ({
         const subDivisions = getSubDivisions(majorInterval);
 
         const ticks: { time: number; isMajor: boolean }[] = [];
-        const totalMajor = Math.ceil(duration / majorInterval);
+        const totalMajor = Math.ceil(rulerDuration / majorInterval);
 
         for (let i = 0; i <= totalMajor; i++) {
             const majorTime = parseFloat((i * majorInterval).toFixed(4));
-            if (majorTime > duration) break;
+            if (majorTime > rulerDuration) break;
             ticks.push({ time: majorTime, isMajor: true });
 
             // Sub-ticks within this segment
             if (i < totalMajor) {
                 for (let sub = 1; sub < subDivisions; sub++) {
                     const subTime = parseFloat((majorTime + sub * (majorInterval / subDivisions)).toFixed(4));
-                    if (subTime <= duration && subTime < parseFloat(((i + 1) * majorInterval).toFixed(4))) {
+                    if (subTime <= rulerDuration && subTime < parseFloat(((i + 1) * majorInterval).toFixed(4))) {
                         ticks.push({ time: subTime, isMajor: false });
                     }
                 }
             }
         }
         return ticks;
-    }, [duration, pixelsPerSecond]);
+    }, [rulerDuration, pixelsPerSecond]);
 
     // ─── Time ↔ pixel helpers ─────────────────────────────────────────────────
     const timeToPixel = (t: number) => Math.round(t * pixelsPerSecond);
     const pixelToTime = (px: number) => {
         const clamped = Math.max(0, px);
-        return Math.min(clamped / pixelsPerSecond, duration);
+        return Math.min(clamped / pixelsPerSecond, rulerDuration);
     };
 
     const formatTooltipTime = (t: number) => {
@@ -401,9 +391,9 @@ export const Timeline = ({
         if (isPlaying) {
             interval = window.setInterval(() => {
                 setCurrentTime((prev) => {
-                    if (prev >= duration) {
+                    if (prev >= rulerDuration) {
                         setIsPlaying(false);
-                        return duration;
+                        return rulerDuration;
                     }
                     return prev + 0.1;
                 });
@@ -751,9 +741,15 @@ export const Timeline = ({
                     <div
                         ref={tracksScrollRef}
                         className={`flex-1 overflow-x-auto overflow-y-auto custom-scrollbar relative ${isDark ? 'bg-[#14141d]' : 'bg-white'}`}
-                        onScroll={() => {
+                        onScroll={(e) => {
                             if (tracksScrollRef.current && scrollParentRef.current) {
-                                scrollParentRef.current.scrollLeft = tracksScrollRef.current.scrollLeft;
+                                const currentScrollLeft = tracksScrollRef.current.scrollLeft;
+                                console.log(
+                                    `DEBUG SCROLL: Scroll thumb moved. New scrollLeft is ${currentScrollLeft}px. ` +
+                                    `Because scrollLeft changed, the physical content inside visually pans to the *${currentScrollLeft > 0 ? "LEFT" : "RIGHT"}* compared to its origin. ` +
+                                    `This is native browser layout: pulling the thumb RIGHT reveals content on the right by sliding the track LEFT.`
+                                );
+                                scrollParentRef.current.scrollLeft = currentScrollLeft;
                             }
                         }}
                     >
@@ -796,7 +792,7 @@ export const Timeline = ({
                                 </div>
 
                                 <div className="relative h-[62px] shrink-0 flex items-center">
-                                    <div className={`absolute inset-y-0 left-0 right-4 rounded-xl flex items-center z-10 ${isDark ? 'bg-[#1e1e2e]' : 'bg-[#e5e7eb]'}`}>
+                                    <div className={`absolute inset-y-0 left-0 rounded-xl flex items-center z-10 ${isDark ? 'bg-[#1e1e2e]' : 'bg-[#e5e7eb]'}`} style={{ width: `${containerWidth * 0.95}px` }}>
 
                                         {scenes.map((scene, sceneIndex) => {
                                             const isSelected = selectedSceneId === scene.id;
@@ -1016,7 +1012,7 @@ export const Timeline = ({
                                 {isPlaying ? <Pause size={10} fill="currentColor" /> : <Play size={10} fill="currentColor" className="ml-0.5" />}
                             </button>
                             <span className={`text-[11px] font-medium tracking-[0.02em] ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
-                                {`${formatTime(currentTime)} / ${formatTime(duration)}`}
+                                {`${formatTime(currentTime)} / ${formatTime(rulerDuration)}`}
                             </span>
                         </div>
 
