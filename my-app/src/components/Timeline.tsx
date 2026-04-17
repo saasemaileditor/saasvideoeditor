@@ -700,7 +700,7 @@ export const Timeline = ({
                     >
                         <div
                             className="h-[36px] relative px-1"
-                            style={{ minWidth: `${timelineWidth + vertSBWidth}px` }}
+                            style={{ minWidth: `${timelineWidth + vertSBWidth + 38}px` }}
                             onMouseDown={handleTimelineMouseDown}
                             onMouseMove={handleTimelineMouseMove}
                             onMouseLeave={() => { setHoverTime(null); setHoverScrubberPos(null); }}
@@ -755,6 +755,21 @@ export const Timeline = ({
                         onScroll={() => {
                             if (tracksScrollRef.current && scrollParentRef.current) {
                                 scrollParentRef.current.scrollLeft = tracksScrollRef.current.scrollLeft;
+                                
+                                // --- DETAILED DEBUG LOG: SCROLL ALIGNMENT ---
+                                console.log('[Debug] Scroll Alignment Tracker:', {
+                                    scrollLeftValue: tracksScrollRef.current.scrollLeft,
+                                    trackMaxScrollAllowed: tracksScrollRef.current.scrollWidth - tracksScrollRef.current.clientWidth,
+                                    rulerMaxScrollAllowed: scrollParentRef.current.scrollWidth - scrollParentRef.current.clientWidth,
+                                    trackDimensions: {
+                                        scrollWidth: tracksScrollRef.current.scrollWidth,
+                                        clientWidth: tracksScrollRef.current.clientWidth
+                                    },
+                                    rulerDimensions: {
+                                        scrollWidth: scrollParentRef.current.scrollWidth,
+                                        clientWidth: scrollParentRef.current.clientWidth
+                                    }
+                                });
                             }
                         }}
                         onMouseMove={(e) => {
@@ -806,7 +821,7 @@ export const Timeline = ({
                                 </div>
 
                                 <div className="relative h-[62px] shrink-0 flex items-center">
-                                    <div className={`absolute inset-y-0 left-0 rounded-xl flex items-center z-10 ${isDark ? 'bg-[#1e1e2e]' : 'bg-[#e5e7eb]'}`} style={{ width: `${containerWidth * 0.95}px` }}>
+                                    <div className={`absolute inset-y-0 left-0 rounded-xl flex items-center z-10 ${isDark ? 'bg-[#1e1e2e]' : 'bg-[#e5e7eb]'}`} style={{ width: `${Math.max(containerWidth * 0.95, contentWidth + 66)}px` }}>
 
                                         {scenes.map((scene, sceneIndex) => {
                                             const isSelected = selectedSceneId === scene.id;
