@@ -170,7 +170,7 @@ export const Timeline = ({
     // timelineWidth: equals containerWidth when content fits (zero overflow = no scrollbar),
     // equals contentWidth when zoomed in (overflow = real scrollbar appears),
     // equals containerWidth+1 when hovering vertical scrollbar (triggers real scrollbar as a peek hint)
-    const timelineWidth = hasHorizontalOverflow ? contentWidth + 32 : (isHoveringVertSB ? containerWidth + 1 : containerWidth);
+    const timelineWidth = hasHorizontalOverflow ? contentWidth + 66 : (isHoveringVertSB ? containerWidth + 1 : containerWidth);
     // rulerDuration: how many seconds the visible ruler covers
     const rulerDuration = timelineWidth / pixelsPerSecond;
 
@@ -700,7 +700,7 @@ export const Timeline = ({
                     >
                         <div
                             className="h-[36px] relative px-1"
-                            style={{ minWidth: `${timelineWidth + vertSBWidth + 38}px` }}
+                            style={{ minWidth: `${timelineWidth + vertSBWidth + 4}px` }}
                             onMouseDown={handleTimelineMouseDown}
                             onMouseMove={handleTimelineMouseMove}
                             onMouseLeave={() => { setHoverTime(null); setHoverScrubberPos(null); }}
@@ -806,7 +806,7 @@ export const Timeline = ({
                                 </div>
 
                                 <div className="relative h-[62px] shrink-0 flex items-center">
-                                    <div className={`absolute inset-y-0 left-0 rounded-xl flex items-center z-10 ${isDark ? 'bg-[#1e1e2e]' : 'bg-[#e5e7eb]'}`} style={{ width: `${Math.max(containerWidth * 0.95, contentWidth + 66)}px` }}>
+                                    <div className={`absolute inset-y-0 left-0 rounded-xl flex items-center z-10 ${isDark ? 'bg-[#1e1e2e]' : 'bg-[#e5e7eb]'}`} style={{ width: `${Math.max(containerWidth * 0.95, hasHorizontalOverflow ? contentWidth + 66 : contentWidth)}px` }}>
 
                                         {scenes.map((scene, sceneIndex) => {
                                             const isSelected = selectedSceneId === scene.id;
