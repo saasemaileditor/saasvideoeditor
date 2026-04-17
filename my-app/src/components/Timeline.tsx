@@ -755,21 +755,6 @@ export const Timeline = ({
                         onScroll={() => {
                             if (tracksScrollRef.current && scrollParentRef.current) {
                                 scrollParentRef.current.scrollLeft = tracksScrollRef.current.scrollLeft;
-                                
-                                // --- DETAILED DEBUG LOG: SCROLL ALIGNMENT ---
-                                console.log('[Debug] Scroll Alignment Tracker:', {
-                                    scrollLeftValue: tracksScrollRef.current.scrollLeft,
-                                    trackMaxScrollAllowed: tracksScrollRef.current.scrollWidth - tracksScrollRef.current.clientWidth,
-                                    rulerMaxScrollAllowed: scrollParentRef.current.scrollWidth - scrollParentRef.current.clientWidth,
-                                    trackDimensions: {
-                                        scrollWidth: tracksScrollRef.current.scrollWidth,
-                                        clientWidth: tracksScrollRef.current.clientWidth
-                                    },
-                                    rulerDimensions: {
-                                        scrollWidth: scrollParentRef.current.scrollWidth,
-                                        clientWidth: scrollParentRef.current.clientWidth
-                                    }
-                                });
                             }
                         }}
                         onMouseMove={(e) => {
