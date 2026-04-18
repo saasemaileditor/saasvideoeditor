@@ -174,6 +174,39 @@ export const Timeline = ({
     // rulerDuration: how many seconds the visible ruler covers
     const rulerDuration = timelineWidth / pixelsPerSecond;
 
+    // ─── Filmora "Viewport Leash" (Scrubber physical bounding during zoom) ──
+    const prevZoomForLeash = useRef(zoom);
+
+    useEffect(() => {
+        // We strictly ONLY want to unleash the leash when the zoom mathematically changes
+        if (prevZoomForLeash.current === zoom) return;
+        prevZoomForLeash.current = zoom;
+
+        // The user JUST zoomed. Get physical box boundaries of the timeline viewport.
+        if (!tracksScrollRef.current) return;
+
+        const scrollLeft = tracksScrollRef.current.scrollLeft;
+        const clientWidth = tracksScrollRef.current.clientWidth;
+
+        // Calculate precisely where the zoom is trying to blast the scrubber
+        const scrubberPx = timeToPixel(currentTime);
+
+        // Define safe glass walls (with 10px breathing room)
+        const leftEdgePx = scrollLeft + 10;
+        const rightEdgePx = scrollLeft + clientWidth - 10;
+
+        // If the scrubber is blasting past the walls, overwrite its time to pin it against the glass!
+        if (scrubberPx < leftEdgePx) {
+            const newTime = pixelToTime(leftEdgePx);
+            setCurrentTime(newTime);
+            if (scrubberFaded) setScrubberTime(newTime);
+        } else if (scrubberPx > rightEdgePx) {
+            const newTime = pixelToTime(rightEdgePx);
+            setCurrentTime(newTime);
+            if (scrubberFaded) setScrubberTime(newTime);
+        }
+    }, [zoom, pixelsPerSecond, currentTime, scrubberFaded]);
+
     // ─── Timeline Keyboard Shortcuts ──────────────────────────────────────────────
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
