@@ -171,8 +171,8 @@ export const Timeline = ({
     const hasHorizontalOverflow = contentWidth > containerWidth;
     // timelineWidth: equals containerWidth when content fits, equals contentWidth+66 when zoomed in
     const timelineWidth = hasHorizontalOverflow ? contentWidth + 66 : containerWidth;
-    // rulerDuration: how many seconds the visible ruler covers
-    const rulerDuration = timelineWidth / pixelsPerSecond;
+    // rulerDuration: how many seconds the visible ruler covers (accounting for 8px total edge padding)
+    const rulerDuration = Math.max(0, timelineWidth - 8) / pixelsPerSecond;
 
     // ─── Filmora "Viewport Leash" (Scrubber physical bounding during zoom) ──
     const prevZoomForLeash = useRef(zoom);
@@ -387,26 +387,37 @@ export const Timeline = ({
     };
 
     const handleTimelineMouseDown = (e: React.MouseEvent) => {
-        // Check if click came from resize handle
         const target = e.target as HTMLElement;
+
+        // Guard 1: resize handle
         const isResizeHandle = target.closest('[data-resize-handle]') !== null;
+        if (isResizeHandle) return;
 
-        if (isResizeHandle) {
-            return;
-        }
-
-        // Guard: ignore clicks on the native vertical scrollbar (right edge of tracks container)
+        // Guard 2: native vertical scrollbar
         if (tracksScrollRef.current) {
-            const scrollRect = tracksScrollRef.current.getBoundingClientRect();
-            if (e.clientX > scrollRect.right - 20) return;
+            const el = tracksScrollRef.current;
+            const scrollbarWidth = el.offsetWidth - el.clientWidth;
+            const scrollRect = el.getBoundingClientRect();
+            const threshold = scrollRect.right - scrollbarWidth;
+            if (scrollbarWidth > 0 && e.clientX > threshold) return;
         }
+
+        if (!timelineRef.current) return;
+
+        const rect = timelineRef.current.getBoundingClientRect();
+        const x = e.clientX - rect.left - 4;
+        const rawTime = pixelToTime(x);
+        const snapped = getSnappedTime(rawTime);
+
+        console.log(`[ALIGNMENT DEBUG] Mousedown at clientX: ${e.clientX.toFixed(1)}`);
+        console.log(`- rect.left: ${rect.left.toFixed(1)}`);
+        console.log(`- derived x (inner px): ${x.toFixed(1)}`);
+        console.log(`- rawTime: ${rawTime.toFixed(4)}s`);
+        console.log(`- snapped: ${snapped.toFixed(4)}s`);
+        console.log(`- timeToPixel(snapped): ${timeToPixel(snapped)}px`);
 
         setIsDraggingPlayhead(true);
-        if (timelineRef.current) {
-            const rect = timelineRef.current.getBoundingClientRect();
-            const x = e.clientX - rect.left - 4;
-            setCurrentTime(getSnappedTime(pixelToTime(x)));
-        }
+        setCurrentTime(snapped);
     };
 
     useEffect(() => {
@@ -428,6 +439,7 @@ export const Timeline = ({
             document.removeEventListener('mouseup', handleMouseUp);
         };
     }, [isDraggingPlayhead, setCurrentTime, duration]);
+
 
     // Simulated Playback Logic
     useEffect(() => {
@@ -793,7 +805,7 @@ export const Timeline = ({
 
                             {/* ── Ruler Row ── sticky top so it stays pinned during vertical scroll */}
                             <div
-                                className={`sticky top-0 z-40 h-[28px] relative px-1 ${isDark ? 'bg-[#14141d]' : 'bg-white'}`}
+                                className={`sticky top-0 z-40 h-[30px] relative px-1 ${isDark ? 'bg-[#14141d]' : 'bg-white'}`}
                                 style={{ minWidth: `${timelineWidth}px` }}
                             >
                                 {/* Ghost scrubber triangle (ruler only) */}
@@ -808,7 +820,9 @@ export const Timeline = ({
                                 )}
 
                                 {/* Playhead triangle (ruler only) */}
-                                <div className="absolute top-0 bottom-0 w-[2px] z-35 pointer-events-none left-0"
+                                <div
+                                    data-playhead-triangle
+                                    className="absolute top-0 bottom-0 w-[2px] z-35 pointer-events-none left-0"
                                     style={{
                                         transform: `translateX(${timeToPixel(scrubberFaded ? scrubberTime : currentTime)}px)`,
                                         opacity: dragState.scrubberSnapped ? 1 : (scrubberFaded ? 0.5 : 1)
@@ -820,7 +834,7 @@ export const Timeline = ({
                                 </div>
 
                                 {/* Ruler ticks */}
-                                <div className="h-[28px] flex absolute inset-x-0 z-10 pt-2 cursor-col-resize">
+                                <div className="h-[30px] flex absolute inset-x-0 z-10 pt-2 cursor-col-resize">
                                     {rulerTicks.map((tick) => (
                                         <div
                                             key={tick.time}
@@ -840,7 +854,7 @@ export const Timeline = ({
 
                             {/* Ghost scrubber line (full height — ruler + tracks) */}
                             {hoverTime !== null && !isDraggingPlayhead && hoveredHandleSceneId === null && resizingScene === null && (
-                                <div className="absolute top-[28px] bottom-0 w-[2px] z-35 pointer-events-none left-1"
+                                <div className="absolute top-[30px] bottom-0 w-[2px] z-35 pointer-events-none left-1"
                                     style={{ transform: `translateX(${timeToPixel(hoverTime)}px)` }}
                                 >
                                     <div className="absolute top-0 bottom-0 left-0 right-0 bg-gray-800 opacity-60 rounded-full" />
@@ -848,7 +862,9 @@ export const Timeline = ({
                             )}
 
                             {/* Playhead line (full height — ruler + tracks) */}
-                            <div className="absolute top-[28px] bottom-0 w-[2px] z-35 pointer-events-none left-1"
+                            <div
+                                id="debug-playhead-line"
+                                className="absolute top-[30px] bottom-0 w-[2px] z-35 pointer-events-none left-1"
                                 style={{
                                     transform: `translateX(${timeToPixel(scrubberFaded ? scrubberTime : currentTime)}px)`,
                                     opacity: dragState.scrubberSnapped ? 1 : (scrubberFaded ? 0.5 : 1)
@@ -858,7 +874,7 @@ export const Timeline = ({
                             </div>
 
                             {/* Tracks content */}
-                            <div className="flex flex-col gap-[2px] py-0">
+                            <div className="flex flex-col gap-[2px] py-0 relative">
 
                                 {/* Row 1: Add Elements */}
                                 <div className="relative h-9 shrink-0 flex items-center">
