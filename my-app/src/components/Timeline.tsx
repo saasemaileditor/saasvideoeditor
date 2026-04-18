@@ -793,12 +793,12 @@ export const Timeline = ({
 
                             {/* ── Ruler Row ── sticky top so it stays pinned during vertical scroll */}
                             <div
-                                className={`sticky top-0 z-20 h-[36px] relative px-1 ${isDark ? 'bg-[#14141d]' : 'bg-white'}`}
+                                className={`sticky top-0 z-40 h-[28px] relative px-1 ${isDark ? 'bg-[#14141d]' : 'bg-white'}`}
                                 style={{ minWidth: `${timelineWidth}px` }}
                             >
                                 {/* Ghost scrubber triangle (ruler only) */}
                                 {hoverTime !== null && !isDraggingPlayhead && hoveredHandleSceneId === null && resizingScene === null && (
-                                    <div className="absolute top-0 bottom-0 w-[2px] z-35 pointer-events-none left-1"
+                                    <div className="absolute top-0 bottom-0 w-[2px] z-35 pointer-events-none left-0"
                                         style={{ transform: `translateX(${timeToPixel(hoverTime)}px)` }}
                                     >
                                         <svg width="10" height="8" viewBox="0 0 10 8" className="absolute top-[2px] left-1/2 -translate-x-1/2 text-[#1f2937]" fill="currentColor">
@@ -808,7 +808,7 @@ export const Timeline = ({
                                 )}
 
                                 {/* Playhead triangle (ruler only) */}
-                                <div className="absolute top-0 bottom-0 w-[2px] z-35 pointer-events-none left-1"
+                                <div className="absolute top-0 bottom-0 w-[2px] z-35 pointer-events-none left-0"
                                     style={{
                                         transform: `translateX(${timeToPixel(scrubberFaded ? scrubberTime : currentTime)}px)`,
                                         opacity: dragState.scrubberSnapped ? 1 : (scrubberFaded ? 0.5 : 1)
@@ -820,7 +820,7 @@ export const Timeline = ({
                                 </div>
 
                                 {/* Ruler ticks */}
-                                <div className="h-[36px] flex absolute inset-x-1 z-10 pt-2 cursor-col-resize">
+                                <div className="h-[28px] flex absolute inset-x-0 z-10 pt-2 cursor-col-resize">
                                     {rulerTicks.map((tick) => (
                                         <div
                                             key={tick.time}
@@ -840,7 +840,7 @@ export const Timeline = ({
 
                             {/* Ghost scrubber line (full height — ruler + tracks) */}
                             {hoverTime !== null && !isDraggingPlayhead && hoveredHandleSceneId === null && resizingScene === null && (
-                                <div className="absolute top-0 bottom-0 w-[2px] z-35 pointer-events-none left-1"
+                                <div className="absolute top-[28px] bottom-0 w-[2px] z-35 pointer-events-none left-1"
                                     style={{ transform: `translateX(${timeToPixel(hoverTime)}px)` }}
                                 >
                                     <div className="absolute top-0 bottom-0 left-0 right-0 bg-gray-800 opacity-60 rounded-full" />
@@ -848,7 +848,7 @@ export const Timeline = ({
                             )}
 
                             {/* Playhead line (full height — ruler + tracks) */}
-                            <div className="absolute top-0 bottom-0 w-[2px] z-35 pointer-events-none left-1"
+                            <div className="absolute top-[28px] bottom-0 w-[2px] z-35 pointer-events-none left-1"
                                 style={{
                                     transform: `translateX(${timeToPixel(scrubberFaded ? scrubberTime : currentTime)}px)`,
                                     opacity: dragState.scrubberSnapped ? 1 : (scrubberFaded ? 0.5 : 1)
