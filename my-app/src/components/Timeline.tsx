@@ -812,7 +812,7 @@ export const Timeline = ({
                                 {/* Ghost scrubber triangle (ruler only) */}
                                 {hoverTime !== null && !isDraggingPlayhead && hoveredHandleSceneId === null && resizingScene === null && (
                                     <div className="absolute top-0 bottom-0 w-[2px] z-35 pointer-events-none left-0"
-                                        style={{ transform: `translateX(${timeToPixel(hoverTime)}px)` }}
+                                        style={{ transform: `translateX(calc(${timeToPixel(hoverTime)}px - 1px))` }}
                                     >
                                         <svg width="10" height="8" viewBox="0 0 10 8" className="absolute top-[2px] left-1/2 -translate-x-1/2 text-[#1f2937]" fill="currentColor">
                                             <path d="M2.5 1h5c1.1 0 1.6 1.3.8 2.1L5.8 5.7c-.4.4-1.1.4-1.5 0L1.7 3.1C.9 2.3 1.4 1 2.5 1z" />
@@ -825,7 +825,7 @@ export const Timeline = ({
                                     data-playhead-triangle
                                     className="absolute top-0 bottom-0 w-[2px] z-35 pointer-events-none left-0"
                                     style={{
-                                        transform: `translateX(${timeToPixel(scrubberFaded ? scrubberTime : currentTime)}px)`,
+                                        transform: `translateX(calc(${timeToPixel(scrubberFaded ? scrubberTime : currentTime)}px - 1px))`,
                                         opacity: dragState.scrubberSnapped ? 1 : (scrubberFaded ? 0.5 : 1)
                                     }}
                                 >
@@ -840,7 +840,7 @@ export const Timeline = ({
                                         <div
                                             key={tick.time}
                                             className="absolute top-0 bottom-0 flex flex-row items-start pointer-events-none pt-2"
-                                            style={{ left: `${timeToPixel(tick.time)}px` }}
+                                            style={{ left: `calc(${timeToPixel(tick.time)}px - 1px)` }}
                                         >
                                             <div className={`w-[2px] rounded-full ${tick.isMajor ? 'h-5' : 'h-2.5 mt-[5px]'} ${isDark ? 'bg-gray-600' : 'bg-gray-300'}`} />
                                             {tick.isMajor && (
@@ -856,7 +856,7 @@ export const Timeline = ({
                             {/* Ghost scrubber line (full height — ruler + tracks) */}
                             {hoverTime !== null && !isDraggingPlayhead && hoveredHandleSceneId === null && resizingScene === null && (
                                 <div className="absolute top-[30px] bottom-0 w-[2px] z-35 pointer-events-none left-1"
-                                    style={{ transform: `translateX(${timeToPixel(hoverTime)}px)` }}
+                                    style={{ transform: `translateX(calc(${timeToPixel(hoverTime)}px - 1px))` }}
                                 >
                                     <div className="absolute top-0 bottom-0 left-0 right-0 bg-gray-800 opacity-60 rounded-full" />
                                 </div>
@@ -867,7 +867,7 @@ export const Timeline = ({
                                 id="debug-playhead-line"
                                 className="absolute top-[30px] bottom-0 w-[2px] z-35 pointer-events-none left-1"
                                 style={{
-                                    transform: `translateX(${timeToPixel(scrubberFaded ? scrubberTime : currentTime)}px)`,
+                                    transform: `translateX(calc(${timeToPixel(scrubberFaded ? scrubberTime : currentTime)}px - 1px))`,
                                     opacity: dragState.scrubberSnapped ? 1 : (scrubberFaded ? 0.5 : 1)
                                 }}
                             >
@@ -899,11 +899,11 @@ export const Timeline = ({
                                             const spacerPx = isLiveLeftDrag
                                                 ? liveLeftDrag.current.spacerPx
                                                 : (scene.leadingGap || 0) * pixelsPerSecond;
-                                            const scenePx = (isLiveLeftDrag
+                                            const scenePx = isLiveLeftDrag
                                                 ? liveLeftDrag.current.scenePx
                                                 : isLiveRightDrag
                                                     ? liveRightDrag.current.scenePx
-                                                    : timeToPixel(scene.duration)) + 1;
+                                                    : timeToPixel(scene.duration);
 
                                             return (
                                                 <React.Fragment key={scene.id}>
