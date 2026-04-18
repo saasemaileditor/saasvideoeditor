@@ -70,6 +70,7 @@ export const Timeline = ({
     const tracksScrollRef = useRef<HTMLDivElement>(null);
     const [hoverTime, setHoverTime] = useState<number | null>(null);
     const [hoverScrubberPos, setHoverScrubberPos] = useState<{ top: number; left: number } | null>(null);
+    const [activeGapTooltip, setActiveGapTooltip] = useState<{ text: string, pos: { top: number, left: number } } | null>(null);
     const [showPlusDropdown, setShowPlusDropdown] = useState(false);
     const [dropdownPos, setDropdownPos] = useState<{ top: number; left: number } | null>(null);
     const [showGapDropdown, setShowGapDropdown] = useState(false);
@@ -338,7 +339,7 @@ export const Timeline = ({
     }, [rulerDuration, pixelsPerSecond]);
 
     // ─── Time ↔ pixel helpers ─────────────────────────────────────────────────
-    const timeToPixel = (t: number) => Math.round(t * pixelsPerSecond);
+    const timeToPixel = (t: number) => t * pixelsPerSecond;
     const pixelToTime = (px: number) => {
         const clamped = Math.max(0, px);
         return Math.min(clamped / pixelsPerSecond, rulerDuration);
@@ -897,12 +898,13 @@ export const Timeline = ({
                                             const isLiveRightDrag = liveRightDrag.current.sceneId === scene.id;
                                             const spacerPx = isLiveLeftDrag
                                                 ? liveLeftDrag.current.spacerPx
-                                                : Math.round((scene.leadingGap || 0) * pixelsPerSecond);
-                                            const scenePx = isLiveLeftDrag
+                                                : (scene.leadingGap || 0) * pixelsPerSecond;
+                                            const scenePx = (isLiveLeftDrag
                                                 ? liveLeftDrag.current.scenePx
                                                 : isLiveRightDrag
                                                     ? liveRightDrag.current.scenePx
-                                                    : timeToPixel(scene.duration);
+                                                    : timeToPixel(scene.duration)) + 1;
+
                                             return (
                                                 <React.Fragment key={scene.id}>
                                                     {/* Leading gap spacer */}
@@ -988,25 +990,28 @@ export const Timeline = ({
                                                                                 setGapDropdownPos({ top: rect.top, left: rect.left + rect.width / 2 });
                                                                                 setActiveGapIndex(sceneIndex);
                                                                                 setShowGapDropdown(prev => !prev);
+                                                                                setActiveGapTooltip(null);
                                                                             }}
+                                                                            onMouseEnter={(e) => {
+                                                                                const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                                                                                setActiveGapTooltip({ text: 'Add media / blank', pos: { top: rect.top, left: rect.left + rect.width / 2 } });
+                                                                            }}
+                                                                            onMouseLeave={() => setActiveGapTooltip(null)}
                                                                         >
                                                                             <Plus size={13} strokeWidth={2.5} className="text-gray-600" />
-                                                                        </div>
-                                                                        <div className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-[6px] opacity-0 group-hover/plus:opacity-100 transition-opacity duration-150 whitespace-nowrap">
-                                                                            <div className="bg-[#1f2937] text-white text-[11px] font-medium px-2 py-1 rounded-md shadow-lg">Add media / blank</div>
-                                                                            <div className="w-0 h-0 border-l-[4px] border-r-[4px] border-t-[4px] border-l-transparent border-r-transparent border-t-[#1f2937] mx-auto" />
                                                                         </div>
                                                                     </div>
                                                                     <div className="relative group/trans">
                                                                         <div
                                                                             className="w-[24px] h-[24px] rounded-full bg-white border border-gray-300 shadow-sm flex items-center justify-center cursor-pointer hover:bg-gray-100 hover:border-gray-400 transition-colors"
                                                                             onClick={(e) => { e.stopPropagation(); }}
+                                                                            onMouseEnter={(e) => {
+                                                                                const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                                                                                setActiveGapTooltip({ text: 'Add transition', pos: { top: rect.top, left: rect.left + rect.width / 2 } });
+                                                                            }}
+                                                                            onMouseLeave={() => setActiveGapTooltip(null)}
                                                                         >
                                                                             <StepForward size={12} strokeWidth={2} className="text-gray-600" />
-                                                                        </div>
-                                                                        <div className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-[6px] opacity-0 group-hover/trans:opacity-100 transition-opacity duration-150 whitespace-nowrap">
-                                                                            <div className="bg-[#1f2937] text-white text-[11px] font-medium px-2 py-1 rounded-md shadow-lg">Add transition</div>
-                                                                            <div className="w-0 h-0 border-l-[4px] border-r-[4px] border-t-[4px] border-l-transparent border-r-transparent border-t-[#1f2937] mx-auto" />
                                                                         </div>
                                                                     </div>
                                                                 </div>
@@ -1223,6 +1228,27 @@ export const Timeline = ({
                 document.body
             )}
 
+            {/* Portal-based Gap Buttons Tooltip */}
+            {activeGapTooltip !== null && !showGapDropdown && ReactDOM.createPortal(
+                <div
+                    className="fixed z-[9999] pointer-events-none flex flex-col items-center"
+                    style={{
+                        top: activeGapTooltip.pos.top - 6,
+                        left: activeGapTooltip.pos.left,
+                        transform: 'translate(-50%, -100%)',
+                    }}
+                >
+                    <div className="bg-[#1f2937] text-white text-[11px] font-medium px-2 py-1 rounded-md shadow-lg whitespace-nowrap relative z-10">
+                        {activeGapTooltip.text}
+                    </div>
+                    {/* Tooltip triangle caret */}
+                    <svg width="12" height="9" viewBox="0 0 10 8" className="text-[#1f2937] mt-[-2.5px] mx-auto relative z-0" fill="currentColor">
+                        <path d="M2.5 1h5c1.1 0 1.6 1.3.8 2.1L5.8 5.7c-.4.4-1.1.4-1.5 0L1.7 3.1C.9 2.3 1.4 1 2.5 1z" />
+                    </svg>
+                </div>,
+                document.body
+            )}
+
             {/* Portal-based Real Scrubber Timer Tooltip — shown only while dragging the playhead */}
             {isDraggingPlayhead && timelineRef.current && (() => {
                 const rect = timelineRef.current!.getBoundingClientRect();
@@ -1268,8 +1294,8 @@ export const Timeline = ({
                             {displayDuration.toFixed(1)}s
                         </div>
                         {/* Downward-pointing triangle — same caret style as ghost scrubber */}
-                        <svg width="12" height="7" viewBox="0 0 12 7" className="text-[#1f2937] mt-[-1px]" fill="currentColor">
-                            <path d="M0 0 L12 0 L6 7 Z" />
+                        <svg width="12" height="9" viewBox="0 0 10 8" className="text-[#1f2937] mt-[-2.5px]" fill="currentColor">
+                            <path d="M2.5 1h5c1.1 0 1.6 1.3.8 2.1L5.8 5.7c-.4.4-1.1.4-1.5 0L1.7 3.1C.9 2.3 1.4 1 2.5 1z" />
                         </svg>
                     </div>,
                     document.body
