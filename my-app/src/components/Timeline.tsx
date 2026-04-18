@@ -38,7 +38,10 @@ export const Timeline = ({
     // New state: scrubber follows resize handle and fades while dragging
     const [scrubberTime, setScrubberTime] = useState(currentTime);
     const [scrubberFaded, setScrubberFaded] = useState(false);
-    const [scrubberSnapped, setScrubberSnapped] = useState(false); // true when resize handle snaps to scrubber
+    const [dragState, setDragState] = useState<{
+        scrubberSnapped: boolean;
+        resizeTooltip: { x: number; y: number } | null;
+    }>({ scrubberSnapped: false, resizeTooltip: null });
 
 
     // ─── Global Scene State (shared undo/redo via zustand-travel) ──────────────
@@ -64,8 +67,6 @@ export const Timeline = ({
     const RESIZE_DRAG_THRESHOLD = 5; // pixels - must move more than this to be considered a drag
 
     const [containerWidth, setContainerWidth] = useState(0);
-    const [vertSBWidth, setVertSBWidth] = useState(0); // vertical scrollbar width of tracks area
-    const scrollParentRef = useRef<HTMLDivElement>(null);
     const tracksScrollRef = useRef<HTMLDivElement>(null);
     const [hoverTime, setHoverTime] = useState<number | null>(null);
     const [hoverScrubberPos, setHoverScrubberPos] = useState<{ top: number; left: number } | null>(null);
@@ -77,6 +78,7 @@ export const Timeline = ({
     const [selectedSceneId, setSelectedSceneId] = useState<string | null>(null);
 
 
+
     const [resizingScene, setResizingScene] = useState<{
         id: string;
         side: 'left' | 'right';
@@ -84,10 +86,10 @@ export const Timeline = ({
         startDuration: number;
         startLeadingGap: number;
     } | null>(null);
-    const [resizeTooltip, setResizeTooltip] = useState<{ x: number; y: number } | null>(null);
+
     const [hoveredHandleSceneId, setHoveredHandleSceneId] = useState<string | null>(null);
     const [hoveredGapIndex, setHoveredGapIndex] = useState<number | null>(null);
-    const [isHoveringVertSB, setIsHoveringVertSB] = useState(false); // tracks hover on vertical scrollbar strip
+
     const plusBtnRef = useRef<HTMLButtonElement>(null);
     const dropdownRef = useRef<HTMLDivElement>(null);
     const gapDropdownRef = useRef<HTMLDivElement>(null);
@@ -100,6 +102,8 @@ export const Timeline = ({
     const liveRightDrag = useRef<{ sceneId: string | null; scenePx: number; duration: number }>(
         { sceneId: null, scenePx: 0, duration: 0 }
     );
+    const grayBarRef = useRef<HTMLDivElement>(null);
+    const autoScrollRAF = useRef<number | null>(null);
 
     // Compute dropdown position when it opens
     useEffect(() => {
@@ -142,14 +146,12 @@ export const Timeline = ({
     }, [showPlusDropdown]);
 
 
-    // Track the tracks scroll area's width and vertical scrollbar width
+    // Track the tracks scroll area's width
     useEffect(() => {
         if (!tracksScrollRef.current) return;
         const observer = new ResizeObserver(() => {
             if (tracksScrollRef.current) {
                 setContainerWidth(tracksScrollRef.current.clientWidth);
-                // vertical scrollbar width = offsetWidth - clientWidth
-                setVertSBWidth(tracksScrollRef.current.offsetWidth - tracksScrollRef.current.clientWidth);
             }
         });
         observer.observe(tracksScrollRef.current);
@@ -167,10 +169,8 @@ export const Timeline = ({
     const contentWidth = Math.ceil(duration * pixelsPerSecond);
     // True when content is wider than the visible tracks container → real horizontal scrollbar appears
     const hasHorizontalOverflow = contentWidth > containerWidth;
-    // timelineWidth: equals containerWidth when content fits (zero overflow = no scrollbar),
-    // equals contentWidth when zoomed in (overflow = real scrollbar appears),
-    // equals containerWidth+1 when hovering vertical scrollbar (triggers real scrollbar as a peek hint)
-    const timelineWidth = hasHorizontalOverflow ? contentWidth + 66 : (isHoveringVertSB ? containerWidth + 1 : containerWidth);
+    // timelineWidth: equals containerWidth when content fits, equals contentWidth+66 when zoomed in
+    const timelineWidth = hasHorizontalOverflow ? contentWidth + 66 : containerWidth;
     // rulerDuration: how many seconds the visible ruler covers
     const rulerDuration = timelineWidth / pixelsPerSecond;
 
@@ -347,7 +347,7 @@ export const Timeline = ({
             setHoverTime(time);
 
             setHoverScrubberPos({
-                top: scrollParentRef.current ? scrollParentRef.current.getBoundingClientRect().top : rect.top,
+                top: tracksScrollRef.current ? tracksScrollRef.current.getBoundingClientRect().top : rect.top,
                 left: rect.left + 4 + timeToPixel(time)
             });
         }
@@ -449,7 +449,7 @@ export const Timeline = ({
         // Scrubber stays at current position for now
         setScrubberFaded(true);
         setScrubberTime(currentTime);
-        setScrubberSnapped(false);
+        setDragState(prev => ({ ...prev, scrubberSnapped: false }));
     };
 
     useEffect(() => {
@@ -565,13 +565,56 @@ export const Timeline = ({
                 if (sceneEl) sceneEl.style.width = newScenePx + 'px';
             }
 
-            // Turn scrubber purple ONLY when magnetically snapped
-            if (isNearScrubber !== scrubberSnapped) {
-                setScrubberSnapped(isNearScrubber);
-            }
 
-            // Small tooltip re-render; React reads liveLeftDrag.current for widths → no conflict
-            setResizeTooltip(prev => prev ? { ...prev, x: e.clientX } : null);
+
+            // Update gray bar width via DOM — zero re-renders, perfectly in sync
+            const afterDuration = currentScenes.slice(sceneIdx + 1).reduce((sum, s) => sum + s.duration, 0);
+            let liveSceneDuration: number;
+            if (resizingScene.side === 'right') {
+                liveSceneDuration = liveRightDrag.current.duration;
+            } else {
+                liveSceneDuration = (liveLeftDrag.current.spacerPx + liveLeftDrag.current.scenePx) / pixelsPerSecond;
+            }
+            const liveTotalDuration = priorDuration + liveSceneDuration + afterDuration;
+            const liveGrayWidth = Math.max(Math.ceil(Math.max(liveTotalDuration, 5.0) * pixelsPerSecond) + 66, containerWidth * 0.95);
+            if (grayBarRef.current) grayBarRef.current.style.width = liveGrayWidth + 'px';
+
+            // Single React re-render per pixel: update tooltip position and snap state together
+            setDragState(prev => ({
+                ...prev,
+                scrubberSnapped: isNearScrubber,
+                resizeTooltip: prev.resizeTooltip ? { ...prev.resizeTooltip, x: e.clientX } : null
+            }));
+
+            const scrollEl = tracksScrollRef.current;
+            if (scrollEl) {
+                const rect = scrollEl.getBoundingClientRect();
+                const EDGE_ZONE = 80; // px from edge to start scrolling
+                const MAX_SPEED = 20; // px per frame max
+
+                let scrollSpeed = 0;
+                if (e.clientX > rect.right - EDGE_ZONE) {
+                    // near right edge
+                    scrollSpeed = Math.round(((e.clientX - (rect.right - EDGE_ZONE)) / EDGE_ZONE) * MAX_SPEED);
+                } else if (e.clientX < rect.left + EDGE_ZONE) {
+                    // near left edge
+                    scrollSpeed = -Math.round((((rect.left + EDGE_ZONE) - e.clientX) / EDGE_ZONE) * MAX_SPEED);
+                }
+
+                // Cancel previous frame before starting new one
+                if (autoScrollRAF.current !== null) cancelAnimationFrame(autoScrollRAF.current);
+
+                if (scrollSpeed !== 0) {
+                    const scroll = () => {
+                        if (!tracksScrollRef.current) return;
+                        tracksScrollRef.current.scrollLeft += scrollSpeed;
+                        autoScrollRAF.current = requestAnimationFrame(scroll);
+                    };
+                    autoScrollRAF.current = requestAnimationFrame(scroll);
+                } else {
+                    autoScrollRAF.current = null;
+                }
+            }
         };
 
         const handleMouseUp = () => {
@@ -609,11 +652,16 @@ export const Timeline = ({
                 liveLeftDrag.current = { sceneId: null, spacerPx: 0, scenePx: 0, duration: 0 };
             }
             // End of resize: stop fading and reset snap
+            if (grayBarRef.current) grayBarRef.current.style.width = '';
             setScrubberFaded(false);
-            setScrubberSnapped(false);
+            setDragState({ scrubberSnapped: false, resizeTooltip: null });
             setResizingScene(null);
-            setResizeTooltip(null);
             setPendingResizeClick(null); // Also clear any pending click
+
+            if (autoScrollRAF.current !== null) {
+                cancelAnimationFrame(autoScrollRAF.current);
+                autoScrollRAF.current = null;
+            }
         };
 
         document.addEventListener('mousemove', handleMouseMove);
@@ -621,8 +669,12 @@ export const Timeline = ({
         return () => {
             document.removeEventListener('mousemove', handleMouseMove);
             document.removeEventListener('mouseup', handleMouseUp);
+            if (autoScrollRAF.current !== null) {
+                cancelAnimationFrame(autoScrollRAF.current);
+                autoScrollRAF.current = null;
+            }
         };
-    }, [resizingScene, pixelsPerSecond, duration, scrubberSnapped, scrubberTime]);
+    }, [resizingScene, pixelsPerSecond, duration, dragState.scrubberSnapped, scrubberTime]);
 
     // Click vs Drag detection for resize handles
     useEffect(() => {
@@ -649,7 +701,7 @@ export const Timeline = ({
                     startDuration: pendingResizeClick.startDuration,
                     startLeadingGap: pendingResizeClick.startLeadingGap
                 });
-                setResizeTooltip({ x: e.clientX, y: e.clientY });
+                setDragState(prev => ({ ...prev, resizeTooltip: { x: e.clientX, y: e.clientY } }));
 
                 // Clear pending click
                 setPendingResizeClick(null);
@@ -690,82 +742,12 @@ export const Timeline = ({
             <div className={`h-[180px] pt-0 pb-2 flex-shrink-0 flex flex-col transition-colors duration-200 overflow-hidden -mx-[10px] -mb-[10px] ${isDark ? 'bg-[#1e1e2e] border-t border-[#2a2d45]' : 'bg-white border-t border-gray-200'}`}>
 
 
-                {/* Main Timeline Area — ruler and tracks are SEPARATE scroll containers */}
+                {/* Main Timeline Area — single unified scroll container */}
                 <div className="flex-1 flex flex-col overflow-hidden">
 
-                    {/* ── Ruler Row ── horizontal scroll synced to tracks, scrollbar hidden */}
-                    <div
-                        ref={scrollParentRef}
-                        className={`flex-shrink-0 overflow-x-hidden ${isDark ? 'bg-[#14141d]' : 'bg-white'}`}
-                    >
-                        <div
-                            className="h-[36px] relative px-1"
-                            style={{ minWidth: `${timelineWidth + vertSBWidth + 4}px` }}
-                            onMouseDown={handleTimelineMouseDown}
-                            onMouseMove={handleTimelineMouseMove}
-                            onMouseLeave={() => { setHoverTime(null); setHoverScrubberPos(null); }}
-                        >
-                            {/* Ghost scrubber triangle (ruler only) */}
-                            {hoverTime !== null && !isDraggingPlayhead && hoveredHandleSceneId === null && resizingScene === null && (
-                                <div className="absolute top-0 bottom-0 w-[2px] z-35 pointer-events-none left-1"
-                                    style={{ transform: `translateX(${timeToPixel(hoverTime)}px)` }}
-                                >
-                                    <svg width="10" height="8" viewBox="0 0 10 8" className="absolute top-[2px] left-1/2 -translate-x-1/2 text-[#1f2937]" fill="currentColor">
-                                        <path d="M2.5 1h5c1.1 0 1.6 1.3.8 2.1L5.8 5.7c-.4.4-1.1.4-1.5 0L1.7 3.1C.9 2.3 1.4 1 2.5 1z" />
-                                    </svg>
-                                </div>
-                            )}
-
-                            {/* Playhead triangle (ruler only) */}
-                            <div className="absolute top-0 bottom-0 w-[2px] z-35 pointer-events-none left-1"
-                                style={{
-                                    transform: `translateX(${timeToPixel(scrubberFaded ? scrubberTime : currentTime)}px)`,
-                                    opacity: scrubberSnapped ? 1 : (scrubberFaded ? 0.5 : 1)
-                                }}
-                            >
-                                <svg width="10" height="8" viewBox="0 0 10 8" className={`absolute top-[2px] left-1/2 -translate-x-1/2 transition-colors duration-150 ${scrubberSnapped ? 'text-[#7c3aed]' : 'text-gray-800'}`} fill="currentColor">
-                                    <path d="M2.5 1h5c1.1 0 1.6 1.3.8 2.1L5.8 5.7c-.4.4-1.1.4-1.5 0L1.7 3.1C.9 2.3 1.4 1 2.5 1z" />
-                                </svg>
-                            </div>
-
-                            {/* Ruler ticks */}
-                            <div className="h-[36px] flex absolute inset-x-1 z-10 pt-2 cursor-col-resize">
-                                {rulerTicks.map((tick) => (
-                                    <div
-                                        key={tick.time}
-                                        className="absolute top-0 bottom-0 flex flex-row items-start pointer-events-none pt-2"
-                                        style={{ left: `${timeToPixel(tick.time)}px` }}
-                                    >
-                                        <div className={`w-[2px] rounded-full ${tick.isMajor ? 'h-5' : 'h-2.5 mt-[5px]'} ${isDark ? 'bg-gray-600' : 'bg-gray-300'}`} />
-                                        {tick.isMajor && (
-                                            <span className={`text-[14px] font-medium select-none ml-1.5 whitespace-nowrap -mt-0.5 ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
-                                                {formatRulerLabel(tick.time)}
-                                            </span>
-                                        )}
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* ── Tracks Row ── synced horizontally + vertical scrollbar always pinned to right edge */}
                     <div
                         ref={tracksScrollRef}
                         className={`flex-1 overflow-x-auto overflow-y-auto custom-scrollbar relative ${isDark ? 'bg-[#14141d]' : 'bg-white'}`}
-                        onScroll={() => {
-                            if (tracksScrollRef.current && scrollParentRef.current) {
-                                scrollParentRef.current.scrollLeft = tracksScrollRef.current.scrollLeft;
-                            }
-                        }}
-                        onMouseMove={(e) => {
-                            if (tracksScrollRef.current && !hasHorizontalOverflow) {
-                                const rect = tracksScrollRef.current.getBoundingClientRect();
-                                // Vertical scrollbar strip is the rightmost ~12px of the element
-                                const inVertSBStrip = e.clientX >= rect.right - 12;
-                                setIsHoveringVertSB(inVertSBStrip);
-                            }
-                        }}
-                        onMouseLeave={() => setIsHoveringVertSB(false)}
                     >
                         <div
                             className="relative transition-all duration-300 ease-out px-1"
@@ -775,7 +757,55 @@ export const Timeline = ({
                             onMouseMove={handleTimelineMouseMove}
                             onMouseLeave={() => { setHoverTime(null); setHoverScrubberPos(null); }}
                         >
-                            {/* Ghost scrubber line (tracks only) */}
+
+                            {/* ── Ruler Row ── sticky top so it stays pinned during vertical scroll */}
+                            <div
+                                className={`sticky top-0 z-20 h-[36px] relative px-1 ${isDark ? 'bg-[#14141d]' : 'bg-white'}`}
+                                style={{ minWidth: `${timelineWidth}px` }}
+                            >
+                                {/* Ghost scrubber triangle (ruler only) */}
+                                {hoverTime !== null && !isDraggingPlayhead && hoveredHandleSceneId === null && resizingScene === null && (
+                                    <div className="absolute top-0 bottom-0 w-[2px] z-35 pointer-events-none left-1"
+                                        style={{ transform: `translateX(${timeToPixel(hoverTime)}px)` }}
+                                    >
+                                        <svg width="10" height="8" viewBox="0 0 10 8" className="absolute top-[2px] left-1/2 -translate-x-1/2 text-[#1f2937]" fill="currentColor">
+                                            <path d="M2.5 1h5c1.1 0 1.6 1.3.8 2.1L5.8 5.7c-.4.4-1.1.4-1.5 0L1.7 3.1C.9 2.3 1.4 1 2.5 1z" />
+                                        </svg>
+                                    </div>
+                                )}
+
+                                {/* Playhead triangle (ruler only) */}
+                                <div className="absolute top-0 bottom-0 w-[2px] z-35 pointer-events-none left-1"
+                                    style={{
+                                        transform: `translateX(${timeToPixel(scrubberFaded ? scrubberTime : currentTime)}px)`,
+                                        opacity: dragState.scrubberSnapped ? 1 : (scrubberFaded ? 0.5 : 1)
+                                    }}
+                                >
+                                    <svg width="10" height="8" viewBox="0 0 10 8" className={`absolute top-[2px] left-1/2 -translate-x-1/2 transition-colors duration-150 ${dragState.scrubberSnapped ? 'text-[#7c3aed]' : 'text-gray-800'}`} fill="currentColor">
+                                        <path d="M2.5 1h5c1.1 0 1.6 1.3.8 2.1L5.8 5.7c-.4.4-1.1.4-1.5 0L1.7 3.1C.9 2.3 1.4 1 2.5 1z" />
+                                    </svg>
+                                </div>
+
+                                {/* Ruler ticks */}
+                                <div className="h-[36px] flex absolute inset-x-1 z-10 pt-2 cursor-col-resize">
+                                    {rulerTicks.map((tick) => (
+                                        <div
+                                            key={tick.time}
+                                            className="absolute top-0 bottom-0 flex flex-row items-start pointer-events-none pt-2"
+                                            style={{ left: `${timeToPixel(tick.time)}px` }}
+                                        >
+                                            <div className={`w-[2px] rounded-full ${tick.isMajor ? 'h-5' : 'h-2.5 mt-[5px]'} ${isDark ? 'bg-gray-600' : 'bg-gray-300'}`} />
+                                            {tick.isMajor && (
+                                                <span className={`text-[14px] font-medium select-none ml-1.5 whitespace-nowrap -mt-0.5 ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+                                                    {formatRulerLabel(tick.time)}
+                                                </span>
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* Ghost scrubber line (full height — ruler + tracks) */}
                             {hoverTime !== null && !isDraggingPlayhead && hoveredHandleSceneId === null && resizingScene === null && (
                                 <div className="absolute top-0 bottom-0 w-[2px] z-35 pointer-events-none left-1"
                                     style={{ transform: `translateX(${timeToPixel(hoverTime)}px)` }}
@@ -784,14 +814,14 @@ export const Timeline = ({
                                 </div>
                             )}
 
-                            {/* Playhead line (tracks only) */}
+                            {/* Playhead line (full height — ruler + tracks) */}
                             <div className="absolute top-0 bottom-0 w-[2px] z-35 pointer-events-none left-1"
                                 style={{
                                     transform: `translateX(${timeToPixel(scrubberFaded ? scrubberTime : currentTime)}px)`,
-                                    opacity: scrubberSnapped ? 1 : (scrubberFaded ? 0.5 : 1)
+                                    opacity: dragState.scrubberSnapped ? 1 : (scrubberFaded ? 0.5 : 1)
                                 }}
                             >
-                                <div className={`absolute top-0 bottom-0 left-0 right-0 rounded-full transition-colors duration-150 ${scrubberSnapped ? 'bg-[#7c3aed]' : 'bg-gray-800'}`} />
+                                <div className={`absolute top-0 bottom-0 left-0 right-0 rounded-full transition-colors duration-150 ${dragState.scrubberSnapped ? 'bg-[#7c3aed]' : 'bg-gray-800'}`} />
                             </div>
 
                             {/* Tracks content */}
@@ -806,7 +836,11 @@ export const Timeline = ({
                                 </div>
 
                                 <div className="relative h-[62px] shrink-0 flex items-center">
-                                    <div className={`absolute inset-y-0 left-0 rounded-xl flex items-center z-10 ${isDark ? 'bg-[#1e1e2e]' : 'bg-[#e5e7eb]'}`} style={{ width: `${Math.max(containerWidth * 0.95, hasHorizontalOverflow ? contentWidth + 66 : contentWidth)}px` }}>
+                                    <div
+                                        ref={grayBarRef}
+                                        className={`absolute inset-y-0 left-0 rounded-xl flex items-center z-10 ${isDark ? 'bg-[#1e1e2e]' : 'bg-[#e5e7eb]'}`}
+                                        style={{ width: `${Math.max(contentWidth + 66, containerWidth * 0.95)}px` }}
+                                    >
 
                                         {scenes.map((scene, sceneIndex) => {
                                             const isSelected = selectedSceneId === scene.id;
@@ -1147,7 +1181,7 @@ export const Timeline = ({
                     <div
                         className="fixed z-[9999] pointer-events-none flex flex-col items-center"
                         style={{
-                            top: scrollParentRef.current ? scrollParentRef.current.getBoundingClientRect().top : rect.top,
+                            top: tracksScrollRef.current ? tracksScrollRef.current.getBoundingClientRect().top : rect.top,
                             left: rect.left + 4 + timeToPixel(currentTime),
                             transform: 'translate(-50%, -100%)',
                             marginTop: '4px'
@@ -1162,7 +1196,7 @@ export const Timeline = ({
             })()}
 
             {/* Portal-based Resize Tooltip — appears above blank while dragging resize handle */}
-            {resizingScene && resizeTooltip && (() => {
+            {resizingScene && dragState.resizeTooltip && (() => {
                 const activeScene = scenes.find(s => s.id === resizingScene.id);
                 if (!activeScene) return null;
                 // Both handles now use DOM — read live refs for accurate tooltip display
@@ -1175,8 +1209,8 @@ export const Timeline = ({
                     <div
                         className="fixed z-[9999] pointer-events-none flex flex-col items-center"
                         style={{
-                            top: resizeTooltip.y - 78,
-                            left: resizeTooltip.x,
+                            top: dragState.resizeTooltip.y - 78,
+                            left: dragState.resizeTooltip.x,
                             transform: 'translateX(-50%)',
                         }}
                     >
