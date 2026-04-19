@@ -987,11 +987,11 @@ export const Timeline = ({
                                                             <div className="absolute top-1.5 right-1.5 opacity-0 group-hover/scene:opacity-100 transition-opacity z-20">
                                                                 <div
                                                                     onClick={(e) => e.stopPropagation()}
-                                                                    className="bg-[#6b7280] hover:bg-[#7c3aed] rounded-full px-[6px] py-[5px] flex items-center gap-[2.5px] transition-colors cursor-pointer"
+                                                                    className="bg-[#6b7280] hover:bg-[#7c3aed] rounded-full px-[6px] py-[4px] flex items-center gap-[2.5px] transition-colors cursor-pointer"
                                                                 >
-                                                                    <span className="w-[3px] h-[3px] rounded-full bg-white block" />
-                                                                    <span className="w-[3px] h-[3px] rounded-full bg-white block" />
-                                                                    <span className="w-[3px] h-[3px] rounded-full bg-white block" />
+                                                                    <span className="w-[1.5px] h-[1.5px] rounded-full bg-white block" />
+                                                                    <span className="w-[1.5px] h-[1.5px] rounded-full bg-white block" />
+                                                                    <span className="w-[1.5px] h-[1.5px] rounded-full bg-white block" />
                                                                 </div>
                                                             </div>
                                                         )}
