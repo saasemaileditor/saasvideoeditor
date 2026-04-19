@@ -1,6 +1,7 @@
 import React, { useRef, useEffect, useState, useMemo } from 'react';
 import ReactDOM from 'react-dom';
 import { Play, Pause, Plus, LayoutGrid, Music, Maximize, CloudUpload, RectangleHorizontal, StepForward } from 'lucide-react';
+import { useFloating, shift, offset, autoUpdate } from '@floating-ui/react';
 import { useEditorStore, getHistoryControls } from '../store/useEditorStore';
 
 interface TimelineProps {
@@ -83,9 +84,22 @@ export const Timeline = ({
     const [hoverScrubberPos, setHoverScrubberPos] = useState<{ top: number; left: number } | null>(null);
     const [activeGapTooltip, setActiveGapTooltip] = useState<{ text: string, pos: { top: number, left: number } } | null>(null);
     const [showPlusDropdown, setShowPlusDropdown] = useState(false);
-    const [dropdownPos, setDropdownPos] = useState<{ top: number; left: number } | null>(null);
+    const { refs: plusDropdownRefs, floatingStyles: plusDropdownStyles } = useFloating({
+        open: showPlusDropdown,
+        placement: 'top-start',
+        strategy: 'fixed',
+        middleware: [offset(8), shift({ padding: 16 })],
+        whileElementsMounted: autoUpdate,
+    });
+
     const [showGapDropdown, setShowGapDropdown] = useState(false);
-    const [gapDropdownPos, setGapDropdownPos] = useState<{ top: number; left: number } | null>(null);
+    const { refs: gapDropdownRefs, floatingStyles: gapDropdownStyles } = useFloating({
+        open: showGapDropdown,
+        placement: 'top',
+        strategy: 'fixed',
+        middleware: [offset(8), shift({ padding: 16 })],
+        whileElementsMounted: autoUpdate,
+    });
     const [activeGapIndex, setActiveGapIndex] = useState<number | null>(null);
     const [selectedSceneId, setSelectedSceneId] = useState<string | null>(null);
 
@@ -120,18 +134,12 @@ export const Timeline = ({
     const grayBarRef = useRef<HTMLDivElement>(null);
     const autoScrollRAF = useRef<number | null>(null);
 
-    // Compute dropdown position when it opens
+    // Connect Plus Button reference to Floating UI when opened
     useEffect(() => {
         if (showPlusDropdown && plusBtnRef.current) {
-            const rect = plusBtnRef.current.getBoundingClientRect();
-            setDropdownPos({
-                top: rect.top - 8, // 8px gap above the button
-                left: rect.left,
-            });
-        } else {
-            setDropdownPos(null);
+            plusDropdownRefs.setReference(plusBtnRef.current);
         }
-    }, [showPlusDropdown]);
+    }, [showPlusDropdown, plusDropdownRefs]);
 
     // Close gap dropdown on click outside
     useEffect(() => {
@@ -1013,8 +1021,7 @@ export const Timeline = ({
                                                                             className="w-[24px] h-[24px] rounded-full bg-white border border-gray-300 shadow-sm flex items-center justify-center cursor-pointer hover:bg-gray-100 hover:border-gray-400 transition-colors"
                                                                             onClick={(e) => {
                                                                                 e.stopPropagation();
-                                                                                const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-                                                                                setGapDropdownPos({ top: rect.top, left: rect.left + rect.width / 2 });
+                                                                                gapDropdownRefs.setReference(e.currentTarget as HTMLElement);
                                                                                 setActiveGapIndex(sceneIndex);
                                                                                 setShowGapDropdown(prev => !prev);
                                                                                 setActiveGapTooltip(null);
@@ -1159,15 +1166,14 @@ export const Timeline = ({
             </div>
 
             {/* Portal-based dropdown — renders at body level to escape all overflow containers */}
-            {showPlusDropdown && dropdownPos && ReactDOM.createPortal(
+            {showPlusDropdown && ReactDOM.createPortal(
                 <div
-                    ref={dropdownRef}
-                    className={`fixed w-44 rounded-xl shadow-lg border py-1.5 z-[9999] ${isDark ? 'bg-[#1e1e2e] border-gray-700' : 'bg-white border-gray-200'}`}
-                    style={{
-                        top: dropdownPos.top,
-                        left: dropdownPos.left,
-                        transform: 'translateY(-100%)',
+                    ref={(node) => {
+                        plusDropdownRefs.setFloating(node);
+                        if (dropdownRef) dropdownRef.current = node;
                     }}
+                    className={`fixed w-44 rounded-xl shadow-lg border py-1.5 z-[9999] ${isDark ? 'bg-[#1e1e2e] border-gray-700' : 'bg-white border-gray-200'}`}
+                    style={plusDropdownStyles}
                 >
                     <button
                         onClick={() => { setShowPlusDropdown(false); onOpenMediaPanel(); }}
@@ -1196,15 +1202,14 @@ export const Timeline = ({
             )}
 
             {/* Portal-based Gap Dropdown — same style as main plus dropdown */}
-            {showGapDropdown && gapDropdownPos && ReactDOM.createPortal(
+            {showGapDropdown && ReactDOM.createPortal(
                 <div
-                    ref={gapDropdownRef}
-                    className={`fixed w-44 rounded-xl shadow-lg border py-1.5 z-[9999] ${isDark ? 'bg-[#1e1e2e] border-gray-700' : 'bg-white border-gray-200'}`}
-                    style={{
-                        top: gapDropdownPos.top,
-                        left: gapDropdownPos.left,
-                        transform: 'translate(-50%, -100%) translateY(-8px)',
+                    ref={(node) => {
+                        gapDropdownRefs.setFloating(node);
+                        if (gapDropdownRef) gapDropdownRef.current = node;
                     }}
+                    className={`fixed w-44 rounded-xl shadow-lg border py-1.5 z-[9999] ${isDark ? 'bg-[#1e1e2e] border-gray-700' : 'bg-white border-gray-200'}`}
+                    style={gapDropdownStyles}
                 >
                     <button
                         onClick={() => {
