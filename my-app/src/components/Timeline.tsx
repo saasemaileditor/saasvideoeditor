@@ -720,8 +720,14 @@ export const Timeline = ({
                 setCurrentTime(priorDuration);
                 liveLeftDrag.current = { sceneId: null, spacerPx: 0, scenePx: 0, duration: 0 };
             }
-            // End of resize: stop fading and reset snap
-            if (grayBarRef.current) grayBarRef.current.style.width = '';
+            // End of resize: restore grey box to correct final width using LIVE DOM width (not stale React state)
+            if (grayBarRef.current && tracksScrollRef.current) {
+                const liveContainerWidth = tracksScrollRef.current.clientWidth;
+                const currentScenes = useEditorStore.getState().scenes;
+                const finalContentWidth = Math.ceil(Math.max(currentScenes.reduce((sum, s) => sum + s.duration, 0), 5.0) * pixelsPerSecond);
+                const finalGrayWidth = Math.max(finalContentWidth + 66, liveContainerWidth * 0.95);
+                grayBarRef.current.style.width = finalGrayWidth + 'px';
+            }
             setScrubberFaded(false);
             setDragState({ scrubberSnapped: false, resizeTooltip: null });
             setResizingScene(null);
