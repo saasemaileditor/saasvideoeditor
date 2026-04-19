@@ -95,9 +95,12 @@ export const Timeline = ({
         id: string;
         side: 'left' | 'right';
         startX: number;
+        startScrollLeft: number;  // scroll offset at drag start — makes deltaX scroll-aware
         startDuration: number;
         startLeadingGap: number;
     } | null>(null);
+    // Stores the live mouse X position so the persistent RAF loop can read it every frame
+    const liveMouseX = useRef<number>(0);
 
     const [hoveredHandleSceneId, setHoveredHandleSceneId] = useState<string | null>(null);
     const [hoveredGapIndex, setHoveredGapIndex] = useState<number | null>(null);
@@ -525,7 +528,13 @@ export const Timeline = ({
         if (!resizingScene) return;
 
         const handleMouseMove = (e: MouseEvent) => {
-            const deltaX = e.clientX - resizingScene.startX;
+            // Store live mouse position for the persistent RAF loop to read every frame
+            liveMouseX.current = e.clientX;
+
+            // Scroll-aware deltaX: accounts for how much the timeline has scrolled since drag started
+            // This is the core fix — without this, clip stops growing when mouse is stationary during auto-scroll
+            const currentScrollLeft = tracksScrollRef.current?.scrollLeft ?? 0;
+            const deltaX = (e.clientX + currentScrollLeft) - (resizingScene.startX + resizingScene.startScrollLeft);
 
             // Calculate current resize handle position in time
             // Read scenes imperatively to avoid stale closure during drag
@@ -647,6 +656,8 @@ export const Timeline = ({
             const liveTotalDuration = priorDuration + liveSceneDuration + afterDuration;
             const liveGrayWidth = Math.max(Math.ceil(Math.max(liveTotalDuration, 5.0) * pixelsPerSecond) + 66, containerWidth * 0.95);
             if (grayBarRef.current) grayBarRef.current.style.width = liveGrayWidth + 'px';
+            // Also keep outer container in sync with grayBar so scroll boundary matches visible content
+            if (timelineRef.current) timelineRef.current.style.minWidth = liveGrayWidth + 'px';
 
             // Single React re-render per pixel: update tooltip position and snap state together
             setDragState(prev => ({
@@ -654,37 +665,30 @@ export const Timeline = ({
                 scrubberSnapped: isNearScrubber,
                 resizeTooltip: prev.resizeTooltip ? { ...prev.resizeTooltip, x: e.clientX } : null
             }));
-
-            const scrollEl = tracksScrollRef.current;
-            if (scrollEl) {
-                const rect = scrollEl.getBoundingClientRect();
-                const EDGE_ZONE = 80; // px from edge to start scrolling
-                const MAX_SPEED = 20; // px per frame max
-
-                let scrollSpeed = 0;
-                if (e.clientX > rect.right - EDGE_ZONE) {
-                    // near right edge
-                    scrollSpeed = Math.round(((e.clientX - (rect.right - EDGE_ZONE)) / EDGE_ZONE) * MAX_SPEED);
-                } else if (e.clientX < rect.left + EDGE_ZONE) {
-                    // near left edge
-                    scrollSpeed = -Math.round((((rect.left + EDGE_ZONE) - e.clientX) / EDGE_ZONE) * MAX_SPEED);
-                }
-
-                // Cancel previous frame before starting new one
-                if (autoScrollRAF.current !== null) cancelAnimationFrame(autoScrollRAF.current);
-
-                if (scrollSpeed !== 0) {
-                    const scroll = () => {
-                        if (!tracksScrollRef.current) return;
-                        tracksScrollRef.current.scrollLeft += scrollSpeed;
-                        autoScrollRAF.current = requestAnimationFrame(scroll);
-                    };
-                    autoScrollRAF.current = requestAnimationFrame(scroll);
-                } else {
-                    autoScrollRAF.current = null;
-                }
-            }
+            // NOTE: Auto-scroll is handled by the persistent RAF loop started below — NOT here
         };
+
+        // ─── Persistent auto-scroll RAF loop (industry standard) ──────────────────
+        // Runs every frame for the ENTIRE drag. Reads liveMouseX set by mousemove.
+        // Because deltaX is scroll-aware, scrolling naturally grows the clip — no wall ever.
+        const EDGE_ZONE = 80;
+        const MAX_SPEED = 20;
+        const autoScrollLoop = () => {
+            if (!tracksScrollRef.current) return;
+            const el = tracksScrollRef.current;
+            const rect = el.getBoundingClientRect();
+            const mx = liveMouseX.current;
+
+            let scrollSpeed = 0;
+            if (mx > rect.right - EDGE_ZONE) {
+                scrollSpeed = Math.round(((mx - (rect.right - EDGE_ZONE)) / EDGE_ZONE) * MAX_SPEED);
+            } else if (mx < rect.left + EDGE_ZONE) {
+                scrollSpeed = -Math.round((((rect.left + EDGE_ZONE) - mx) / EDGE_ZONE) * MAX_SPEED);
+            }
+            if (scrollSpeed !== 0) el.scrollLeft += scrollSpeed;
+            autoScrollRAF.current = requestAnimationFrame(autoScrollLoop);
+        };
+        autoScrollRAF.current = requestAnimationFrame(autoScrollLoop);
 
         const handleMouseUp = () => {
             // Read scenes imperatively to avoid stale closure
@@ -768,11 +772,12 @@ export const Timeline = ({
             if (totalDelta > RESIZE_DRAG_THRESHOLD && !hasDragged) {
                 hasDragged = true;
 
-                // Convert pending click to actual resize
+                // Convert pending click to actual resize — capture scrollLeft so deltaX stays scroll-aware
                 setResizingScene({
                     id: pendingResizeClick.sceneId,
                     side: pendingResizeClick.side,
                     startX: pendingResizeClick.startX,
+                    startScrollLeft: tracksScrollRef.current?.scrollLeft ?? 0,
                     startDuration: pendingResizeClick.startDuration,
                     startLeadingGap: pendingResizeClick.startLeadingGap
                 });
