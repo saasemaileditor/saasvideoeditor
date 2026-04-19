@@ -168,12 +168,11 @@ export const Timeline = ({
 
     // Actual pixel width of the video content at current zoom
     const contentWidth = Math.ceil(duration * pixelsPerSecond);
-    // True when content is wider than the visible tracks container → real horizontal scrollbar appears
-    const hasHorizontalOverflow = contentWidth > containerWidth;
-    // timelineWidth: equals containerWidth when content fits, equals contentWidth+66 when zoomed in
-    const timelineWidth = hasHorizontalOverflow ? contentWidth + 66 : containerWidth;
-    // rulerDuration: how many seconds the visible ruler covers (accounting for 8px total edge padding)
-    const rulerDuration = Math.max(0, timelineWidth - 8) / pixelsPerSecond;
+    // 66px for the plus button area + 20px fixed extra visual scrolling gap
+    const TAIL_PX = 66 + 20;
+    const timelineWidth = Math.max(contentWidth + TAIL_PX, containerWidth);
+    // Scrubber is allowed to hit the absolute edge (no dead zone)
+    const rulerDuration = timelineWidth / pixelsPerSecond;
 
     // ─── Filmora "Viewport Leash" (Scrubber physical bounding during zoom) ──
     const prevZoomForLeash = useRef(zoom);
@@ -345,11 +344,23 @@ export const Timeline = ({
         return Math.min(clamped / pixelsPerSecond, rulerDuration);
     };
 
-    const formatTooltipTime = (t: number) => {
+    const getViewportEdgeState = (clientX: number): 'right' | null => {
+        if (!tracksScrollRef.current) return null;
+        const rect = tracksScrollRef.current.getBoundingClientRect();
+        // Approx half the tooltip width (20px) to detect text pushed off screen
+        const threshold = 24;
+        if (clientX > rect.right - threshold) return 'right';
+        return null;
+    };
+
+    const formatTooltipTime = (t: number, edge: 'right' | null = null) => {
+        if (edge === 'right') {
+            return Math.floor(t) + '...';
+        }
         const decimals = zoom >= 400 ? 2 : 1;
         const factor = Math.pow(10, decimals);
         // Truncate cleanly while avoiding strict floating-point underflow (e.g. 0.19999->0.19)
-        return (Math.floor(t * factor + 1e-6) / factor).toFixed(decimals);
+        return (Math.floor(t * factor + 1e-6) / factor).toFixed(decimals) + 's';
     };
 
     // Magnetic Snapping Utility (4 pixels pull radius)
@@ -448,9 +459,10 @@ export const Timeline = ({
         if (isPlaying) {
             interval = window.setInterval(() => {
                 setCurrentTime((prev) => {
-                    if (prev >= rulerDuration) {
+                    // Stop at actual content end, not the ruler tail
+                    if (prev >= duration) {
                         setIsPlaying(false);
-                        return rulerDuration;
+                        return duration;
                     }
                     return prev + 0.1;
                 });
@@ -1114,7 +1126,7 @@ export const Timeline = ({
                                 {isPlaying ? <Pause size={10} fill="currentColor" /> : <Play size={10} fill="currentColor" className="ml-0.5" />}
                             </button>
                             <span className={`text-[11px] font-medium tracking-[0.02em] ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
-                                {`${formatTime(currentTime)} / ${formatTime(rulerDuration)}`}
+                                {`${formatTime(currentTime)} / ${formatTime(duration)}`}
                             </span>
                         </div>
 
@@ -1222,7 +1234,7 @@ export const Timeline = ({
                     }}
                 >
                     <div className="bg-[#1f2937] text-white text-[14px] font-semibold px-3 py-1.5 rounded-[8px] shadow-md">
-                        {formatTooltipTime(hoverTime)}s
+                        {formatTooltipTime(hoverTime, getViewportEdgeState(hoverScrubberPos.left))}
                     </div>
                 </div>,
                 document.body
@@ -1252,18 +1264,19 @@ export const Timeline = ({
             {/* Portal-based Real Scrubber Timer Tooltip — shown only while dragging the playhead */}
             {isDraggingPlayhead && timelineRef.current && (() => {
                 const rect = timelineRef.current!.getBoundingClientRect();
+                const scrubberLeft = rect.left + 4 + timeToPixel(currentTime);
                 return ReactDOM.createPortal(
                     <div
                         className="fixed z-[9999] pointer-events-none flex flex-col items-center"
                         style={{
                             top: tracksScrollRef.current ? tracksScrollRef.current.getBoundingClientRect().top : rect.top,
-                            left: rect.left + 4 + timeToPixel(currentTime),
+                            left: scrubberLeft,
                             transform: 'translate(-50%, -100%)',
                             marginTop: '4px'
                         }}
                     >
                         <div className="bg-[#1f2937] text-white text-[14px] font-semibold px-3 py-1.5 rounded-[8px] shadow-md">
-                            {formatTooltipTime(currentTime)}s
+                            {formatTooltipTime(currentTime, getViewportEdgeState(scrubberLeft))}
                         </div>
                     </div>,
                     document.body
