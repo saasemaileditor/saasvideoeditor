@@ -527,23 +527,15 @@ export const Timeline = ({
     useEffect(() => {
         if (!resizingScene) return;
 
-        const handleMouseMove = (e: MouseEvent) => {
-            // Store live mouse position for the persistent RAF loop to read every frame
-            liveMouseX.current = e.clientX;
-
-            // Scroll-aware deltaX: accounts for how much the timeline has scrolled since drag started
-            // This is the core fix — without this, clip stops growing when mouse is stationary during auto-scroll
+        const updateDragDOM = () => {
             const currentScrollLeft = tracksScrollRef.current?.scrollLeft ?? 0;
-            const deltaX = (e.clientX + currentScrollLeft) - (resizingScene.startX + resizingScene.startScrollLeft);
+            const deltaX = (liveMouseX.current + currentScrollLeft) - (resizingScene.startX + resizingScene.startScrollLeft);
 
-            // Calculate current resize handle position in time
-            // Read scenes imperatively to avoid stale closure during drag
             const currentScenes = useEditorStore.getState().scenes;
             const sceneIdx = currentScenes.findIndex(s => s.id === resizingScene.id);
             const priorDuration = currentScenes.slice(0, sceneIdx).reduce((sum, s) => sum + s.duration, 0);
             const sceneStartTime = priorDuration + (currentScenes[sceneIdx].leadingGap || 0);
 
-            // Calculate where the resize edge currently is (in time)
             let currentEdgeTime: number;
             if (resizingScene.side === 'right') {
                 const startScenePx = Math.round(resizingScene.startDuration * pixelsPerSecond);
@@ -568,23 +560,19 @@ export const Timeline = ({
                 currentEdgeTime = priorDuration + (newSpacerPxRaw / pixelsPerSecond);
             }
 
-            // SNAP LOGIC: Check if within 10 pixels of scrubber (in time)
-            const snapThresholdPx = 5; // 5 pixels threshold
-            const snapThresholdTime = snapThresholdPx / pixelsPerSecond; // convert to time
+            const snapThresholdPx = 5; 
+            const snapThresholdTime = snapThresholdPx / pixelsPerSecond; 
             const distanceToScrubber = Math.abs(currentEdgeTime - scrubberTime);
             const isNearScrubber = distanceToScrubber <= snapThresholdTime;
 
             if (resizingScene.side === 'right') {
-                // Right handle: pure DOM update — same pattern as left, zero shake
                 const startScenePx = Math.round(resizingScene.startDuration * pixelsPerSecond);
                 const minScenePx = Math.round(0.3 * pixelsPerSecond);
                 let newScenePx = Math.max(minScenePx, startScenePx + deltaX);
 
-                // Apply MAGNETIC SNAP if near scrubber - edge JUMPS to scrubber position
                 if (isNearScrubber) {
                     const targetScenePx = (scrubberTime - sceneStartTime) * pixelsPerSecond;
                     newScenePx = Math.max(minScenePx, targetScenePx);
-                    // When snapped, edge is now exactly at scrubber position
                 }
 
                 liveRightDrag.current = {
@@ -596,7 +584,6 @@ export const Timeline = ({
                 const sceneEl = sceneRefs.current.get(resizingScene.id);
                 if (sceneEl) sceneEl.style.width = newScenePx + 'px';
             } else {
-                // Left handle: pure DOM update — zero shake.
                 const startLeadingPx = Math.round(resizingScene.startLeadingGap * pixelsPerSecond);
                 const startScenePx = Math.round(resizingScene.startDuration * pixelsPerSecond);
                 const rightEdge = startLeadingPx + startScenePx;
@@ -606,11 +593,9 @@ export const Timeline = ({
                 let newScenePx;
 
                 if (newSpacerPx < 0) {
-                    // Spacer exhausted — scene EXPANDS freely to the right
                     newScenePx = startScenePx + Math.abs(newSpacerPx);
                     newSpacerPx = 0;
                 } else {
-                    // Collapsing: spacer grows, scene shrinks (right edge stays fixed)
                     newScenePx = rightEdge - newSpacerPx;
                     if (newScenePx < minScenePx) {
                         newScenePx = minScenePx;
@@ -618,7 +603,6 @@ export const Timeline = ({
                     }
                 }
 
-                // Apply MAGNETIC SNAP if near scrubber - edge JUMPS to scrubber position
                 if (isNearScrubber) {
                     const targetSpacerPx = (scrubberTime - priorDuration) * pixelsPerSecond;
                     newSpacerPx = Math.max(0, targetSpacerPx);
@@ -627,7 +611,6 @@ export const Timeline = ({
                         newScenePx = minScenePx;
                         newSpacerPx = rightEdge - minScenePx;
                     }
-                    // When snapped, edge is now exactly at scrubber position
                 }
 
                 liveLeftDrag.current = {
@@ -643,9 +626,6 @@ export const Timeline = ({
                 if (sceneEl) sceneEl.style.width = newScenePx + 'px';
             }
 
-
-
-            // Update gray bar width via DOM — zero re-renders, perfectly in sync
             const afterDuration = currentScenes.slice(sceneIdx + 1).reduce((sum, s) => sum + s.duration, 0);
             let liveSceneDuration: number;
             if (resizingScene.side === 'right') {
@@ -656,8 +636,17 @@ export const Timeline = ({
             const liveTotalDuration = priorDuration + liveSceneDuration + afterDuration;
             const liveGrayWidth = Math.max(Math.ceil(Math.max(liveTotalDuration, 5.0) * pixelsPerSecond) + 66, containerWidth * 0.95);
             if (grayBarRef.current) grayBarRef.current.style.width = liveGrayWidth + 'px';
-            // Also keep outer container in sync with grayBar so scroll boundary matches visible content
             if (timelineRef.current) timelineRef.current.style.minWidth = liveGrayWidth + 'px';
+
+            return isNearScrubber;
+        };
+
+        const handleMouseMove = (e: MouseEvent) => {
+            // Store live mouse position for the persistent RAF loop to read every frame
+            liveMouseX.current = e.clientX;
+
+            // Grow the clip using pure DOM physics
+            const isNearScrubber = updateDragDOM();
 
             // Single React re-render per pixel: update tooltip position and snap state together
             setDragState(prev => ({
@@ -685,7 +674,11 @@ export const Timeline = ({
             } else if (mx < rect.left + EDGE_ZONE) {
                 scrollSpeed = -Math.round((((rect.left + EDGE_ZONE) - mx) / EDGE_ZONE) * MAX_SPEED);
             }
-            if (scrollSpeed !== 0) el.scrollLeft += scrollSpeed;
+            if (scrollSpeed !== 0) {
+                el.scrollLeft += scrollSpeed;
+                // ZERO-TRADEOFF WALL FIX: Tell the inner content to grow instantly inside the scroll loop!
+                updateDragDOM();
+            }
             autoScrollRAF.current = requestAnimationFrame(autoScrollLoop);
         };
         autoScrollRAF.current = requestAnimationFrame(autoScrollLoop);
