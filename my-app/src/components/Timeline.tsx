@@ -54,6 +54,17 @@ export const Timeline = ({
         return Math.max(contentDuration, 5.0);
     }, [scenes]);
 
+    // Smart snap: only pull the scrubber back if the total duration shrinks (via undo, delete, or shrinking a clip)
+    const prevDuration = useRef(duration);
+    useEffect(() => {
+        if (duration < prevDuration.current) {
+            if (currentTime > duration) {
+                setCurrentTime(duration);
+            }
+        }
+        prevDuration.current = duration;
+    }, [duration, currentTime, setCurrentTime]);
+
     // Click vs Drag detection for resize handles
     const [pendingResizeClick, setPendingResizeClick] = useState<{
         sceneId: string;
