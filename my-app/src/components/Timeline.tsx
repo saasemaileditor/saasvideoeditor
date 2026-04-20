@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useState, useMemo } from 'react';
+import React, { useRef, useEffect, useState, useMemo, useCallback } from 'react';
 import ReactDOM from 'react-dom';
 import { Play, Pause, Plus, LayoutGrid, Music, Maximize, CloudUpload, RectangleHorizontal, StepForward, Scissors, Copy, Trash2 } from 'lucide-react';
 import { useFloating, shift, offset, autoUpdate } from '@floating-ui/react';
@@ -256,6 +256,28 @@ export const Timeline = ({
         }
     }, [zoom, pixelsPerSecond, currentTime, scrubberFaded]);
 
+    const handleDuplicateScene = useCallback(() => {
+        if (!selectedSceneId) return;
+        const currentScenes = useEditorStore.getState().scenes;
+        const sceneIndex = currentScenes.findIndex(s => s.id === selectedSceneId);
+        if (sceneIndex === -1) return;
+        
+        const originalScene = currentScenes[sceneIndex];
+        // Universal deep clone logic for all future nested properties on scene objects
+        const clonedScene = JSON.parse(JSON.stringify(originalScene));
+        const newId = Date.now().toString() + Math.random().toString(36).substring(2, 7);
+        clonedScene.id = newId;
+        
+        // Ensure inserted right after the current scene
+        addScene(clonedScene, sceneIndex + 1);
+        getHistoryControls().archive();
+        window.dispatchEvent(new CustomEvent('history-updated'));
+        
+        setSelectedSceneId(newId);
+        const priorDuration = currentScenes.slice(0, sceneIndex + 1).reduce((sum, s) => sum + s.duration, 0);
+        setCurrentTime(priorDuration);
+    }, [selectedSceneId, addScene, setCurrentTime]);
+
     // ─── Timeline Keyboard Shortcuts ──────────────────────────────────────────────
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
@@ -310,6 +332,14 @@ export const Timeline = ({
                     setZoom(prev => Math.max(10, prev - 100));
                     break;
 
+                case 'd':
+                case 'D':
+                    if (e.ctrlKey || e.metaKey) {
+                        e.preventDefault();
+                        handleDuplicateScene();
+                    }
+                    break;
+
                 case 'Delete':
                 case 'Backspace':
                     if (selectedSceneId) {
@@ -328,7 +358,7 @@ export const Timeline = ({
 
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [isPlaying, setIsPlaying, setCurrentTime, rulerDuration, setZoom, selectedSceneId, removeScene]);
+    }, [isPlaying, setIsPlaying, setCurrentTime, rulerDuration, setZoom, selectedSceneId, removeScene, handleDuplicateScene]);
 
 
     // ─── Adaptive ruler tick generation (industry-standard: intervals adapt to zoom) ──
@@ -434,6 +464,15 @@ export const Timeline = ({
     const handleTimelineMouseMove = (e: React.MouseEvent) => {
         // Don't update hover state during an active resize drag
         if (resizingScene !== null) return;
+
+        // Guard: hide ghost scrubber if hovering exactly over the 3-dot pill
+        const target = e.target as HTMLElement;
+        if (target.closest('[data-dropdown-trigger="scene"]')) {
+            setHoverTime(null);
+            setHoverScrubberPos(null);
+            return;
+        }
+
         if (timelineRef.current) {
             const rect = timelineRef.current.getBoundingClientRect();
             const x = e.clientX - rect.left - 4;
@@ -450,9 +489,8 @@ export const Timeline = ({
     const handleTimelineMouseDown = (e: React.MouseEvent) => {
         const target = e.target as HTMLElement;
 
-        // Guard 1: resize handle
-        const isResizeHandle = target.closest('[data-resize-handle]') !== null;
-        if (isResizeHandle) return;
+        // Guard 1: resize handle or 3-dot pill
+        if (target.closest('[data-resize-handle]') || target.closest('[data-dropdown-trigger="scene"]')) return;
 
         // Guard 2: native vertical scrollbar
         if (tracksScrollRef.current) {
@@ -1383,27 +1421,35 @@ export const Timeline = ({
                             setShowSceneDropdown(false);
                             // TODO: Implement split
                         }}
-                        className={`w-full flex items-center gap-3 px-4 py-2.5 text-[13px] font-medium transition-colors ${isDark ? 'text-gray-300 hover:bg-gray-800' : 'text-gray-700 hover:bg-gray-100'}`}
+                        className={`w-full flex items-center justify-between px-4 py-2 transition-colors ${isDark ? 'hover:bg-gray-800' : 'hover:bg-gray-100'}`}
                     >
-                        <Scissors size={16} /> Split
+                        <div className={`flex items-center gap-3 text-[13px] font-medium ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
+                            <Scissors size={16} /> Split
+                        </div>
+                        <div className={`text-[10.5px] tracking-wide font-medium px-1.5 py-0.5 rounded-[4px] ${isDark ? 'bg-gray-800 text-gray-400' : 'bg-[#e4e6eb] text-[#4b5563]'}`}>S</div>
                     </button>
                     <button
                         onClick={() => {
                             setShowSceneDropdown(false);
                             // TODO: Implement add transition
                         }}
-                        className={`w-full flex items-center gap-3 px-4 py-2.5 text-[13px] font-medium transition-colors ${isDark ? 'text-gray-300 hover:bg-gray-800' : 'text-gray-700 hover:bg-gray-100'}`}
+                        className={`w-full flex items-center justify-between px-4 py-2 transition-colors ${isDark ? 'hover:bg-gray-800' : 'hover:bg-gray-100'}`}
                     >
-                        <StepForward size={16} /> Add Transition
+                        <div className={`flex items-center gap-3 text-[13px] font-medium ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
+                            <StepForward size={16} /> Add Transition
+                        </div>
                     </button>
                     <button
                         onClick={() => {
                             setShowSceneDropdown(false);
-                            // TODO: Implement duplicate
+                            handleDuplicateScene();
                         }}
-                        className={`w-full flex items-center gap-3 px-4 py-2.5 text-[13px] font-medium transition-colors ${isDark ? 'text-gray-300 hover:bg-gray-800' : 'text-gray-700 hover:bg-gray-100'}`}
+                        className={`w-full flex items-center justify-between px-4 py-2 transition-colors ${isDark ? 'hover:bg-gray-800' : 'hover:bg-gray-100'}`}
                     >
-                        <Copy size={16} /> Duplicate
+                        <div className={`flex items-center gap-3 text-[13px] font-medium ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
+                            <Copy size={16} /> Duplicate
+                        </div>
+                        <div className={`text-[10.5px] tracking-wide font-medium px-1.5 py-0.5 rounded-[4px] ${isDark ? 'bg-gray-800 text-gray-400' : 'bg-[#e4e6eb] text-[#4b5563]'}`}>Ctrl+D</div>
                     </button>
                     <button
                         onClick={() => {
@@ -1415,9 +1461,12 @@ export const Timeline = ({
                                 setSelectedSceneId(null);
                             }
                         }}
-                        className={`w-full flex items-center gap-3 px-4 py-2.5 text-[13px] font-medium transition-colors ${isDark ? 'text-gray-300 hover:bg-gray-800' : 'text-gray-700 hover:bg-gray-100'}`}
+                        className={`w-full flex items-center justify-between px-4 py-2 transition-colors ${isDark ? 'hover:bg-gray-800' : 'hover:bg-gray-100'}`}
                     >
-                        <Trash2 size={16} /> Delete
+                        <div className={`flex items-center gap-3 text-[13px] font-medium ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
+                            <Trash2 size={16} /> Delete
+                        </div>
+                        <div className={`text-[10.5px] tracking-wide font-medium px-1.5 py-0.5 rounded-[4px] ${isDark ? 'bg-gray-800 text-gray-400' : 'bg-[#e4e6eb] text-[#4b5563]'}`}>DELETE</div>
                     </button>
                 </div>,
                 document.body
