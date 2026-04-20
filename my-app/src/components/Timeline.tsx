@@ -1075,6 +1075,26 @@ export const Timeline = ({
                                                     <div
                                                         ref={(el) => { sceneRefs.current.set(scene.id, el); }}
                                                         onClick={() => setSelectedSceneId(isSelected ? null : scene.id)}
+                                                        onContextMenu={(e) => {
+                                                            e.preventDefault();
+                                                            e.stopPropagation();
+                                                            // Select scene if not already selected
+                                                            setSelectedSceneId(scene.id);
+                                                            // Set floating reference to a virtual element at cursor position
+                                                            sceneDropdownRefs.setReference({
+                                                                getBoundingClientRect: () => ({
+                                                                    x: e.clientX,
+                                                                    y: e.clientY,
+                                                                    top: e.clientY,
+                                                                    left: e.clientX,
+                                                                    bottom: e.clientY,
+                                                                    right: e.clientX,
+                                                                    width: 0,
+                                                                    height: 0,
+                                                                }),
+                                                            });
+                                                            setShowSceneDropdown(true);
+                                                        }}
                                                         className={`relative h-full bg-white rounded-md overflow-hidden flex items-end p-2 flex-shrink-0 cursor-pointer border-[1.5px] group/scene ${isSelected ? 'border-[#7c3aed]' : 'border-[#d1d5db]'}`}
                                                         style={{ width: `${scenePx}px` }}
                                                     >
