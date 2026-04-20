@@ -282,29 +282,29 @@ export const Timeline = ({
         for (let i = 0; i < sceneIndex; i++) {
             pastDuration += currentScenes[i].duration + (currentScenes[i].leadingGap || 0);
         }
-        
+
         const originalScene = currentScenes[sceneIndex];
         const sceneStart = pastDuration + (originalScene.leadingGap || 0);
-        
+
         const leftDuration = parseFloat((currentTime - sceneStart).toFixed(2));
         const rightDuration = parseFloat((originalScene.duration - leftDuration).toFixed(2));
-        
+
         if (leftDuration <= 0.1 || rightDuration <= 0.1) return;
-        
+
         // Update first half
         updateScene(originalScene.id, { duration: leftDuration });
-        
+
         // Create second half using universal deep clone
         const clonedScene = JSON.parse(JSON.stringify(originalScene));
         const newId = Date.now().toString() + Math.random().toString(36).substring(2, 7);
         clonedScene.id = newId;
         clonedScene.duration = rightDuration;
         clonedScene.leadingGap = 0;
-        
+
         addScene(clonedScene, sceneIndex + 1);
         getHistoryControls().archive();
         window.dispatchEvent(new CustomEvent('history-updated'));
-        
+
         setSelectedSceneId(newId);
     }, [selectedSceneId, currentTime, addScene, updateScene]);
 
@@ -313,18 +313,18 @@ export const Timeline = ({
         const currentScenes = useEditorStore.getState().scenes;
         const sceneIndex = currentScenes.findIndex(s => s.id === selectedSceneId);
         if (sceneIndex === -1) return;
-        
+
         const originalScene = currentScenes[sceneIndex];
         // Universal deep clone logic for all future nested properties on scene objects
         const clonedScene = JSON.parse(JSON.stringify(originalScene));
         const newId = Date.now().toString() + Math.random().toString(36).substring(2, 7);
         clonedScene.id = newId;
-        
+
         // Ensure inserted right after the current scene
         addScene(clonedScene, sceneIndex + 1);
         getHistoryControls().archive();
         window.dispatchEvent(new CustomEvent('history-updated'));
-        
+
         setSelectedSceneId(newId);
         const priorDuration = currentScenes.slice(0, sceneIndex + 1).reduce((sum, s) => sum + s.duration, 0);
         setCurrentTime(priorDuration);
@@ -717,8 +717,8 @@ export const Timeline = ({
                 currentEdgeTime = priorDuration + (newSpacerPxRaw / pixelsPerSecond);
             }
 
-            const snapThresholdPx = 5; 
-            const snapThresholdTime = snapThresholdPx / pixelsPerSecond; 
+            const snapThresholdPx = 5;
+            const snapThresholdTime = snapThresholdPx / pixelsPerSecond;
             const distanceToScrubber = Math.abs(currentEdgeTime - scrubberTime);
             const isNearScrubber = distanceToScrubber <= snapThresholdTime;
 
@@ -1088,6 +1088,9 @@ export const Timeline = ({
                                                 : isLiveRightDrag
                                                     ? liveRightDrag.current.scenePx
                                                     : timeToPixel(scene.duration);
+                                            // Hide inner chrome when the tile is too narrow to fit them
+                                            const isTinyHandles = scenePx < 28;
+                                            const isTinyText = scenePx < 32;
 
                                             return (
                                                 <React.Fragment key={scene.id}>
@@ -1124,7 +1127,7 @@ export const Timeline = ({
                                                         style={{ width: `${scenePx}px` }}
                                                         data-scene-block="true"
                                                     >
-                                                        {isSelected && resizingScene?.id !== scene.id && (
+                                                        {isSelected && resizingScene?.id !== scene.id && !isTinyText && (
                                                             <span className={`text-[12.5px] font-bold text-[#1f2937] leading-none tracking-tight transition-opacity ${hoveredHandleSceneId === scene.id ? 'opacity-0' : 'opacity-100'}`}>
                                                                 {scene.duration.toFixed(1)}s
                                                             </span>
@@ -1133,27 +1136,27 @@ export const Timeline = ({
                                                         <>
                                                             <div
                                                                 data-resize-handle="left"
-                                                                className={`absolute left-0 top-0 bottom-0 w-[40px] flex items-center justify-start pl-[9px] cursor-ew-resize transition-opacity z-10 ${hoveredHandleSceneId === scene.id ? 'opacity-100' : 'opacity-0'}`}
-                                                                style={{ background: 'linear-gradient(to right, rgba(0,0,0,0.22) 0%, rgba(0,0,0,0.07) 55%, transparent 100%)' }}
+                                                                className={`absolute left-0 top-0 bottom-0 w-[40px] flex items-center justify-start pl-[9px] cursor-ew-resize transition-opacity z-10 ${!isTinyHandles && hoveredHandleSceneId === scene.id ? 'opacity-100' : 'opacity-0'}`}
+                                                                style={{ background: isTinyHandles ? 'none' : 'linear-gradient(to right, rgba(0,0,0,0.22) 0%, rgba(0,0,0,0.07) 55%, transparent 100%)' }}
                                                                 onMouseEnter={() => setHoveredHandleSceneId(scene.id)}
                                                                 onMouseLeave={() => setHoveredHandleSceneId(null)}
                                                                 onMouseDown={(e) => handleResizeStart(e, scene.id, 'left', scene.duration)}
                                                             >
-                                                                <div className="w-[3px] h-[26px] bg-white rounded-full shadow-md flex-shrink-0" />
+                                                                {!isTinyHandles && <div className="w-[3px] h-[26px] bg-white rounded-full shadow-md flex-shrink-0" />}
                                                             </div>
                                                             <div
                                                                 data-resize-handle="right"
-                                                                className={`absolute right-0 top-0 bottom-0 w-[40px] flex items-center justify-end pr-[9px] cursor-ew-resize transition-opacity z-10 ${hoveredHandleSceneId === scene.id ? 'opacity-100' : 'opacity-0'}`}
-                                                                style={{ background: 'linear-gradient(to left, rgba(0,0,0,0.22) 0%, rgba(0,0,0,0.07) 55%, transparent 100%)' }}
+                                                                className={`absolute right-0 top-0 bottom-0 w-[40px] flex items-center justify-end pr-[9px] cursor-ew-resize transition-opacity z-10 ${!isTinyHandles && hoveredHandleSceneId === scene.id ? 'opacity-100' : 'opacity-0'}`}
+                                                                style={{ background: isTinyHandles ? 'none' : 'linear-gradient(to left, rgba(0,0,0,0.22) 0%, rgba(0,0,0,0.07) 55%, transparent 100%)' }}
                                                                 onMouseEnter={() => setHoveredHandleSceneId(scene.id)}
                                                                 onMouseLeave={() => setHoveredHandleSceneId(null)}
                                                                 onMouseDown={(e) => handleResizeStart(e, scene.id, 'right', scene.duration)}
                                                             >
-                                                                <div className="w-[3px] h-[26px] bg-white rounded-full shadow-md flex-shrink-0" />
+                                                                {!isTinyHandles && <div className="w-[3px] h-[26px] bg-white rounded-full shadow-md flex-shrink-0" />}
                                                             </div>
                                                         </>
 
-                                                        {isSelected && (
+                                                        {isSelected && !isTinyText && (
                                                             <div className="absolute top-1.5 right-1.5 opacity-0 group-hover/scene:opacity-100 transition-opacity z-20">
                                                                 <div
                                                                     data-dropdown-trigger="scene"
