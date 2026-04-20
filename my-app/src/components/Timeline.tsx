@@ -256,6 +256,57 @@ export const Timeline = ({
         }
     }, [zoom, pixelsPerSecond, currentTime, scrubberFaded]);
 
+    const canSplitSelectedScene = useMemo(() => {
+        if (!selectedSceneId) return false;
+        let pastDuration = 0;
+        for (const scene of scenes) {
+            const start = pastDuration + (scene.leadingGap || 0);
+            const end = start + scene.duration;
+            if (scene.id === selectedSceneId) {
+                // To split, scrubber must be strictly inside the scene (not exactly on edges, giving 0.1s tolerance)
+                return currentTime >= start + 0.1 && currentTime <= end - 0.1;
+            }
+            pastDuration = end;
+        }
+        return false;
+    }, [selectedSceneId, scenes, currentTime]);
+
+    const handleSplitScene = useCallback(() => {
+        if (!selectedSceneId || !canSplitSelectedScene) return;
+        const currentScenes = useEditorStore.getState().scenes;
+        const sceneIndex = currentScenes.findIndex(s => s.id === selectedSceneId);
+        if (sceneIndex === -1) return;
+
+        let pastDuration = 0;
+        for (let i = 0; i < sceneIndex; i++) {
+            pastDuration += currentScenes[i].duration + (currentScenes[i].leadingGap || 0);
+        }
+        
+        const originalScene = currentScenes[sceneIndex];
+        const sceneStart = pastDuration + (originalScene.leadingGap || 0);
+        
+        const leftDuration = parseFloat((currentTime - sceneStart).toFixed(2));
+        const rightDuration = parseFloat((originalScene.duration - leftDuration).toFixed(2));
+        
+        if (leftDuration <= 0 || rightDuration <= 0) return;
+        
+        // Update first half
+        updateScene(originalScene.id, { duration: leftDuration });
+        
+        // Create second half using universal deep clone
+        const clonedScene = JSON.parse(JSON.stringify(originalScene));
+        const newId = Date.now().toString() + Math.random().toString(36).substring(2, 7);
+        clonedScene.id = newId;
+        clonedScene.duration = rightDuration;
+        clonedScene.leadingGap = 0; // The second part natively follows the first
+        
+        addScene(clonedScene, sceneIndex + 1);
+        getHistoryControls().archive();
+        window.dispatchEvent(new CustomEvent('history-updated'));
+        
+        setSelectedSceneId(newId);
+    }, [selectedSceneId, canSplitSelectedScene, currentTime, addScene, updateScene]);
+
     const handleDuplicateScene = useCallback(() => {
         if (!selectedSceneId) return;
         const currentScenes = useEditorStore.getState().scenes;
@@ -332,6 +383,14 @@ export const Timeline = ({
                     setZoom(prev => Math.max(10, prev - 100));
                     break;
 
+                case 's':
+                case 'S':
+                    if (!e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey && selectedSceneId) {
+                        e.preventDefault();
+                        handleSplitScene();
+                    }
+                    break;
+
                 case 'd':
                 case 'D':
                     if (e.ctrlKey || e.metaKey) {
@@ -358,7 +417,7 @@ export const Timeline = ({
 
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [isPlaying, setIsPlaying, setCurrentTime, rulerDuration, setZoom, selectedSceneId, removeScene, handleDuplicateScene]);
+    }, [isPlaying, setIsPlaying, setCurrentTime, rulerDuration, setZoom, selectedSceneId, removeScene, handleDuplicateScene, handleSplitScene]);
 
 
     // ─── Adaptive ruler tick generation (industry-standard: intervals adapt to zoom) ──
@@ -1416,18 +1475,20 @@ export const Timeline = ({
                     className={`fixed w-48 rounded-xl shadow-lg border py-1.5 z-[9999] ${isDark ? 'bg-[#1e1e2e] border-gray-700' : 'bg-white border-gray-200'}`}
                     style={sceneDropdownStyles}
                 >
-                    <button
-                        onClick={() => {
-                            setShowSceneDropdown(false);
-                            // TODO: Implement split
-                        }}
-                        className={`w-full flex items-center justify-between px-4 py-2 transition-colors ${isDark ? 'hover:bg-gray-800' : 'hover:bg-gray-100'}`}
-                    >
-                        <div className={`flex items-center gap-3 text-[13px] font-medium ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
-                            <Scissors size={16} /> Split
-                        </div>
-                        <div className={`text-[10.5px] tracking-wide font-medium px-1.5 py-0.5 rounded-[4px] ${isDark ? 'bg-gray-800 text-gray-400' : 'bg-[#e4e6eb] text-[#4b5563]'}`}>S</div>
-                    </button>
+                    {canSplitSelectedScene && (
+                        <button
+                            onClick={() => {
+                                setShowSceneDropdown(false);
+                                handleSplitScene();
+                            }}
+                            className={`w-full flex items-center justify-between px-4 py-2 transition-colors ${isDark ? 'hover:bg-gray-800' : 'hover:bg-gray-100'}`}
+                        >
+                            <div className={`flex items-center gap-3 text-[13px] font-medium ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
+                                <Scissors size={16} /> Split
+                            </div>
+                            <div className={`text-[10.5px] tracking-wide font-medium px-1.5 py-0.5 rounded-[4px] ${isDark ? 'bg-gray-800 text-gray-400' : 'bg-[#e4e6eb] text-[#4b5563]'}`}>S</div>
+                        </button>
+                    )}
                     <button
                         onClick={() => {
                             setShowSceneDropdown(false);
