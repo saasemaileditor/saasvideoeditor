@@ -696,14 +696,14 @@ export const Timeline = ({
             let currentEdgeTime: number;
             if (resizingScene.side === 'right') {
                 const startScenePx = Math.round(resizingScene.startDuration * pixelsPerSecond);
-                const minScenePx = Math.round(0.3 * pixelsPerSecond);
+                const minScenePx = Math.round(0.1 * pixelsPerSecond);
                 const newScenePxRaw = Math.max(minScenePx, startScenePx + deltaX);
                 currentEdgeTime = sceneStartTime + (newScenePxRaw / pixelsPerSecond);
             } else {
                 const startLeadingPx = Math.round(resizingScene.startLeadingGap * pixelsPerSecond);
                 const startScenePx = Math.round(resizingScene.startDuration * pixelsPerSecond);
                 const rightEdge = startLeadingPx + startScenePx;
-                const minScenePx = Math.round(0.3 * pixelsPerSecond);
+                const minScenePx = Math.round(0.1 * pixelsPerSecond);
 
                 let newSpacerPxRaw = startLeadingPx + deltaX;
                 if (newSpacerPxRaw < 0) {
@@ -724,7 +724,7 @@ export const Timeline = ({
 
             if (resizingScene.side === 'right') {
                 const startScenePx = Math.round(resizingScene.startDuration * pixelsPerSecond);
-                const minScenePx = Math.round(0.3 * pixelsPerSecond);
+                const minScenePx = Math.round(0.1 * pixelsPerSecond);
                 let newScenePx = Math.max(minScenePx, startScenePx + deltaX);
 
                 if (isNearScrubber) {
@@ -744,7 +744,7 @@ export const Timeline = ({
                 const startLeadingPx = Math.round(resizingScene.startLeadingGap * pixelsPerSecond);
                 const startScenePx = Math.round(resizingScene.startDuration * pixelsPerSecond);
                 const rightEdge = startLeadingPx + startScenePx;
-                const minScenePx = Math.round(0.3 * pixelsPerSecond);
+                const minScenePx = Math.round(0.1 * pixelsPerSecond);
 
                 let newSpacerPx = startLeadingPx + deltaX;
                 let newScenePx;
