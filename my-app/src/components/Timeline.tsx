@@ -271,10 +271,11 @@ export const Timeline = ({
         return false;
     }, [selectedSceneId, scenes, currentTime]);
 
-    const handleSplitScene = useCallback(() => {
-        if (!selectedSceneId || !canSplitSelectedScene) return;
+    const handleSplitScene = useCallback((sceneIdOverride?: string) => {
+        const targetId = sceneIdOverride ?? selectedSceneId;
+        if (!targetId) return;
         const currentScenes = useEditorStore.getState().scenes;
-        const sceneIndex = currentScenes.findIndex(s => s.id === selectedSceneId);
+        const sceneIndex = currentScenes.findIndex(s => s.id === targetId);
         if (sceneIndex === -1) return;
 
         let pastDuration = 0;
@@ -288,7 +289,7 @@ export const Timeline = ({
         const leftDuration = parseFloat((currentTime - sceneStart).toFixed(2));
         const rightDuration = parseFloat((originalScene.duration - leftDuration).toFixed(2));
         
-        if (leftDuration <= 0 || rightDuration <= 0) return;
+        if (leftDuration <= 0.1 || rightDuration <= 0.1) return;
         
         // Update first half
         updateScene(originalScene.id, { duration: leftDuration });
@@ -298,14 +299,14 @@ export const Timeline = ({
         const newId = Date.now().toString() + Math.random().toString(36).substring(2, 7);
         clonedScene.id = newId;
         clonedScene.duration = rightDuration;
-        clonedScene.leadingGap = 0; // The second part natively follows the first
+        clonedScene.leadingGap = 0;
         
         addScene(clonedScene, sceneIndex + 1);
         getHistoryControls().archive();
         window.dispatchEvent(new CustomEvent('history-updated'));
         
         setSelectedSceneId(newId);
-    }, [selectedSceneId, canSplitSelectedScene, currentTime, addScene, updateScene]);
+    }, [selectedSceneId, currentTime, addScene, updateScene]);
 
     const handleDuplicateScene = useCallback(() => {
         if (!selectedSceneId) return;
@@ -385,9 +386,24 @@ export const Timeline = ({
 
                 case 's':
                 case 'S':
-                    if (!e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey && selectedSceneId) {
-                        e.preventDefault();
-                        handleSplitScene();
+                    if (!e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey) {
+                        // Find the scene the scrubber is inside — works selected or unselected
+                        const currentScenes = useEditorStore.getState().scenes;
+                        let pastDur = 0;
+                        let targetId: string | undefined;
+                        for (const scene of currentScenes) {
+                            const start = pastDur + (scene.leadingGap || 0);
+                            const end = start + scene.duration;
+                            if (currentTime >= start + 0.1 && currentTime <= end - 0.1) {
+                                targetId = scene.id;
+                                break;
+                            }
+                            pastDur = end;
+                        }
+                        if (targetId) {
+                            e.preventDefault();
+                            handleSplitScene(targetId);
+                        }
                     }
                     break;
 
@@ -521,8 +537,12 @@ export const Timeline = ({
     };
 
     const handleTimelineMouseMove = (e: React.MouseEvent) => {
-        // Don't update hover state during an active resize drag
-        if (resizingScene !== null) return;
+        // Don't update hover state during an active resize drag or when scene dropdown is open
+        if (resizingScene !== null || showSceneDropdown) {
+            setHoverTime(null);
+            setHoverScrubberPos(null);
+            return;
+        }
 
         // Guard: hide ghost scrubber if hovering exactly over the 3-dot pill
         const target = e.target as HTMLElement;
