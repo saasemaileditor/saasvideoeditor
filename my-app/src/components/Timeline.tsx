@@ -1,6 +1,6 @@
 import React, { useRef, useEffect, useState, useMemo } from 'react';
 import ReactDOM from 'react-dom';
-import { Play, Pause, Plus, LayoutGrid, Music, Maximize, CloudUpload, RectangleHorizontal, StepForward } from 'lucide-react';
+import { Play, Pause, Plus, LayoutGrid, Music, Maximize, CloudUpload, RectangleHorizontal, StepForward, Scissors, Copy, Trash2 } from 'lucide-react';
 import { useFloating, shift, offset, autoUpdate } from '@floating-ui/react';
 import { useEditorStore, getHistoryControls } from '../store/useEditorStore';
 
@@ -103,6 +103,15 @@ export const Timeline = ({
     const [activeGapIndex, setActiveGapIndex] = useState<number | null>(null);
     const [selectedSceneId, setSelectedSceneId] = useState<string | null>(null);
 
+    const [showSceneDropdown, setShowSceneDropdown] = useState(false);
+    const { refs: sceneDropdownRefs, floatingStyles: sceneDropdownStyles } = useFloating({
+        open: showSceneDropdown,
+        placement: 'top',
+        strategy: 'fixed',
+        middleware: [offset(4), shift({ padding: 16 })],
+        whileElementsMounted: autoUpdate,
+    });
+
 
 
     const [resizingScene, setResizingScene] = useState<{
@@ -122,6 +131,7 @@ export const Timeline = ({
     const plusBtnRef = useRef<HTMLButtonElement>(null);
     const dropdownRef = useRef<HTMLDivElement>(null);
     const gapDropdownRef = useRef<HTMLDivElement>(null);
+    const sceneDropdownRef = useRef<HTMLDivElement>(null);
     // Refs for left-handle DOM-direct updates — no React re-renders during drag = zero shake
     const spacerRefs = useRef<Map<string, HTMLDivElement | null>>(new Map());
     const sceneRefs = useRef<Map<string, HTMLDivElement | null>>(new Map());
@@ -145,27 +155,44 @@ export const Timeline = ({
     useEffect(() => {
         if (!showGapDropdown) return;
         const handleClickOutside = (e: MouseEvent) => {
-            if (gapDropdownRef.current && !gapDropdownRef.current.contains(e.target as Node)) {
+            const target = e.target as HTMLElement;
+            if (target.closest('[data-dropdown-trigger="gap"]')) return;
+            if (gapDropdownRef.current && !gapDropdownRef.current.contains(target)) {
                 setShowGapDropdown(false);
             }
         };
-        document.addEventListener('mousedown', handleClickOutside);
-        return () => document.removeEventListener('mousedown', handleClickOutside);
+        document.addEventListener('mousedown', handleClickOutside, true);
+        return () => document.removeEventListener('mousedown', handleClickOutside, true);
     }, [showGapDropdown]);
+
+    // Close scene dropdown on click outside
+    useEffect(() => {
+        if (!showSceneDropdown) return;
+        const handleClickOutside = (e: MouseEvent) => {
+            const target = e.target as HTMLElement;
+            if (target.closest('[data-dropdown-trigger="scene"]')) return;
+            if (sceneDropdownRef.current && !sceneDropdownRef.current.contains(target)) {
+                setShowSceneDropdown(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside, true);
+        return () => document.removeEventListener('mousedown', handleClickOutside, true);
+    }, [showSceneDropdown]);
 
     // Close main dropdown on click outside
     useEffect(() => {
         if (!showPlusDropdown) return;
         const handleClickOutside = (e: MouseEvent) => {
+            const target = e.target as Node;
             if (
-                dropdownRef.current && !dropdownRef.current.contains(e.target as Node) &&
-                plusBtnRef.current && !plusBtnRef.current.contains(e.target as Node)
+                dropdownRef.current && !dropdownRef.current.contains(target) &&
+                plusBtnRef.current && !plusBtnRef.current.contains(target)
             ) {
                 setShowPlusDropdown(false);
             }
         };
-        document.addEventListener('mousedown', handleClickOutside);
-        return () => document.removeEventListener('mousedown', handleClickOutside);
+        document.addEventListener('mousedown', handleClickOutside, true);
+        return () => document.removeEventListener('mousedown', handleClickOutside, true);
     }, [showPlusDropdown]);
 
 
@@ -986,7 +1013,12 @@ export const Timeline = ({
                                                         {isSelected && (
                                                             <div className="absolute top-1.5 right-1.5 opacity-0 group-hover/scene:opacity-100 transition-opacity z-20">
                                                                 <div
-                                                                    onClick={(e) => e.stopPropagation()}
+                                                                    data-dropdown-trigger="scene"
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        sceneDropdownRefs.setReference(e.currentTarget as HTMLElement);
+                                                                        setShowSceneDropdown(prev => !prev);
+                                                                    }}
                                                                     className="bg-[#6b7280] hover:bg-[#7c3aed] rounded-full px-[6px] py-[4px] flex items-center gap-[2.5px] transition-colors cursor-pointer"
                                                                 >
                                                                     <span className="w-[1.5px] h-[1.5px] rounded-full bg-white block" />
@@ -1018,6 +1050,7 @@ export const Timeline = ({
                                                                 >
                                                                     <div className="relative group/plus">
                                                                         <div
+                                                                            data-dropdown-trigger="gap"
                                                                             className="w-[24px] h-[24px] rounded-full bg-white border border-gray-300 shadow-sm flex items-center justify-center cursor-pointer hover:bg-gray-100 hover:border-gray-400 transition-colors"
                                                                             onClick={(e) => {
                                                                                 e.stopPropagation();
@@ -1334,6 +1367,61 @@ export const Timeline = ({
                     document.body
                 );
             })()}
+
+            {/* Portal-based Scene Dropdown (3-dot menu) */}
+            {showSceneDropdown && ReactDOM.createPortal(
+                <div
+                    ref={(node) => {
+                        sceneDropdownRefs.setFloating(node);
+                        if (sceneDropdownRef) sceneDropdownRef.current = node;
+                    }}
+                    className={`fixed w-48 rounded-xl shadow-lg border py-1.5 z-[9999] ${isDark ? 'bg-[#1e1e2e] border-gray-700' : 'bg-white border-gray-200'}`}
+                    style={sceneDropdownStyles}
+                >
+                    <button
+                        onClick={() => {
+                            setShowSceneDropdown(false);
+                            // TODO: Implement split
+                        }}
+                        className={`w-full flex items-center gap-3 px-4 py-2.5 text-[13px] font-medium transition-colors ${isDark ? 'text-gray-300 hover:bg-gray-800' : 'text-gray-700 hover:bg-gray-100'}`}
+                    >
+                        <Scissors size={16} /> Split
+                    </button>
+                    <button
+                        onClick={() => {
+                            setShowSceneDropdown(false);
+                            // TODO: Implement add transition
+                        }}
+                        className={`w-full flex items-center gap-3 px-4 py-2.5 text-[13px] font-medium transition-colors ${isDark ? 'text-gray-300 hover:bg-gray-800' : 'text-gray-700 hover:bg-gray-100'}`}
+                    >
+                        <StepForward size={16} /> Add Transition
+                    </button>
+                    <button
+                        onClick={() => {
+                            setShowSceneDropdown(false);
+                            // TODO: Implement duplicate
+                        }}
+                        className={`w-full flex items-center gap-3 px-4 py-2.5 text-[13px] font-medium transition-colors ${isDark ? 'text-gray-300 hover:bg-gray-800' : 'text-gray-700 hover:bg-gray-100'}`}
+                    >
+                        <Copy size={16} /> Duplicate
+                    </button>
+                    <button
+                        onClick={() => {
+                            setShowSceneDropdown(false);
+                            if (selectedSceneId) {
+                                removeScene(selectedSceneId);
+                                getHistoryControls().archive();
+                                window.dispatchEvent(new CustomEvent('history-updated'));
+                                setSelectedSceneId(null);
+                            }
+                        }}
+                        className={`w-full flex items-center gap-3 px-4 py-2.5 text-[13px] font-medium transition-colors ${isDark ? 'text-gray-300 hover:bg-gray-800' : 'text-gray-700 hover:bg-gray-100'}`}
+                    >
+                        <Trash2 size={16} /> Delete
+                    </button>
+                </div>,
+                document.body
+            )}
         </>
     );
 };
