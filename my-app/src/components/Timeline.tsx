@@ -551,6 +551,11 @@ export const Timeline = ({
         // Guard 1: resize handle or 3-dot pill
         if (target.closest('[data-resize-handle]') || target.closest('[data-dropdown-trigger="scene"]')) return;
 
+        // Clicking empty timeline area deselects any selected scene
+        if (!target.closest('[data-scene-block]')) {
+            setSelectedSceneId(null);
+        }
+
         // Guard 2: native vertical scrollbar
         if (tracksScrollRef.current) {
             const el = tracksScrollRef.current;
@@ -1074,7 +1079,7 @@ export const Timeline = ({
                                                     />
                                                     <div
                                                         ref={(el) => { sceneRefs.current.set(scene.id, el); }}
-                                                        onClick={() => setSelectedSceneId(isSelected ? null : scene.id)}
+                                                        onClick={(e) => { e.stopPropagation(); setSelectedSceneId(scene.id); }}
                                                         onContextMenu={(e) => {
                                                             e.preventDefault();
                                                             e.stopPropagation();
@@ -1097,6 +1102,7 @@ export const Timeline = ({
                                                         }}
                                                         className={`relative h-full bg-white rounded-md overflow-hidden flex items-end p-2 flex-shrink-0 cursor-pointer border-[1.5px] group/scene ${isSelected ? 'border-[#7c3aed]' : 'border-[#d1d5db]'}`}
                                                         style={{ width: `${scenePx}px` }}
+                                                        data-scene-block="true"
                                                     >
                                                         {isSelected && resizingScene?.id !== scene.id && (
                                                             <span className={`text-[12.5px] font-bold text-[#1f2937] leading-none tracking-tight transition-opacity ${hoveredHandleSceneId === scene.id ? 'opacity-0' : 'opacity-100'}`}>
