@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useRef } from 'react';
 import Moveable from 'react-moveable';
 import type { OnDrag, OnResize, OnRotate } from 'react-moveable';
 import type { CanvasElement } from '../store/useEditorStore';
@@ -8,21 +8,19 @@ export interface CanvaBoundingBoxProps {
     el: CanvasElement;
     updateElement: (id: string, data: Partial<CanvasElement>) => void;
     containerRef: React.RefObject<HTMLElement | null>;
+    targetRef: React.RefObject<HTMLElement | null>;
 }
 
-export function CanvaBoundingBox({ el, updateElement, containerRef }: CanvaBoundingBoxProps) {
-    const targetSelector = `.canvas-element-${el.id}`;
-    const [target, setTarget] = useState<HTMLElement | null>(null);
+export function CanvaBoundingBox({ el, updateElement, containerRef, targetRef }: CanvaBoundingBoxProps) {
+    const target = targetRef?.current;
+    const moveableRef = useRef<any>(null);
 
-    // Initial mount to find target DOM node
+    // Initial mount: update rect directly since target is provided by React
     useEffect(() => {
-        // Use a short timeout to ensure the DOM element has rendered if it just mounted
-        const timer = setTimeout(() => {
-            const t = document.querySelector(targetSelector) as HTMLElement | null;
-            if (t) setTarget(t);
-        }, 10);
-        return () => clearTimeout(timer);
-    }, [targetSelector]);
+        if (moveableRef.current) {
+            moveableRef.current.updateRect();
+        }
+    }, [target]);
 
     // Keep track of state at the start of a drag/resize/rotate 
     // so we can compute absolute values linearly without React state lag
@@ -150,6 +148,7 @@ export function CanvaBoundingBox({ el, updateElement, containerRef }: CanvaBound
                 }
             `}</style>
             <Moveable
+                ref={moveableRef}
                 target={target}
                 container={containerRef.current}
 

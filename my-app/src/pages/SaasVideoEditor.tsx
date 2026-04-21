@@ -507,7 +507,9 @@ const CanvasDropZone = ({ canvasRef, isDark, setSelectedId, children }: {
 
 // Extracted element component — lazy-loads from the element registry
 const SceneElement = memo(({ el, isDark, isSelected, updateElement, setSelectedId, containerRef }: any) => {
-    const handleClick = useCallback((e: React.MouseEvent) => {
+    const sceneElementRef = useRef<HTMLDivElement>(null);
+
+    const handlePointerDown = useCallback((e: React.PointerEvent) => {
         e.stopPropagation();
         setSelectedId(el.id);
     }, [el.id, setSelectedId]);
@@ -523,8 +525,9 @@ const SceneElement = memo(({ el, isDark, isSelected, updateElement, setSelectedI
         <>
             {/* The actual element */}
             <div
+                ref={sceneElementRef}
                 className={`canvas-element-${el.id}`}
-                onClick={handleClick}
+                onPointerDown={handlePointerDown}
                 style={{
                     position: 'absolute',
                     left: el.position[0] - w / 2,
@@ -562,6 +565,7 @@ const SceneElement = memo(({ el, isDark, isSelected, updateElement, setSelectedI
                     el={el}
                     updateElement={updateElement}
                     containerRef={containerRef}
+                    targetRef={sceneElementRef}
                 />
             )}
         </>
