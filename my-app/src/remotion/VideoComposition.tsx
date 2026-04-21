@@ -13,11 +13,18 @@ export const VideoComposition = () => {
           key={el.id}
           style={{
             position: 'absolute',
-            left: el.position[0],
-            top: el.position[1],
-            transform: `scale(${el.scale[0]})`,
+            left: 0,
+            top: 0,
+            width: el.boundingSize?.[0] ?? 200,
+            height: el.boundingSize?.[1] ?? 60,
+            transform: el.transform,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
             color: '#fff',
             fontSize: 24,
+            zIndex: el.zIndex ?? 1,
+            overflow: 'visible',
           }}
         >
           {el.content}
