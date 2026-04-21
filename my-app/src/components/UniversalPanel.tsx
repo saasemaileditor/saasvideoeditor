@@ -2,24 +2,16 @@ import { useRef, useEffect, useState } from 'react';
 import { Search, X } from 'lucide-react';
 import { VirtualizedGrid } from './VirtualizedGrid';
 import { GlobalLoader } from './ui/global-loader';
-import { 
-  DndContext, 
-  closestCenter, 
-  KeyboardSensor, 
-  PointerSensor, 
-  useSensor, 
-  useSensors,
-} from '@dnd-kit/core';
-import type { DragEndEvent, DragStartEvent } from '@dnd-kit/core';
-import { DragOverlay, defaultDropAnimationSideEffects } from '@dnd-kit/core';
 import {
-  SortableContext,
-  sortableKeyboardCoordinates,
-  verticalListSortingStrategy,
-  useSortable
-} from '@dnd-kit/sortable';
-import { CSS } from '@dnd-kit/utilities';
-import { snapCenterToCursor } from '@dnd-kit/modifiers';
+    draggable,
+    dropTargetForElements,
+    monitorForElements,
+} from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
+import {
+    attachClosestEdge,
+    extractClosestEdge,
+} from '@atlaskit/pragmatic-drag-and-drop-hitbox/closest-edge';
+import type { Edge } from '@atlaskit/pragmatic-drag-and-drop-hitbox/types';
 
 // ── Smart search helper ──────────────────────────────────────────────────────
 function filterAndSortItems<T>(
@@ -105,33 +97,48 @@ function SortableItem<T>({
   isDark: boolean;
   renderItem: (item: T, index: number, listeners?: any, attributes?: any) => React.ReactNode 
 }) {
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging
-  } = useSortable({ id });
-
-  const style = {
-    transform: CSS.Translate.toString(transform),
-    transition,
-    zIndex: isDragging ? 10 : undefined,
-  };
+  const ref = useRef<HTMLDivElement>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const [closestEdge, setClosestEdge] = useState<Edge | null>(null);
 
   const isSortable = id !== 'canvas-background';
 
+  useEffect(() => {
+    if (!isSortable || !ref.current) return;
+    const el = ref.current;
+
+    const dragCleanup = draggable({
+      element: el,
+      getInitialData: () => ({ id, index }),
+      onDragStart: () => setIsDragging(true),
+      onDrop: () => setIsDragging(false),
+    });
+
+    const dropCleanup = dropTargetForElements({
+      element: el,
+      getData: ({ input }) => {
+        return attachClosestEdge(
+          { id, index },
+          { element: el, input, allowedEdges: ['top', 'bottom'] }
+        );
+      },
+      onDragEnter: (args) => setClosestEdge(extractClosestEdge(args.self.data)),
+      onDrag: (args) => setClosestEdge(extractClosestEdge(args.self.data)),
+      onDragLeave: () => setClosestEdge(null),
+      onDrop: () => setClosestEdge(null),
+    });
+
+    return () => {
+      dragCleanup();
+      dropCleanup();
+    };
+  }, [id, index, isSortable]);
+
   return (
-    <div ref={setNodeRef} style={style}>
-      {isDragging ? (
-        <div 
-          className={`mx-2 mb-1.5 rounded-xl border-2 border-dashed ${isDark ? 'bg-gray-800/30 border-gray-700/50' : 'bg-gray-100 border-gray-200'}`}
-          style={{ height: '64px' }} 
-        />
-      ) : (
-        renderItem(item, index, isSortable ? listeners : undefined, isSortable ? attributes : undefined)
-      )}
+    <div ref={ref} className="relative z-[1]" style={{ opacity: isDragging ? 0.3 : 1 }}>
+      {renderItem(item, index)}
+      {closestEdge === 'top' && <div className="absolute top-0 left-0 right-0 h-0.5 bg-[#7c3aed] z-10" />}
+      {closestEdge === 'bottom' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#7c3aed] z-10" />}
     </div>
   );
 }
@@ -172,31 +179,36 @@ export function UniversalPanel<T>({
   columnCount = 3,
   onReorder,
 }: UniversalPanelProps<T>) {
-  // ── DND Sensors ──────────────────────────────────────────────────────────
-  const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
-    useSensor(KeyboardSensor, {
-      coordinateGetter: sortableKeyboardCoordinates,
-    })
-  );
+  // ── Pragmatic Drag and Drop Monitor ─────────────────────────────────────────
+  useEffect(() => {
+    if (!onReorder) return;
+    return monitorForElements({
+      onDrop({ source, location }) {
+        const target = location.current.dropTargets[0];
+        if (!target) return;
 
-  const [activeId, setActiveId] = useState<string | null>(null);
+        const sourceData = source.data;
+        const targetData = target.data;
 
-  const handleDragStart = (event: DragStartEvent) => {
-    setActiveId(event.active.id as string);
-  };
+        if (sourceData.id === targetData.id) return;
+        if (typeof sourceData.index !== 'number' || typeof targetData.index !== 'number') return;
 
-  const handleDragEnd = (event: DragEndEvent) => {
-    const { active, over } = event;
-    setActiveId(null);
-    if (onReorder && over && active.id !== over.id) {
-        const oldIndex = filteredItems.findIndex(i => getItemId(i) === active.id);
-        const newIndex = filteredItems.findIndex(i => getItemId(i) === over.id);
-        if (oldIndex !== -1 && newIndex !== -1) {
-            onReorder(oldIndex, newIndex);
+        const closestEdgeOfTarget = extractClosestEdge(targetData);
+        if (!closestEdgeOfTarget) return;
+
+        let startIndex = sourceData.index as number;
+        let finishIndex = targetData.index as number;
+        
+        if (startIndex < finishIndex && closestEdgeOfTarget === 'top') {
+          finishIndex -= 1;
+        } else if (startIndex > finishIndex && closestEdgeOfTarget === 'bottom') {
+          finishIndex += 1;
         }
-    }
-  };
+
+        onReorder(startIndex, finishIndex);
+      }
+    });
+  }, [onReorder]);
 
   // ── Scroll reset ───────────────────────────────────────────────────────────
   const resetScrollRef = useRef<(() => void) | undefined>(undefined);
@@ -330,65 +342,7 @@ export function UniversalPanel<T>({
       ) : (
         /* ── Grid ──────────────────────────────────────────────────────────── */
         <div className="flex-1 min-h-0">
-          {onReorder ? (
-            <DndContext 
-              sensors={sensors}
-              modifiers={[snapCenterToCursor]}
-              collisionDetection={closestCenter}
-              onDragStart={handleDragStart}
-              onDragEnd={handleDragEnd}
-            >
-              <SortableContext 
-                items={filteredItems.filter(i => getItemId(i) !== 'canvas-background').map(getItemId)} 
-                strategy={verticalListSortingStrategy}
-              >
-                <VirtualizedGrid
-                  items={filteredItems}
-                  columnCount={columnCount}
-                  width={width}
-                  height={height}
-                  itemHeight={itemHeight}
-                  itemWidth={itemWidth}
-                  getItemId={getItemId}
-                  renderItem={(item, index) => (
-                    <SortableItem 
-                      id={getItemId(item)}
-                      item={item}
-                      index={index}
-                      isDark={isDark}
-                      renderItem={renderItem}
-                    />
-                  )}
-                  isFetchingNextPage={isFetchingNextPage}
-                  isFetchingPreviousPage={isFetchingPreviousPage}
-                  loadOnce={loadOnce}
-                  totalCount={totalCount}
-                  pageSize={pageSize}
-                  firstPageParam={firstPageParam}
-                  onScrollEnd={() => {
-                    if (hasNextPage && !isFetchingNextPage && fetchNextPage) {
-                      fetchNextPage();
-                    }
-                  }}
-                  onScrollStart={() => {
-                    if (hasPreviousPage && !isFetchingPreviousPage && fetchPreviousPage) {
-                      fetchPreviousPage();
-                    }
-                  }}
-                  onResetScroll={(fn) => { resetScrollRef.current = fn; }}
-                />
-              </SortableContext>
-
-              <DragOverlay dropAnimation={{ sideEffects: defaultDropAnimationSideEffects({ styles: { active: { opacity: '0.5' } } }), duration: 200 }}>
-                {activeId ? (
-                    <div style={{ width: itemWidth || width }}>
-                        {renderItem(filteredItems.find(i => getItemId(i) === activeId)!, -1)}
-                    </div>
-                ) : null}
-              </DragOverlay>
-            </DndContext>
-          ) : (
-            <VirtualizedGrid
+          <VirtualizedGrid
               items={filteredItems}
               columnCount={columnCount}
               width={width}
@@ -396,7 +350,18 @@ export function UniversalPanel<T>({
               itemHeight={itemHeight}
               itemWidth={itemWidth}
               getItemId={getItemId}
-              renderItem={renderItem}
+              renderItem={onReorder 
+                ? (item, index) => (
+                    <SortableItem 
+                      id={getItemId(item)}
+                      item={item}
+                      index={index}
+                      isDark={isDark}
+                      renderItem={renderItem}
+                    />
+                  )
+                : renderItem
+              }
               isFetchingNextPage={isFetchingNextPage}
               isFetchingPreviousPage={isFetchingPreviousPage}
               loadOnce={loadOnce}
@@ -415,7 +380,6 @@ export function UniversalPanel<T>({
               }}
               onResetScroll={(fn) => { resetScrollRef.current = fn; }}
             />
-          )}
         </div>
       )}
     </div>

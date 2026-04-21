@@ -9,25 +9,19 @@ import { PANEL_ELEMENTS, getElementComponent, ELEMENT_CATEGORIES } from '../comp
 import type { PanelElementDef } from '../components/elements';
 
 import {
-    DndContext,
-    DragOverlay,
-    useDroppable,
-    useDraggable,
-    useSensor,
-    useSensors,
-    PointerSensor,
-    type DragStartEvent,
-    type DragEndEvent,
-} from '@dnd-kit/core';
+    draggable,
+    dropTargetForElements,
+    monitorForElements,
+} from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
 import {
     Undo2, Redo2, Play, Download,
     Layers, Video, Sparkles, LayoutTemplate,
-    X, Settings as SettingsIcon, Sun, Moon, Monitor, Type, Square,
+    X, Settings as SettingsIcon, Sun, Moon, Monitor, Type,
     Move, Smartphone, ChevronDown, ArrowLeft, GripVertical, MoreVertical,
     Box, PieChart, AppWindow, Smile, Triangle
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
-import { snapCenterToCursor } from '@dnd-kit/modifiers';
+
 
 const TABS = [
     { id: 'Elements', icon: Layers, label: 'Elements' },
@@ -357,18 +351,26 @@ export const useAnimations = (searchQuery: string) => {
 
 /* ─── Draggable element sidebar card ─── */
 const DraggableElementCard = ({ element, isDark }: { element: PanelElementDef, isDark: boolean }) => {
-    const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
-        id: `sidebar-${element.type}`,
-        data: { type: element.type, label: element.label, boundingSize: element.boundingSize },
-    });
+    const ref = useRef<HTMLDivElement>(null);
+    const [isDragging, setIsDragging] = useState(false);
+
+    useEffect(() => {
+        const el = ref.current;
+        if (!el) return;
+        
+        return draggable({
+            element: el,
+            getInitialData: () => ({ type: element.type, label: element.label, boundingSize: element.boundingSize }),
+            onDragStart: () => setIsDragging(true),
+            onDrop: () => setIsDragging(false),
+        });
+    }, [element]);
 
     const PreviewComponent = getElementComponent(element.type) as React.ElementType<any>;
 
     return (
         <div
-            ref={setNodeRef}
-            {...listeners}
-            {...attributes}
+            ref={ref}
             className={`relative w-full h-[120px] hover:cursor-grab group touch-none ${isDragging ? 'opacity-40' : ''}`}
         >
             <div className={`relative w-full h-full flex flex-col items-center justify-between p-3 border rounded-xl z-10 transition-all duration-300 overflow-hidden ${isDark 
@@ -396,23 +398,31 @@ const DraggableElementCard = ({ element, isDark }: { element: PanelElementDef, i
     );
 };
 
-/* ─── Draggable sidebar card (uses @dnd-kit useDraggable) ─── */
+/* ─── Draggable sidebar card (uses Pragmatic Drag and Drop) ─── */
 const DraggableCard = ({ elementId, icon: Icon, label, isDark }: {
     elementId: string;
     icon: LucideIcon;
     label: string;
     isDark: boolean;
 }) => {
-    const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
-        id: `sidebar-${elementId}`,
-        data: { type: elementId },
-    });
+    const ref = useRef<HTMLDivElement>(null);
+    const [isDragging, setIsDragging] = useState(false);
+
+    useEffect(() => {
+        const el = ref.current;
+        if (!el) return;
+        
+        return draggable({
+            element: el,
+            getInitialData: () => ({ type: elementId }), // ID is used as type in the original code
+            onDragStart: () => setIsDragging(true),
+            onDrop: () => setIsDragging(false),
+        });
+    }, [elementId]);
 
     return (
         <div
-            ref={setNodeRef}
-            {...listeners}
-            {...attributes}
+            ref={ref}
             className={`relative w-full h-full max-h-[140px] hover:cursor-grab group touch-none ${isDragging ? 'opacity-40' : ''
                 }`}
         >
@@ -430,31 +440,40 @@ const DraggableCard = ({ elementId, icon: Icon, label, isDark }: {
     );
 };
 
-/* ─── Drag overlay preview card ─── */
-const DragOverlayCard = ({ icon: Icon, label }: { icon: LucideIcon; label: string }) => (
-    <div className="w-[80px] h-[80px] rounded-xl bg-[#7c3aed] flex flex-col items-center justify-center gap-1 shadow-2xl opacity-90 pointer-events-none">
-        <Icon size={24} className="text-white" />
-        <span className="text-[11px] font-semibold text-white">{label}</span>
-    </div>
-);
 
-/* ─── Canvas drop zone (uses @dnd-kit useDroppable) ─── */
+/* ─── Canvas drop zone (uses Pragmatic Drag and Drop) ─── */
 const CanvasDropZone = ({ canvasRef, isDark, setSelectedId, children }: {
     canvasRef: React.RefObject<HTMLDivElement | null>;
     isDark: boolean;
     setSelectedId: (id: string | null) => void;
     children: React.ReactNode;
 }) => {
-    const { setNodeRef, isOver } = useDroppable({ id: 'canvas-dropzone' });
+    const localRef = useRef<HTMLDivElement>(null);
+    const [isOver, setIsOver] = useState(false);
 
-    // Merge the dnd-kit ref with the existing canvasRef so both systems track the same div
+    useEffect(() => {
+        const el = localRef.current;
+        if (!el) return;
+        
+        return dropTargetForElements({
+            element: el,
+            getData: () => ({ id: 'canvas-dropzone' }),
+            onDragEnter: () => setIsOver(true),
+            onDragLeave: () => setIsOver(false),
+            onDrop: () => setIsOver(false),
+        });
+    }, []);
+
+    // Merge the pdnd localRef with the existing canvasRef so both systems track the same div
     const mergedRef = useCallback(
         (node: HTMLDivElement | null) => {
-            setNodeRef(node);
+            localRef.current = node;
             // canvasRef is a RefObject — assign .current directly
-            (canvasRef as React.MutableRefObject<HTMLDivElement | null>).current = node;
+            if (canvasRef) {
+                (canvasRef as React.MutableRefObject<HTMLDivElement | null>).current = node;
+            }
         },
-        [setNodeRef, canvasRef],
+        [canvasRef],
     );
 
     return (
@@ -613,11 +632,7 @@ const SaasVideoEditor = () => {
         }
     }, [selectedId, setSelectedId]);
  
-     const sensors = useSensors(
-         useSensor(PointerSensor, {
-             activationConstraint: { distance: 5 },
-         })
-     );
+
 
 
     // Undo/redo state — subscribe to store so buttons re-render on history change
@@ -641,11 +656,7 @@ const SaasVideoEditor = () => {
     const [activeDragItem, setActiveDragItem] = useState<string | null>(null);
     const [savedActiveTab, setSavedActiveTab] = useState<string | null>(null);
     const canvasRef = useRef<HTMLDivElement>(null);
-    // Tracks the live pointer position during a dnd-kit drag so handleDragEnd
-    // can use the actual cursor location instead of the (wrong) sidebar-card rect.
-    const pointerRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
-
-    // Derived dnd-kit state (replaces isDragOver / isDraggingElement)
+    // Derived drag state
     const isDraggingElement = activeDragItem !== null;
 
     // Keyboard shortcuts (undo, redo, delete, escape)
@@ -726,88 +737,66 @@ const SaasVideoEditor = () => {
         }
     }, [theme]);
 
-    /* ─── @dnd-kit handlers ─── */
-    const handleDragStart = useCallback((event: DragStartEvent) => {
-        const id = event.active.id as string;
-        
-        // ONLY handle drags that are FROM the sidebar elements
-        if (!id.startsWith('sidebar-')) return;
-        
-        setActiveDragItem(id);
-        setSavedActiveTab(activeTab);
-        setActiveTab(null);
-    }, [activeTab]);
-
-    // Update the ref via a native pointermove listener — runs outside React's event system
-    // so it captures every pixel of movement even when dnd-kit batches its synthetic events.
+    const stateRef = useRef({ activeTab, savedActiveTab });
     useEffect(() => {
-        const onPointerMove = (e: PointerEvent) => {
-            pointerRef.current = { x: e.clientX, y: e.clientY };
-        };
-        window.addEventListener('pointermove', onPointerMove);
-        return () => window.removeEventListener('pointermove', onPointerMove);
-    }, []);
+        stateRef.current = { activeTab, savedActiveTab };
+    }, [activeTab, savedActiveTab]);
 
-    const handleDragEnd = useCallback((event: DragEndEvent) => {
-        const { active, over } = event;
-        
-        setActiveDragItem(null);
+    /* ─── Pragmatic Drag and Drop Monitor ─── */
+    useEffect(() => {
+        return monitorForElements({
+            onDragStart({ source }) {
+                const type = source.data.type as string;
+                if (!type) return;
 
-        if (over?.id !== 'canvas-dropzone') {
-            setActiveTab(savedActiveTab);
-            return;
-        }
+                setActiveDragItem(`sidebar-${type}`);
+                setSavedActiveTab(stateRef.current.activeTab);
+                setActiveTab(null);
+            },
+            onDrop({ source, location }) {
+                setActiveDragItem(null);
 
-        // Extract type from ID (reliable method)
-        const activeId = active.id?.toString() || '';
-        const type = activeId.startsWith('sidebar-') 
-            ? activeId.replace('sidebar-', '') 
-            : active.data?.current?.type;
-        
-        if (!type || !canvasRef.current) return;
+                const dropTargets = location.current.dropTargets;
+                const hitCanvas = dropTargets.some((target: any) => target.data.id === 'canvas-dropzone');
 
-        const canvasRect = canvasRef.current.getBoundingClientRect();
+                if (!hitCanvas || !canvasRef.current) {
+                    setActiveTab(stateRef.current.savedActiveTab);
+                    return;
+                }
 
-        // Use the drag overlay's final position
-        const overlayRect = active.rect.current.translated;
-        
-        if (!overlayRect) return;
+                const type = source.data.type as string;
+                if (!type) return;
 
-        // Calculate drop position as center of the drag overlay, in pixel coords
-        const clientX = overlayRect.left + overlayRect.width / 2;
-        const clientY = overlayRect.top + overlayRect.height / 2;
+                const canvasRect = canvasRef.current.getBoundingClientRect();
+                const clientX = location.current.input.clientX;
+                const clientY = location.current.input.clientY;
 
-        const dropX = clientX - canvasRect.left;
-        const dropY = clientY - canvasRect.top;
+                const dropX = clientX - canvasRect.left;
+                const dropY = clientY - canvasRect.top;
 
-        // Resolve bounding size from PANEL_ELEMENTS registry, or fallback
-        const panelDef = PANEL_ELEMENTS.find(el => el.type === type);
-        const resolvedBoundingSize: [number, number] = 
-            active.data.current?.boundingSize ?? 
-            panelDef?.boundingSize ?? 
-            [200, 80];
+                const panelDef = PANEL_ELEMENTS.find((el: any) => el.type === type);
+                const resolvedBoundingSize: [number, number] = 
+                    (source.data.boundingSize as [number, number]) ?? 
+                    panelDef?.boundingSize ?? 
+                    [200, 80];
 
-        addElement({
-            id: Date.now().toString(),
-            type: type as any,
-            position: [dropX, dropY, 0],
-            rotation: [0, 0, 0],
-            scale: [1, 1, 1],
-            boundingSize: resolvedBoundingSize,
-            props: panelDef?.defaultProps ?? {},
+                addElement({
+                    id: Date.now().toString(),
+                    type: type as any,
+                    position: [dropX, dropY, 0],
+                    rotation: [0, 0, 0],
+                    scale: [1, 1, 1],
+                    boundingSize: resolvedBoundingSize,
+                    props: panelDef?.defaultProps ?? {},
+                });
+
+                getHistoryControls().archive();
+            }
         });
-
-        getHistoryControls().archive();
-    }, [addElement, savedActiveTab]);
+    }, [addElement]);
 
     return (
-        <DndContext 
-            sensors={sensors} 
-            modifiers={[snapCenterToCursor]}
-            onDragStart={handleDragStart} 
-            onDragEnd={handleDragEnd}
-        >
-            <div className={`fixed inset-0 flex flex-col p-[10px] gap-[10px] overflow-hidden transition-colors duration-200 ${isDark ? 'dark bg-[#080810] text-white' : 'bg-[#f3f4f6] text-gray-900'}`}>
+        <div className={`fixed inset-0 flex flex-col p-[10px] gap-[10px] overflow-hidden transition-colors duration-200 ${isDark ? 'dark bg-[#080810] text-white' : 'bg-[#f3f4f6] text-gray-900'}`}>
 
                 {/* 2. Top navigation bar */}
                 <div className={`h-[56px] rounded-b-xl shadow-sm flex-shrink-0 flex items-center justify-between px-4 z-[60] transition-colors duration-200 overflow-hidden -mx-[10px] -mt-[10px] ${isDark ? 'bg-[#1e2235] border-b border-[#2a2d45]' : 'bg-white border-b border-gray-200'}`}>
@@ -1186,7 +1175,7 @@ const SaasVideoEditor = () => {
                                                         })}
                                                     </div>
                                                 }
-                                                renderItem={(el: any, _index: number, listeners?: any, attributes?: any) => positionSubTab === 'Arrange' ? (
+                                                renderItem={(el: any, _index: number) => positionSubTab === 'Arrange' ? (
                                                     <div 
                                                         onClick={() => {
                                                             if (selectedId && canvasRef.current) {
@@ -1238,8 +1227,6 @@ const SaasVideoEditor = () => {
                                                 ) : (
                                                     <div 
                                                         onClick={() => setSelectedId(el.id)}
-                                                        {...attributes} 
-                                                        {...listeners}
                                                         className={`mx-2 mb-1.5 h-[64px] flex items-center cursor-grab active:cursor-grabbing group select-none border rounded-xl overflow-hidden touch-none ${selectedId === el.id 
                                                             ? isDark ? 'bg-[#2d1f5e] border-[#7c3aed] shadow-[0_0_15px_rgba(124,58,237,0.15)]' : 'bg-[#ede9fe] border-[#7c3aed] shadow-[0_0_15px_rgba(124,58,237,0.1)]'
                                                             : isDark ? 'bg-[#2a2a35] border-[#3a3a45] hover:border-[#7c3aed]/50' : 'bg-gray-100/80 border-gray-200 hover:border-[#7c3aed]/30 hover:shadow-sm'}`}
@@ -1441,34 +1428,6 @@ const SaasVideoEditor = () => {
 
                 </div>
             </div>
-
-            {/* Drag overlay — renders the floating card while dragging */}
-            <DragOverlay dropAnimation={null}>
-                {activeDragItem != null && (() => {
-                    // Check UI_ELEMENTS first
-                    const elementEntry = UI_ELEMENTS.find(
-                        (el) => `sidebar-${el.type}` === activeDragItem
-                    );
-                    if (elementEntry) {
-                        const getIcon = (type: string) => {
-                            if (type === 'button') return Square;
-                            if (type === 'card') return AppWindow;
-                            if (type === 'list') return Move;
-                            return Box;
-                        };
-                        return <DragOverlayCard icon={getIcon(elementEntry.type)} label={elementEntry.label} />;
-                    }
-                    
-                    // Check TEMPLATES
-                    const templateEntry = TEMPLATES.find(
-                        (t) => `sidebar-${t.id}` === activeDragItem
-                    );
-                    if (templateEntry) return <DragOverlayCard icon={templateEntry.icon} label={templateEntry.label} />;
-                    
-                    return null;
-                })()}
-            </DragOverlay>
-        </DndContext>
     );
 };
 
