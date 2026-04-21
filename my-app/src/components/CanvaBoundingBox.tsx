@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import Moveable from 'react-moveable';
-import type { OnDrag, OnResize, OnRotate } from 'react-moveable';
+import type { OnDrag, OnScale, OnRotate } from 'react-moveable';
 import type { CanvasElement } from '../store/useEditorStore';
 import { getHistoryControls } from '../store/useEditorStore';
 
@@ -22,78 +22,39 @@ export function CanvaBoundingBox({ el, updateElement, containerRef, targetRef }:
         }
     }, [target]);
 
-    // Keep track of state at the start of a drag/resize/rotate 
-    // so we can compute absolute values linearly without React state lag
-    const dragStartRef = useRef<{ pos: [number, number]; scale: [number, number]; rot: number } | null>(null);
     const pendingUpdatesRef = useRef<Partial<CanvasElement> | null>(null);
 
     const handleStart = () => {
-        dragStartRef.current = {
-            pos: [el.position[0], el.position[1]],
-            scale: [el.scale[0], el.scale[1]],
-            rot: el.rotation?.[2] ?? 0
-        };
         pendingUpdatesRef.current = null;
     };
 
     const handleDrag = (e: OnDrag) => {
-        if (!dragStartRef.current) return;
-        const [startX, startY] = dragStartRef.current.pos;
-
-        // Direct DOM update to bypass React state cycle (fixes trailing box lag)
+        // Direct DOM update to bypass React state cycle
         e.target.style.transform = e.transform;
 
         pendingUpdatesRef.current = {
             ...pendingUpdatesRef.current,
-            position: [startX + e.beforeTranslate[0], startY + e.beforeTranslate[1], 0]
+            transform: e.transform
         };
     };
 
-    const handleResize = (e: OnResize) => {
-        if (!dragStartRef.current) return;
-
-        // Direct DOM Update for jitter-free 60FPS resize
-        e.target.style.width = `${e.width}px`;
-        e.target.style.height = `${e.height}px`;
+    const handleScale = (e: OnScale) => {
+        // Direct DOM Update for jitter-free 60FPS scale
         e.target.style.transform = e.drag.transform;
-
-        // Compute absolute new center for Zustand using top-left expansion math
-        const [BASE_W, BASE_H] = el.boundingSize ?? [200, 60];
-        const [startSx, startSy] = dragStartRef.current.scale;
-
-        const oldW = BASE_W * startSx;
-        const oldH = BASE_H * startSy;
-        const newW = e.width;
-        const newH = e.height;
-
-        const [startX, startY] = dragStartRef.current.pos;
-
-        // Moveable shifts the top-left corner by e.drag.beforeTranslate.
-        // And the element expands by (newW - oldW). This shifts the center rightwards.
-        const newCenterX = startX + e.drag.beforeTranslate[0] + (newW - oldW) / 2;
-        const newCenterY = startY + e.drag.beforeTranslate[1] + (newH - oldH) / 2;
-
-        const newSx = newW / BASE_W;
-        const newSy = newH / BASE_H;
 
         pendingUpdatesRef.current = {
             ...pendingUpdatesRef.current,
-            scale: [newSx, newSy, 1],
-            position: [newCenterX, newCenterY, 0]
+            transform: e.drag.transform
         };
     };
 
     const handleRotate = (e: OnRotate) => {
-        if (!dragStartRef.current) return;
-
         // Direct DOM Update
         e.target.style.transform = e.drag.transform;
 
-        const startRot = dragStartRef.current.rot;
-
         pendingUpdatesRef.current = {
             ...pendingUpdatesRef.current,
-            rotation: [0, 0, startRot + e.beforeRotate]
+            transform: e.drag.transform
         };
     };
 
@@ -164,14 +125,14 @@ export function CanvaBoundingBox({ el, updateElement, containerRef, targetRef }:
                 onDrag={handleDrag}
                 onDragEnd={handleEnd}
 
-                // Resizing
-                resizable={true}
-                throttleResize={0}
+                // Scaling instead of Resizing to use CSS transform strings
+                scalable={true}
+                throttleScale={0}
                 // All 8 directions based on Canva request
                 renderDirections={["nw", "ne", "sw", "se", "w", "e", "n", "s"]}
-                onResizeStart={handleStart}
-                onResize={handleResize}
-                onResizeEnd={handleEnd}
+                onScaleStart={handleStart}
+                onScale={handleScale}
+                onScaleEnd={handleEnd}
 
                 // Rotating
                 rotatable={true}

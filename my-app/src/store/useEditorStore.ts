@@ -15,9 +15,8 @@ export type TimelineScene = {
 export type CanvasElement = {
     id: string;
     type: 'text' | 'device' | 'card' | '3d' | 'chart' | 'counter' | 'button' | 'icon' | 'shape' | 'list' | 'searchBar' | 'notification';
-    position: [number, number, number];
-    rotation: [number, number, number];
-    scale: [number, number, number];
+    transform: string;
+    zIndex?: number;
     content?: string; // Holds the text string, or a URL for an image/video
     /**
      * Base bounding size in world units *before* scale is applied — [width, height].

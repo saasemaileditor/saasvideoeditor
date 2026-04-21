@@ -514,10 +514,7 @@ const SceneElement = memo(({ el, isDark, isSelected, updateElement, setSelectedI
         setSelectedId(el.id);
     }, [el.id, setSelectedId]);
 
-    const [sx, sy] = el.scale;
     const [BASE_W, BASE_H] = el.boundingSize ?? [200, 60];
-    const w = BASE_W * sx;
-    const h = BASE_H * sy;
 
     const ElementComponent = getElementComponent(el.type);
 
@@ -530,10 +527,10 @@ const SceneElement = memo(({ el, isDark, isSelected, updateElement, setSelectedI
                 onPointerDown={handlePointerDown}
                 style={{
                     position: 'absolute',
-                    left: el.position[0] - w / 2,
-                    top: el.position[1] - h / 2,
-                    width: w,
-                    height: h,
+                    left: 0,
+                    top: 0,
+                    width: BASE_W,
+                    height: BASE_H,
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
@@ -542,7 +539,7 @@ const SceneElement = memo(({ el, isDark, isSelected, updateElement, setSelectedI
                     zIndex: isSelected ? 1000 : (el.zIndex ?? 1),
                     pointerEvents: 'auto',
                     overflow: 'visible',
-                    transform: `rotate(${el.rotation?.[2] ?? 0}deg)`,
+                    transform: el.transform,
                 }}
             >
                 {ElementComponent ? (
@@ -787,9 +784,7 @@ const SaasVideoEditor = () => {
                 addElement({
                     id: Date.now().toString(),
                     type: type as any,
-                    position: [dropX, dropY, 0],
-                    rotation: [0, 0, 0],
-                    scale: [1, 1, 1],
+                    transform: `translate(${dropX - resolvedBoundingSize[0] / 2}px, ${dropY - resolvedBoundingSize[1] / 2}px) rotate(0deg) scale(1, 1)`,
                     boundingSize: resolvedBoundingSize,
                     props: panelDef?.defaultProps ?? {},
                 });
@@ -1106,9 +1101,7 @@ const SaasVideoEditor = () => {
                                                             addElement({
                                                                 id: Date.now().toString(),
                                                                 type: 'videoPlaceholder' as any,
-                                                                position: [400, 225, 0],
-                                                                rotation: [0, 0, 0],
-                                                                scale: [1, 1, 1],
+                                                                transform: `translate(${400 - 280 / 2}px, ${225 - 180 / 2}px) rotate(0deg) scale(1, 1)`,
                                                                 boundingSize: [280, 180],
                                                                 props: { url: el.url, thumbnail: el.thumbnail, label: el.label }
                                                             });
@@ -1184,8 +1177,10 @@ const SaasVideoEditor = () => {
                                                         onClick={() => {
                                                             if (selectedId && canvasRef.current) {
                                                                 const rect = canvasRef.current.getBoundingClientRect();
+                                                                const targetEl = elements.get(selectedId);
+                                                                const [baseW, baseH] = targetEl?.boundingSize ?? [200, 60];
                                                                 updateElement(selectedId, {
-                                                                    position: [(el.x / 100) * rect.width, (el.y / 100) * rect.height, 0]
+                                                                    transform: `translate(${(el.x / 100) * rect.width - baseW / 2}px, ${(el.y / 100) * rect.height - baseH / 2}px) rotate(0deg) scale(1, 1)`
                                                                 });
                                                                 getHistoryControls().archive();
                                                                 window.dispatchEvent(new CustomEvent('history-updated'));
