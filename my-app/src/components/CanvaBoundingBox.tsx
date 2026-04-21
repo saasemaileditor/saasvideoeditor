@@ -41,7 +41,7 @@ export function CanvaBoundingBox({ el, updateElement, containerRef }: CanvaBound
     const handleDrag = (e: OnDrag) => {
         if (!dragStartRef.current) return;
         const [startX, startY] = dragStartRef.current.pos;
-        
+
         // Direct DOM update to bypass React state cycle (fixes trailing box lag)
         e.target.style.transform = e.transform;
 
@@ -53,7 +53,7 @@ export function CanvaBoundingBox({ el, updateElement, containerRef }: CanvaBound
 
     const handleResize = (e: OnResize) => {
         if (!dragStartRef.current) return;
-        
+
         // Direct DOM Update for jitter-free 60FPS resize
         e.target.style.width = `${e.width}px`;
         e.target.style.height = `${e.height}px`;
@@ -62,7 +62,7 @@ export function CanvaBoundingBox({ el, updateElement, containerRef }: CanvaBound
         // Compute absolute new center for Zustand using top-left expansion math
         const [BASE_W, BASE_H] = el.boundingSize ?? [200, 60];
         const [startSx, startSy] = dragStartRef.current.scale;
-        
+
         const oldW = BASE_W * startSx;
         const oldH = BASE_H * startSy;
         const newW = e.width;
@@ -87,12 +87,12 @@ export function CanvaBoundingBox({ el, updateElement, containerRef }: CanvaBound
 
     const handleRotate = (e: OnRotate) => {
         if (!dragStartRef.current) return;
-        
+
         // Direct DOM Update
         e.target.style.transform = e.drag.transform;
 
         const startRot = dragStartRef.current.rot;
-        
+
         pendingUpdatesRef.current = {
             ...pendingUpdatesRef.current,
             rotation: [0, 0, startRot + e.beforeRotate]
@@ -119,23 +119,28 @@ export function CanvaBoundingBox({ el, updateElement, containerRef }: CanvaBound
                 }
                 .canva-moveable-style .moveable-control {
                     background: #fff !important;
-                    border: 2px solid #7c3aed !important;
-                    width: 14px !important;
-                    height: 14px !important;
-                    margin-top: -7px !important;
-                    margin-left: -7px !important;
+                    border: 1px solid #6b7280 !important;
+                    width: 10px !important;
+                    height: 10px !important;
+                    margin-top: -5px !important;
+                    margin-left: -5px !important;
+                    border-radius: 50% !important;
                 }
                 .canva-moveable-style .moveable-control.moveable-w,
                 .canva-moveable-style .moveable-control.moveable-e {
-                    height: 24px !important;
-                    border-radius: 12px !important;
-                    margin-top: -12px !important;
+                    width: 8px !important;
+                    height: 20px !important;
+                    border-radius: 4px !important;
+                    margin-top: -10px !important;
+                    margin-left: -4px !important;
                 }
                 .canva-moveable-style .moveable-control.moveable-n,
                 .canva-moveable-style .moveable-control.moveable-s {
-                    width: 24px !important;
-                    border-radius: 12px !important;
-                    margin-left: -12px !important;
+                    width: 20px !important;
+                    height: 8px !important;
+                    border-radius: 4px !important;
+                    margin-left: -10px !important;
+                    margin-top: -4px !important;
                 }
                 .canva-moveable-style .moveable-rotation-control {
                     border-radius: 50% !important;
