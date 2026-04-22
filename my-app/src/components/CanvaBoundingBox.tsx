@@ -79,11 +79,16 @@ export function CanvaBoundingBox({ el, updateElement, containerRef, targetRef }:
                 .canva-moveable-style .moveable-control {
                     background: #fff !important;
                     border: 1px solid #6b7280 !important;
-                    width: 10px !important;
-                    height: 10px !important;
-                    margin-top: -5px !important;
-                    margin-left: -5px !important;
+                    width: 12.5px !important;
+                    height: 12.5px !important;
+                    margin-top: -6.25px !important;
+                    margin-left: -6.25px !important;
                     border-radius: 50% !important;
+                    transition: background-color 0.15s ease !important;
+                }
+                .canva-moveable-style .moveable-control:hover,
+                .canva-moveable-style .moveable-control:active {
+                    background: #7c3aed !important;
                 }
                 .canva-moveable-style .moveable-control.moveable-w,
                 .canva-moveable-style .moveable-control.moveable-e {
@@ -106,6 +111,7 @@ export function CanvaBoundingBox({ el, updateElement, containerRef, targetRef }:
                 }
                 .canva-moveable-style .moveable-line {
                     background: #7c3aed !important;
+                    box-shadow: 0 0 0 0.5px #7c3aed !important; /* Thickens the boundary lines just a bit */
                 }
             `}</style>
             <Moveable
