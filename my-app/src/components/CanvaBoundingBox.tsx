@@ -132,6 +132,10 @@ export function CanvaBoundingBox({ el, updateElement, containerRef, targetRef }:
                 }
                 .canva-moveable-style .moveable-rotation-control:hover {
                     background-color: #f9fafb !important;
+                    background-image: ${ROTATE_ICON_URL} !important;
+                    background-repeat: no-repeat !important;
+                    background-position: center !important;
+                    background-size: 14px 14px !important;
                 }
                 .canva-moveable-style .moveable-rotation-line {
                     display: none !important;
