@@ -3,6 +3,14 @@ import Moveable from 'react-moveable';
 import type { OnDrag, OnScale, OnRotate } from 'react-moveable';
 import type { CanvasElement } from '../store/useEditorStore';
 import { getHistoryControls } from '../store/useEditorStore';
+// Raw SVG import — zero React overhead, pure CSS injection for canvas performance
+import refreshCwRaw from 'lucide-static/icons/refresh-cw.svg?raw';
+
+// Modify the raw SVG: slightly increase stroke-width to 1.5 for better visibility
+const thinRefreshCw = refreshCwRaw.replace(/stroke-width="[^"]+"/g, 'stroke-width="1.5"');
+
+// Encode once at module load (not on every render)
+const ROTATE_ICON_URL = `url("data:image/svg+xml,${encodeURIComponent(thinRefreshCw)}")`;
 
 export interface CanvaBoundingBoxProps {
     el: CanvasElement;
@@ -107,22 +115,22 @@ export function CanvaBoundingBox({ el, updateElement, containerRef, targetRef }:
                     margin-top: -4px !important;
                 }
                 .canva-moveable-style .moveable-rotation-control {
-                    width: 32px !important;
-                    height: 32px !important;
+                    width: 24px !important;
+                    height: 24px !important;
                     border-radius: 50% !important;
                     background: #fff !important;
                     border: 1px solid #d1d5db !important;
-                    box-shadow: 0 2px 8px rgba(0,0,0,0.15) !important;
-                    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23374151' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M21.5 2v6h-6'/%3E%3Cpath d='M2.5 12a10 10 0 1 1 11-10'/%3E%3C/svg%3E") !important;
+                    box-shadow: none !important;
+                    background-image: ${ROTATE_ICON_URL} !important;
                     background-repeat: no-repeat !important;
                     background-position: center !important;
-                    margin-top: -16px !important;
-                    margin-left: -16px !important; /* Perfect mathematical centering */
+                    background-size: 14px 14px !important;
+                    margin-top: -12px !important;
+                    margin-left: -12px !important;
                     cursor: grab !important;
-                    transition: box-shadow 0.15s ease, background-color 0.15s ease !important;
+                    transition: background-color 0.15s ease !important;
                 }
                 .canva-moveable-style .moveable-rotation-control:hover {
-                    box-shadow: 0 4px 12px rgba(0,0,0,0.2) !important;
                     background-color: #f9fafb !important;
                 }
                 .canva-moveable-style .moveable-rotation-line {
