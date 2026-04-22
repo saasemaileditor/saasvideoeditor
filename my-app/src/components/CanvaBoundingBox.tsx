@@ -94,8 +94,15 @@ export function CanvaBoundingBox({ el, updateElement, containerRef, targetRef }:
                     border-radius: 50% !important;
                     transition: background-color 0.15s ease !important;
                 }
-                .canva-moveable-style .moveable-control:hover,
-                .canva-moveable-style .moveable-control:active {
+                /* Explicitly targeting only the 8 resize directions for the purple hover effect */
+                .canva-moveable-style .moveable-control.moveable-nw:hover, .canva-moveable-style .moveable-control.moveable-nw:active,
+                .canva-moveable-style .moveable-control.moveable-ne:hover, .canva-moveable-style .moveable-control.moveable-ne:active,
+                .canva-moveable-style .moveable-control.moveable-sw:hover, .canva-moveable-style .moveable-control.moveable-sw:active,
+                .canva-moveable-style .moveable-control.moveable-se:hover, .canva-moveable-style .moveable-control.moveable-se:active,
+                .canva-moveable-style .moveable-control.moveable-n:hover,  .canva-moveable-style .moveable-control.moveable-n:active,
+                .canva-moveable-style .moveable-control.moveable-s:hover,  .canva-moveable-style .moveable-control.moveable-s:active,
+                .canva-moveable-style .moveable-control.moveable-w:hover,  .canva-moveable-style .moveable-control.moveable-w:active,
+                .canva-moveable-style .moveable-control.moveable-e:hover,  .canva-moveable-style .moveable-control.moveable-e:active {
                     background: #7c3aed !important;
                 }
                 .canva-moveable-style .moveable-control.moveable-w,
