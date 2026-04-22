@@ -130,6 +130,9 @@ export function CanvaBoundingBox({ el, updateElement, containerRef, targetRef }:
                     cursor: grab !important;
                     transition: background-color 0.15s ease !important;
                 }
+                .canva-moveable-style .moveable-rotation-control:active {
+                    cursor: grabbing !important;
+                }
                 .canva-moveable-style .moveable-rotation-control:hover {
                     background-color: #f9fafb !important;
                     background-image: ${ROTATE_ICON_URL} !important;
