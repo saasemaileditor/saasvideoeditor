@@ -1,4 +1,17 @@
 // ─── Category metadata for panel display ────────────────────────────────────
+
+export interface PanelElementDef {
+  type: string;
+  label: string;
+  category: string;
+  categoryLabel: string;
+  boundingSize: [number, number];
+  previewEmoji?: string;
+  defaultProps?: Record<string, any>;
+}
+
+export const PANEL_ELEMENTS: PanelElementDef[] = [];
+export const getElementComponent = (_type: string) => null;
 export const ELEMENT_CATEGORIES = [
   { id: 'text', label: 'Text', emoji: '🔤' },
   { id: 'cards', label: 'Cards', emoji: '🃏' },

@@ -144,12 +144,12 @@ const AnimationCard = ({ preset, isDark, isSelected, onSelect }: {
             onClick={() => { onSelect(); replay(); }}
             onMouseEnter={replay}
             className={`relative w-full h-full flex border transition-all cursor-pointer flex-col items-center justify-center p-3 gap-2 text-center rounded-xl ${isSelected
-                    ? isDark
-                        ? 'border-[#7c3aed] bg-[#2d1f5e]'
-                        : 'border-[#7c3aed] bg-[#ede9fe]'
-                    : isDark
-                        ? 'border-[#2a2d45] bg-[#161625] hover:border-[#7c3aed]/50 hover:bg-[#1e2235]'
-                        : 'border-gray-100 bg-gray-50 hover:border-[#7c3aed]/40 hover:bg-white'
+                ? isDark
+                    ? 'border-[#7c3aed] bg-[#2d1f5e]'
+                    : 'border-[#7c3aed] bg-[#ede9fe]'
+                : isDark
+                    ? 'border-[#2a2d45] bg-[#161625] hover:border-[#7c3aed]/50 hover:bg-[#1e2235]'
+                    : 'border-gray-100 bg-gray-50 hover:border-[#7c3aed]/40 hover:bg-white'
                 }`}
         >
             {/* Preview Box */}
@@ -196,15 +196,15 @@ export const useInfiniteElements = (searchQuery: string, pageSize: number = 20, 
 
             let filteredElements = UI_ELEMENTS;
             if (selectedCategory) {
-               filteredElements = filteredElements.filter(el => el.category === selectedCategory);
+                filteredElements = filteredElements.filter(el => el.category === selectedCategory);
             }
 
             // Server-side filtering mock
             filteredElements = searchQuery
                 ? filteredElements.filter((el) =>
-                      el.label.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                      el.category.toLowerCase().includes(searchQuery.toLowerCase())
-                  )
+                    el.label.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                    el.category.toLowerCase().includes(searchQuery.toLowerCase())
+                )
                 : filteredElements;
 
             const start = pageParam * pageSize;
@@ -245,15 +245,15 @@ export const useTemplates = (searchQuery: string) => {
         queryFn: async () => {
             // Simulate network delay for loading state
             await new Promise((resolve) => setTimeout(resolve, 300));
-            
+
             // Filter templates based on search query
             const filtered = searchQuery
-                ? TEMPLATES.filter((t) => 
+                ? TEMPLATES.filter((t) =>
                     t.label.toLowerCase().includes(searchQuery.toLowerCase()) ||
                     t.id.toLowerCase().includes(searchQuery.toLowerCase())
-                  )
+                )
                 : TEMPLATES;
-            
+
             return {
                 data: filtered,
                 nextPage: undefined, // No pagination for templates
@@ -264,16 +264,7 @@ export const useTemplates = (searchQuery: string) => {
     });
 };
 
-const MEDIA_STOCK = [
-    { id: 'media-1', label: 'Beach Sunset', type: 'video', url: 'https://cdn.pixabay.com/video/2016/09/13/4728-179738301_tiny.mp4', duration: '15s', thumbnail: 'https://images.pexels.com/photos/1032650/pexels-photo-1032650.jpeg?auto=compress&cs=tinysrgb&h=120' },
-    { id: 'media-2', label: 'Mountain Hike', type: 'video', url: 'https://cdn.pixabay.com/video/2021/04/12/70796-538356983_tiny.mp4', duration: '12s', thumbnail: 'https://images.pexels.com/photos/1271619/pexels-photo-1271619.jpeg?auto=compress&cs=tinysrgb&h=120' },
-    { id: 'media-3', label: 'Coffee Brewing', type: 'video', url: 'https://cdn.pixabay.com/video/2020/07/22/45131-441604547_tiny.mp4', duration: '8s', thumbnail: 'https://images.pexels.com/photos/302899/pexels-photo-302899.jpeg?auto=compress&cs=tinysrgb&h=120' },
-    { id: 'media-4', label: 'City Night', type: 'video', url: 'https://cdn.pixabay.com/video/2016/10/18/5888-186981145_tiny.mp4', duration: '10s', thumbnail: 'https://images.pexels.com/photos/1519088/pexels-photo-1519088.jpeg?auto=compress&cs=tinysrgb&h=120' },
-    { id: 'media-5', label: 'Forest Stream', type: 'video', url: 'https://cdn.pixabay.com/video/2021/09/06/87588-601726055_tiny.mp4', duration: '20s', thumbnail: 'https://images.pexels.com/photos/2280954/pexels-photo-2280954.jpeg?auto=compress&cs=tinysrgb&h=120' },
-    { id: 'media-6', label: 'Neon City', type: 'video', url: 'https://cdn.pixabay.com/video/2020/01/14/31154-386047378_tiny.mp4', duration: '14s', thumbnail: 'https://images.pexels.com/photos/3166786/pexels-photo-3166786.jpeg?auto=compress&cs=tinysrgb&h=120' },
-    { id: 'media-7', label: 'Desert Dunes', type: 'video', url: 'https://cdn.pixabay.com/video/2017/04/24/8910-213941423_tiny.mp4', duration: '18s', thumbnail: 'https://images.pexels.com/photos/2044434/pexels-photo-2044434.jpeg?auto=compress&cs=tinysrgb&h=120' },
-    { id: 'media-8', label: 'Cyberpunk Girl', type: 'video', url: 'https://cdn.pixabay.com/video/2020/12/29/60450-496660636_tiny.mp4', duration: '10s', thumbnail: 'https://images.pexels.com/photos/2773498/pexels-photo-2773498.jpeg?auto=compress&cs=tinysrgb&h=120' },
-];
+const MEDIA_STOCK: any[] = [];
 
 export const useMedia = (searchQuery: string) => {
     return useInfiniteQuery({
@@ -281,9 +272,9 @@ export const useMedia = (searchQuery: string) => {
         queryFn: async () => {
             await new Promise((resolve) => setTimeout(resolve, 300));
             const filtered = searchQuery
-                ? MEDIA_STOCK.filter((m) => 
+                ? MEDIA_STOCK.filter((m) =>
                     m.label.toLowerCase().includes(searchQuery.toLowerCase())
-                  )
+                )
                 : MEDIA_STOCK;
             return { data: filtered, nextPage: undefined };
         },
@@ -310,9 +301,9 @@ export const usePositions = (searchQuery: string) => {
         queryFn: async () => {
             await new Promise((resolve) => setTimeout(resolve, 300));
             const filtered = searchQuery
-                ? POSITION_PRESETS.filter((p) => 
+                ? POSITION_PRESETS.filter((p) =>
                     p.label.toLowerCase().includes(searchQuery.toLowerCase())
-                  )
+                )
                 : POSITION_PRESETS;
             return { data: filtered, nextPage: undefined };
         },
@@ -327,18 +318,18 @@ export const useAnimations = (searchQuery: string) => {
         queryFn: async () => {
             // Simulate network delay for loading state
             await new Promise((resolve) => setTimeout(resolve, 300));
-            
+
             // Filter animations based on search query
             // @ts-ignore
             const filtered = searchQuery
                 // @ts-ignore
-                ? ANIMATION_PRESETS.filter((a) => 
+                ? ANIMATION_PRESETS.filter((a) =>
                     a.label.toLowerCase().includes(searchQuery.toLowerCase()) ||
                     a.id.toLowerCase().includes(searchQuery.toLowerCase())
-                  )
+                )
                 // @ts-ignore
                 : ANIMATION_PRESETS;
-            
+
             return {
                 data: filtered,
                 nextPage: undefined, // No pagination for animations
@@ -357,7 +348,7 @@ const DraggableElementCard = ({ element, isDark }: { element: PanelElementDef, i
     useEffect(() => {
         const el = ref.current;
         if (!el) return;
-        
+
         return draggable({
             element: el,
             getInitialData: () => ({ type: element.type, label: element.label, boundingSize: element.boundingSize }),
@@ -366,18 +357,18 @@ const DraggableElementCard = ({ element, isDark }: { element: PanelElementDef, i
         });
     }, [element]);
 
-    const PreviewComponent = getElementComponent(element.type) as React.ElementType<any>;
+    const PreviewComponent = getElementComponent(element.type) as unknown as React.ElementType<any>;
 
     return (
         <div
             ref={ref}
             className={`relative w-full h-[120px] hover:cursor-grab group touch-none ${isDragging ? 'opacity-40' : ''}`}
         >
-            <div className={`relative w-full h-full flex flex-col items-center justify-between p-3 border rounded-xl z-10 transition-all duration-300 overflow-hidden ${isDark 
-                ? 'bg-[#161625] border-[#2a2d45] group-hover:border-[#7c3aed] group-hover:bg-[#2d1f5e]' 
+            <div className={`relative w-full h-full flex flex-col items-center justify-between p-3 border rounded-xl z-10 transition-all duration-300 overflow-hidden ${isDark
+                ? 'bg-[#161625] border-[#2a2d45] group-hover:border-[#7c3aed] group-hover:bg-[#2d1f5e]'
                 : 'bg-white border-gray-200 shadow-sm group-hover:border-[#7c3aed] group-hover:bg-[#ede9fe] group-hover:shadow-md'}`}>
                 {/* Preview: actual component or fallback emoji */}
-                <div className="flex-1 w-full flex items-center justify-center select-none pointer-events-none" style={{transform: "scale(0.55)", transformOrigin: "center center"}}>
+                <div className="flex-1 w-full flex items-center justify-center select-none pointer-events-none" style={{ transform: "scale(0.55)", transformOrigin: "center center" }}>
                     {PreviewComponent ? (
                         <Suspense fallback={<div className="text-4xl">{element.previewEmoji ?? '📦'}</div>}>
                             {/* @ts-ignore */}
@@ -389,7 +380,7 @@ const DraggableElementCard = ({ element, isDark }: { element: PanelElementDef, i
                         </div>
                     )}
                 </div>
-                
+
                 <span className={`text-[11px] mt-1 font-semibold text-center leading-tight transition-colors line-clamp-2 ${isDark ? 'text-gray-300 group-hover:text-white' : 'text-gray-600 group-hover:text-[#7c3aed]'}`}>
                     {element.label}
                 </span>
@@ -411,7 +402,7 @@ const DraggableCard = ({ elementId, icon: Icon, label, isDark }: {
     useEffect(() => {
         const el = ref.current;
         if (!el) return;
-        
+
         return draggable({
             element: el,
             getInitialData: () => ({ type: elementId }), // ID is used as type in the original code
@@ -454,7 +445,7 @@ const CanvasDropZone = ({ canvasRef, isDark, setSelectedId, children }: {
     useEffect(() => {
         const el = localRef.current;
         if (!el) return;
-        
+
         return dropTargetForElements({
             element: el,
             getData: () => ({ id: 'canvas-dropzone' }),
@@ -516,7 +507,7 @@ const SceneElement = memo(({ el, isDark, isSelected, updateElement, setSelectedI
 
     const [BASE_W, BASE_H] = el.boundingSize ?? [200, 60];
 
-    const ElementComponent = getElementComponent(el.type);
+    const ElementComponent = getElementComponent(el.type) as unknown as React.ElementType<any>;
 
     return (
         <>
@@ -539,7 +530,8 @@ const SceneElement = memo(({ el, isDark, isSelected, updateElement, setSelectedI
                     zIndex: isSelected ? 1000 : (el.zIndex ?? 1),
                     pointerEvents: 'auto',
                     overflow: 'visible',
-                    transform: el.transform,
+                    transform: `translate(${el.x ?? 0}px, ${el.y ?? 0}px) rotate(${el.rotation ?? 0}deg) scale(${el.scaleX ?? 1}, ${el.scaleY ?? 1})`,
+                    opacity: el.opacity ?? 1,
                 }}
             >
                 {ElementComponent ? (
@@ -586,15 +578,15 @@ const SaasVideoEditor = () => {
 
     // Infinite Query Hook for Elements
     const elementsPageSize = 12;
-    const { 
-        data: elementsData, 
-        fetchNextPage, 
-        hasNextPage, 
-        isFetchingNextPage, 
-        fetchPreviousPage, 
-        hasPreviousPage, 
-        isFetchingPreviousPage, 
-        isLoading: isElementsLoading 
+    const {
+        data: elementsData,
+        fetchNextPage,
+        hasNextPage,
+        isFetchingNextPage,
+        fetchPreviousPage,
+        hasPreviousPage,
+        isFetchingPreviousPage,
+        isLoading: isElementsLoading
     } = useInfiniteElements(searchQuery, elementsPageSize, selectedCategory);
     const flatElements = elementsData?.pages.flatMap((page) => page.data) ?? [];
 
@@ -619,7 +611,7 @@ const SaasVideoEditor = () => {
         reorderElements,
         removeElement,
     } = useEditorStore();
-    const { 
+    const {
         selectedId, setSelectedId,
         isPlaying, setIsPlaying,
         currentTime, setCurrentTime,
@@ -632,7 +624,7 @@ const SaasVideoEditor = () => {
             if (!exists) setSelectedId(null);
         }
     }, [selectedId, setSelectedId]);
- 
+
 
 
 
@@ -646,7 +638,7 @@ const SaasVideoEditor = () => {
             setCanRedo(controls.canForward());
         };
         sync();
-        
+
         window.addEventListener('history-updated', sync);
         const unsub = useEditorStore.subscribe(sync);
         return () => {
@@ -683,13 +675,13 @@ const SaasVideoEditor = () => {
                 e.preventDefault();
                 getHistoryControls().back();
             }
-            
+
             // Redo: Ctrl+Shift+Z or Ctrl+Y
             if (((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'z') || ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y')) {
                 e.preventDefault();
                 getHistoryControls().forward();
             }
-            
+
             // Delete: Delete or Backspace
             if ((e.key === 'Delete' || e.key === 'Backspace') && selectedId) {
                 e.preventDefault();
@@ -776,15 +768,24 @@ const SaasVideoEditor = () => {
                 const dropY = clientY - canvasRect.top;
 
                 const panelDef = PANEL_ELEMENTS.find((el: any) => el.type === type);
-                const resolvedBoundingSize: [number, number] = 
-                    (source.data.boundingSize as [number, number]) ?? 
-                    panelDef?.boundingSize ?? 
+                const resolvedBoundingSize: [number, number] =
+                    (source.data.boundingSize as [number, number]) ??
+                    panelDef?.boundingSize ??
                     [200, 80];
 
                 addElement({
                     id: Date.now().toString(),
                     type: type as any,
-                    transform: `translate(${dropX - resolvedBoundingSize[0] / 2}px, ${dropY - resolvedBoundingSize[1] / 2}px) rotate(0deg) scale(1, 1)`,
+                    x: dropX - resolvedBoundingSize[0] / 2,
+                    y: dropY - resolvedBoundingSize[1] / 2,
+                    width: resolvedBoundingSize[0],
+                    height: resolvedBoundingSize[1],
+                    rotation: 0,
+                    scaleX: 1,
+                    scaleY: 1,
+                    opacity: 1,
+                    parentId: null,
+                    animations: [],
                     boundingSize: resolvedBoundingSize,
                     props: panelDef?.defaultProps ?? {},
                 });
@@ -797,636 +798,649 @@ const SaasVideoEditor = () => {
     return (
         <div className={`fixed inset-0 flex flex-col p-[10px] gap-[10px] overflow-hidden transition-colors duration-200 ${isDark ? 'dark bg-[#080810] text-white' : 'bg-[#f3f4f6] text-gray-900'}`}>
 
-                {/* 2. Top navigation bar */}
-                <div className={`h-[56px] rounded-b-xl shadow-sm flex-shrink-0 flex items-center justify-between px-4 z-[60] transition-colors duration-200 overflow-hidden -mx-[10px] -mt-[10px] ${isDark ? 'bg-[#1e2235] border-b border-[#2a2d45]' : 'bg-white border-b border-gray-200'}`}>
+            {/* 2. Top navigation bar */}
+            <div className={`h-[56px] rounded-b-xl shadow-sm flex-shrink-0 flex items-center justify-between px-4 z-[60] transition-colors duration-200 overflow-hidden -mx-[10px] -mt-[10px] ${isDark ? 'bg-[#1e2235] border-b border-[#2a2d45]' : 'bg-white border-b border-gray-200'}`}>
 
-                    {/* LEFT SIDE: Logo & History */}
-                    <div className="flex items-center gap-4">
-                        <span className={`font-bold text-[18px] ${isDark ? 'text-white' : 'text-gray-900'}`}>Cliply</span>
-                        <div className={`flex items-center gap-1 border-l pl-4 ${isDark ? 'border-[#2a2d45]' : 'border-gray-200'}`}>
-                            <button
-                                onClick={() => getHistoryControls().back()}
-                                disabled={!canUndo}
-                                className={`p-1.5 rounded-lg transition-colors cursor-pointer ${!canUndo ? 'opacity-40 cursor-not-allowed' : ''} ${isDark ? 'text-gray-400 hover:text-white hover:bg-gray-800' : 'text-gray-500 hover:text-gray-900 hover:bg-gray-100'}`}
-                            >
-                                <Undo2 size={18} />
-                            </button>
-                            <button
-                                onClick={() => getHistoryControls().forward()}
-                                disabled={!canRedo}
-                                className={`p-1.5 rounded-lg transition-colors cursor-pointer ${!canRedo ? 'opacity-40 cursor-not-allowed' : ''} ${isDark ? 'text-gray-400 hover:text-white hover:bg-gray-800' : 'text-gray-500 hover:text-gray-900 hover:bg-gray-100'}`}
-                            >
-                                <Redo2 size={18} />
-                            </button>
-                        </div>
-                    </div>
-
-                    {/* CENTER: Project Name */}
-                    <div className="flex flex-1 justify-center">
-                        <input
-                            type="text"
-                            defaultValue="Untitled Project"
-                            className={`text-center bg-transparent border border-transparent outline-none rounded-lg text-sm font-medium w-48 py-1 transition-all ${isDark ? 'hover:border-gray-700 focus:border-gray-600 focus:bg-gray-800 text-white' : 'hover:border-gray-200 focus:border-gray-200 text-gray-900'}`}
-                        />
-                    </div>
-
-                    {/* RIGHT SIDE: Actions */}
-                    <div className="flex items-center gap-3 relative">
+                {/* LEFT SIDE: Logo & History */}
+                <div className="flex items-center gap-4">
+                    <span className={`font-bold text-[18px] ${isDark ? 'text-white' : 'text-gray-900'}`}>Cliply</span>
+                    <div className={`flex items-center gap-1 border-l pl-4 ${isDark ? 'border-[#2a2d45]' : 'border-gray-200'}`}>
                         <button
-                            onClick={() => setIsSettingsOpen(!isSettingsOpen)}
-                            className={`p-1.5 mr-1 rounded-lg transition-colors cursor-pointer ${isDark ? 'text-gray-400 hover:text-white hover:bg-gray-800' : 'text-gray-500 hover:text-gray-900 hover:bg-gray-100'}`}
-                            title="Settings"
+                            onClick={() => getHistoryControls().back()}
+                            disabled={!canUndo}
+                            className={`p-1.5 rounded-lg transition-colors cursor-pointer ${!canUndo ? 'opacity-40 cursor-not-allowed' : ''} ${isDark ? 'text-gray-400 hover:text-white hover:bg-gray-800' : 'text-gray-500 hover:text-gray-900 hover:bg-gray-100'}`}
                         >
-                            <SettingsIcon size={18} />
-                        </button>
-                        <button className={`flex items-center gap-2 px-4 py-1.5 border text-sm font-medium rounded-lg transition-colors shadow-sm cursor-pointer ${isDark ? 'border-[#2a2d45] bg-[#1e2235] text-gray-200 hover:bg-[#252840]' : 'border-gray-200 bg-white text-gray-700 hover:bg-gray-50'}`}>
-                            <Play size={16} />
-                            Preview
+                            <Undo2 size={18} />
                         </button>
                         <button
-                            onClick={() => window.open('/export', '_blank')}
-                            className="flex items-center gap-2 px-4 py-1.5 bg-[#7c3aed] hover:bg-[#6d28d9] text-white text-sm font-medium rounded-lg transition-colors shadow-sm cursor-pointer border-none"
+                            onClick={() => getHistoryControls().forward()}
+                            disabled={!canRedo}
+                            className={`p-1.5 rounded-lg transition-colors cursor-pointer ${!canRedo ? 'opacity-40 cursor-not-allowed' : ''} ${isDark ? 'text-gray-400 hover:text-white hover:bg-gray-800' : 'text-gray-500 hover:text-gray-900 hover:bg-gray-100'}`}
                         >
-                            <Download size={16} />
-                            Export MP4
+                            <Redo2 size={18} />
                         </button>
                     </div>
-
                 </div>
 
-                {/* Settings Backdrop & Panel */}
-                {isSettingsOpen && (
-                    <>
-                        <div
-                            className="absolute inset-0 z-[90] bg-transparent"
-                            onClick={() => setIsSettingsOpen(false)}
-                        />
-                        <div className={`absolute top-[72px] right-[24px] w-[280px] rounded-xl shadow-xl z-[100] flex flex-col transition-colors duration-200 ${isDark ? 'bg-[#1e2235] border border-[#2a2d45] text-white' : 'bg-white text-gray-900 border border-gray-100'}`}>
-                            <div className={`flex items-center justify-between px-4 py-3 border-b ${isDark ? 'border-[#2a2d45]' : 'border-gray-100'}`}>
-                                <span className="font-bold text-[14px]">Settings</span>
-                                <button
-                                    onClick={() => setIsSettingsOpen(false)}
-                                    className={`p-1 rounded-lg transition-colors cursor-pointer ${isDark ? 'text-gray-400 hover:text-white hover:bg-gray-800' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100'}`}
-                                >
-                                    <X size={16} />
-                                </button>
+                {/* CENTER: Project Name */}
+                <div className="flex flex-1 justify-center">
+                    <input
+                        type="text"
+                        defaultValue="Untitled Project"
+                        className={`text-center bg-transparent border border-transparent outline-none rounded-lg text-sm font-medium w-48 py-1 transition-all ${isDark ? 'hover:border-gray-700 focus:border-gray-600 focus:bg-gray-800 text-white' : 'hover:border-gray-200 focus:border-gray-200 text-gray-900'}`}
+                    />
+                </div>
+
+                {/* RIGHT SIDE: Actions */}
+                <div className="flex items-center gap-3 relative">
+                    <button
+                        onClick={() => setIsSettingsOpen(!isSettingsOpen)}
+                        className={`p-1.5 mr-1 rounded-lg transition-colors cursor-pointer ${isDark ? 'text-gray-400 hover:text-white hover:bg-gray-800' : 'text-gray-500 hover:text-gray-900 hover:bg-gray-100'}`}
+                        title="Settings"
+                    >
+                        <SettingsIcon size={18} />
+                    </button>
+                    <button className={`flex items-center gap-2 px-4 py-1.5 border text-sm font-medium rounded-lg transition-colors shadow-sm cursor-pointer ${isDark ? 'border-[#2a2d45] bg-[#1e2235] text-gray-200 hover:bg-[#252840]' : 'border-gray-200 bg-white text-gray-700 hover:bg-gray-50'}`}>
+                        <Play size={16} />
+                        Preview
+                    </button>
+                    <button
+                        onClick={() => window.open('/export', '_blank')}
+                        className="flex items-center gap-2 px-4 py-1.5 bg-[#7c3aed] hover:bg-[#6d28d9] text-white text-sm font-medium rounded-lg transition-colors shadow-sm cursor-pointer border-none"
+                    >
+                        <Download size={16} />
+                        Export MP4
+                    </button>
+                </div>
+
+            </div>
+
+            {/* Settings Backdrop & Panel */}
+            {isSettingsOpen && (
+                <>
+                    <div
+                        className="absolute inset-0 z-[90] bg-transparent"
+                        onClick={() => setIsSettingsOpen(false)}
+                    />
+                    <div className={`absolute top-[72px] right-[24px] w-[280px] rounded-xl shadow-xl z-[100] flex flex-col transition-colors duration-200 ${isDark ? 'bg-[#1e2235] border border-[#2a2d45] text-white' : 'bg-white text-gray-900 border border-gray-100'}`}>
+                        <div className={`flex items-center justify-between px-4 py-3 border-b ${isDark ? 'border-[#2a2d45]' : 'border-gray-100'}`}>
+                            <span className="font-bold text-[14px]">Settings</span>
+                            <button
+                                onClick={() => setIsSettingsOpen(false)}
+                                className={`p-1 rounded-lg transition-colors cursor-pointer ${isDark ? 'text-gray-400 hover:text-white hover:bg-gray-800' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100'}`}
+                            >
+                                <X size={16} />
+                            </button>
+                        </div>
+
+                        <div className="p-4 flex flex-col gap-6">
+                            <div className="flex flex-col gap-3">
+                                <div className="flex flex-col">
+                                    <span className="text-sm font-semibold">Appearance</span>
+                                    <span className={`text-[11px] mt-0.5 ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>Choose your theme preference</span>
+                                </div>
+                                <div className="flex items-center justify-between gap-2">
+                                    {[
+                                        { id: 'light', icon: Sun, label: 'Light' },
+                                        { id: 'dark', icon: Moon, label: 'Dark' },
+                                        { id: 'system', icon: Monitor, label: 'System' }
+                                    ].map((opt) => {
+                                        const isSelected = theme === opt.id;
+                                        return (
+                                            <button
+                                                key={opt.id}
+                                                onClick={() => setTheme(opt.id as any)}
+                                                className={`flex-1 flex flex-col items-center justify-center p-3 rounded-lg border transition-all cursor-pointer ${isSelected
+                                                    ? 'border-[#7c3aed] bg-[#ede9fe] text-[#7c3aed]'
+                                                    : isDark
+                                                        ? 'border-[#2a2d45] bg-transparent text-gray-400 hover:bg-[#252840] hover:text-gray-200'
+                                                        : 'border-gray-200 bg-white text-gray-500 hover:bg-gray-50 hover:text-gray-700'
+                                                    }`}
+                                            >
+                                                <opt.icon size={18} className="mb-2" />
+                                                <span className="text-xs font-medium">{opt.label}</span>
+                                            </button>
+                                        );
+                                    })}
+                                </div>
                             </div>
 
-                            <div className="p-4 flex flex-col gap-6">
-                                <div className="flex flex-col gap-3">
-                                    <div className="flex flex-col">
-                                        <span className="text-sm font-semibold">Appearance</span>
-                                        <span className={`text-[11px] mt-0.5 ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>Choose your theme preference</span>
-                                    </div>
-                                    <div className="flex items-center justify-between gap-2">
-                                        {[
-                                            { id: 'light', icon: Sun, label: 'Light' },
-                                            { id: 'dark', icon: Moon, label: 'Dark' },
-                                            { id: 'system', icon: Monitor, label: 'System' }
-                                        ].map((opt) => {
-                                            const isSelected = theme === opt.id;
-                                            return (
-                                                <button
-                                                    key={opt.id}
-                                                    onClick={() => setTheme(opt.id as any)}
-                                                    className={`flex-1 flex flex-col items-center justify-center p-3 rounded-lg border transition-all cursor-pointer ${isSelected
-                                                        ? 'border-[#7c3aed] bg-[#ede9fe] text-[#7c3aed]'
-                                                        : isDark
-                                                            ? 'border-[#2a2d45] bg-transparent text-gray-400 hover:bg-[#252840] hover:text-gray-200'
-                                                            : 'border-gray-200 bg-white text-gray-500 hover:bg-gray-50 hover:text-gray-700'
-                                                        }`}
-                                                >
-                                                    <opt.icon size={18} className="mb-2" />
-                                                    <span className="text-xs font-medium">{opt.label}</span>
-                                                </button>
-                                            );
-                                        })}
-                                    </div>
-                                </div>
-
-                                <div className="flex flex-col gap-4">
-                                    <div className="flex items-center justify-between pb-2 border-b border-transparent">
-                                        <span className="text-sm font-medium">Panel expanded by default</span>
+                            <div className="flex flex-col gap-4">
+                                <div className="flex items-center justify-between pb-2 border-b border-transparent">
+                                    <span className="text-sm font-medium">Panel expanded by default</span>
+                                    <div
+                                        onClick={() => setDefaultPanelExpanded(!defaultPanelExpanded)}
+                                        className={`w-10 h-6 flex items-center rounded-full p-1 cursor-pointer transition-colors duration-300 ${defaultPanelExpanded ? 'bg-[#7c3aed]' : isDark ? 'bg-gray-700' : 'bg-gray-300'}`}
+                                    >
                                         <div
-                                            onClick={() => setDefaultPanelExpanded(!defaultPanelExpanded)}
-                                            className={`w-10 h-6 flex items-center rounded-full p-1 cursor-pointer transition-colors duration-300 ${defaultPanelExpanded ? 'bg-[#7c3aed]' : isDark ? 'bg-gray-700' : 'bg-gray-300'}`}
-                                        >
-                                            <div
-                                                className={`w-4 h-4 bg-white rounded-full shadow-sm transition-transform duration-300 ${defaultPanelExpanded ? 'translate-x-4' : 'translate-x-0'}`}
-                                            />
-                                        </div>
+                                            className={`w-4 h-4 bg-white rounded-full shadow-sm transition-transform duration-300 ${defaultPanelExpanded ? 'translate-x-4' : 'translate-x-0'}`}
+                                        />
                                     </div>
                                 </div>
                             </div>
                         </div>
-                    </>
-                )}
+                    </div>
+                </>
+            )}
 
-                {/* 3. Main content area */}
-                <div className="flex flex-col flex-1 min-w-0 min-h-0 relative gap-[10px]">
+            {/* 3. Main content area */}
+            <div className="flex flex-col flex-1 min-w-0 min-h-0 relative gap-[10px]">
 
-                    {/* Middle Section: Left, Center, Right */}
-                    <div className="flex flex-1 min-w-0 min-h-0 gap-[10px]">
+                {/* Middle Section: Left, Center, Right */}
+                <div className="flex flex-1 min-w-0 min-h-0 gap-[10px]">
 
-                        {/* Vertical Toolbar */}
-                        <div className={`w-[52px] flex-shrink-0 ${toolbarShouldCenter ? 'self-center' : ''} flex flex-col items-center gap-3 pt-3 pb-3 z-50 rounded-r-xl overflow-hidden shadow-sm transition-colors duration-200 -ml-[10px] ${isDark ? 'bg-[#1e2235] border border-[#2a2d45]' : 'bg-white border border-transparent'}`}>
-                            {TABS.map((tab) => {
-                                const isActive = activeTab === tab.id;
+                    {/* Vertical Toolbar */}
+                    <div className={`w-[52px] flex-shrink-0 ${toolbarShouldCenter ? 'self-center' : ''} flex flex-col items-center gap-3 pt-3 pb-3 z-50 rounded-r-xl overflow-hidden shadow-sm transition-colors duration-200 -ml-[10px] ${isDark ? 'bg-[#1e2235] border border-[#2a2d45]' : 'bg-white border border-transparent'}`}>
+                        {TABS.map((tab) => {
+                            const isActive = activeTab === tab.id;
+                            return (
+                                <button
+                                    key={tab.id}
+                                    onClick={() => {
+                                        const newTab = isActive ? null : tab.id;
+                                        setActiveTab(newTab);
+                                        // Close right panel when any left panel opens
+                                        if (newTab) setIsRightPanelAnimationOpen(false);
+                                    }}
+                                    className={`w-10 h-10 flex items-center justify-center rounded-xl transition-colors cursor-pointer ${isActive
+                                        ? isDark
+                                            ? 'bg-[#4c1d95] text-[#a78bfa]'
+                                            : 'bg-[#ede9fe] text-[#7c3aed]'
+                                        : isDark
+                                            ? 'bg-transparent text-gray-400 hover:text-white hover:bg-[#252840]'
+                                            : 'bg-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-100'
+                                        }`}
+                                    title={tab.label}
+                                >
+                                    <tab.icon size={20} />
+                                </button>
+                            );
+                        })}
+                    </div>
+
+                    {/* Floating Panel Backdrop - pointer-events-none during drag so canvas can receive drop */}
+                    {activeTab && (
+                        <div
+                            className={`absolute inset-0 z-30 bg-transparent ${isDraggingElement ? 'pointer-events-none' : ''}`}
+                            onClick={() => setActiveTab(null)}
+                        />
+                    )}
+
+                    {/* Floating Panel (Absolute position) */}
+                    <div
+                        className={`absolute top-0 left-[62px] bottom-0 rounded-xl overflow-hidden z-[45] flex flex-col transition-all duration-300 ease-in-out ${activeTab ? 'translate-x-0 shadow-xl opacity-100' : '-translate-x-12 opacity-0 pointer-events-none'
+                            } ${isDark ? 'bg-[#1e2235] border border-[#2a2d45]' : 'bg-white border border-gray-100'}`}
+                        style={{ width: '480px' }}
+                    >
+                        {activeTab && (
+                            <>
+                                <div className="flex-1 min-h-0 flex flex-col">
+                                    {activeTab === 'Elements' && !selectedCategory && !searchQuery ? (
+                                        <UniversalPanel
+                                            title="Elements"
+                                            onClose={() => { setActiveTab(null); }}
+                                            items={ELEMENT_CATEGORIES}
+                                            width={480}
+                                            height="100%"
+                                            itemHeight={140}
+                                            searchQuery={searchQuery}
+                                            onSearchChange={setSearchQuery}
+                                            placeholder="Search elements..."
+                                            getItemId={(cat) => cat.id}
+                                            getItemLabel={(cat) => cat.label}
+                                            panelName="Categories"
+                                            panelIcon={Layers}
+                                            isDark={isDark}
+                                            showCloseButton={true}
+                                            renderItem={(cat) => (
+                                                <div
+                                                    onClick={() => setSelectedCategory(cat.id)}
+                                                    className={`cursor-pointer w-full h-[140px] flex flex-col items-center justify-center border rounded-xl hover:scale-[1.03] transition-transform select-none ${isDark ? 'bg-[#1e2235] border-[#2a2d45] text-white shadow-md' : 'bg-white border-gray-200 text-gray-800 shadow-sm'}`}
+                                                >
+                                                    <span className="text-[40px] mb-3">{cat.emoji}</span>
+                                                    <span className="font-semibold text-[15px]">{cat.label}</span>
+                                                </div>
+                                            )}
+                                        />
+                                    ) : activeTab === 'Elements' ? (
+                                        <UniversalPanel
+                                            title={selectedCategory ? (
+                                                <div className="flex items-center gap-2">
+                                                    <button
+                                                        onClick={(e) => { e.stopPropagation(); setSelectedCategory(null); }}
+                                                        className={`flex items-center justify-center p-1.5 rounded-md transition-colors ${isDark ? 'hover:bg-gray-800 text-gray-400 hover:text-white' : 'hover:bg-gray-100 text-gray-500 hover:text-gray-900'}`}
+                                                    >
+                                                        <ArrowLeft size={18} />
+                                                    </button>
+                                                    <span>{ELEMENT_CATEGORIES.find(c => c.id === selectedCategory)?.label || "Elements"}</span>
+                                                </div>
+                                            ) : "Elements"}
+                                            onClose={() => { setActiveTab(null); setSelectedCategory(null); setSearchQuery(''); }}
+                                            items={flatElements}
+                                            pageSize={elementsPageSize}
+                                            firstPageParam={elementsData?.pageParams?.[0] as number ?? 0}
+                                            width={480}
+                                            height="100%"
+                                            itemHeight={140}
+                                            searchQuery={searchQuery}
+                                            onSearchChange={setSearchQuery}
+                                            placeholder="Search elements..."
+                                            isLoading={isElementsLoading}
+                                            isFetchingNextPage={isFetchingNextPage}
+                                            hasNextPage={hasNextPage}
+                                            fetchNextPage={fetchNextPage}
+                                            isFetchingPreviousPage={isFetchingPreviousPage}
+                                            hasPreviousPage={hasPreviousPage}
+                                            fetchPreviousPage={fetchPreviousPage}
+                                            getItemId={(el) => el.type}
+                                            getItemLabel={(el) => el.label}
+                                            panelName={selectedCategory ? ELEMENT_CATEGORIES.find(c => c.id === selectedCategory)?.label || "Elements" : "Elements"}
+                                            panelIcon={Layers}
+                                            isDark={isDark}
+                                            showCloseButton={true}
+                                            renderItem={(el) => (
+                                                <DraggableElementCard
+                                                    element={el}
+                                                    isDark={isDark}
+                                                />
+                                            )}
+                                        />
+                                    ) : activeTab === 'Templates' ? (
+                                        <UniversalPanel
+                                            title="Templates"
+                                            onClose={() => { setActiveTab(null); }}
+                                            items={flatTemplates}
+                                            width={480}
+                                            height="100%"
+                                            itemHeight={140}
+                                            searchQuery={templateSearchQuery}
+                                            onSearchChange={setTemplateSearchQuery}
+                                            placeholder="Search templates..."
+                                            isLoading={isTemplatesLoading}
+                                            isFetchingNextPage={false}
+                                            hasNextPage={false}
+                                            fetchNextPage={undefined}
+                                            getItemId={(el) => el.id}
+                                            getItemLabel={(el) => el.label}
+                                            panelName="Templates"
+                                            panelIcon={LayoutTemplate}
+                                            isDark={isDark}
+                                            showCloseButton={true}
+                                            renderItem={(el) => (
+                                                <DraggableCard
+                                                    elementId={el.id}
+                                                    icon={el.icon}
+                                                    label={el.label}
+                                                    isDark={isDark}
+                                                />
+                                            )}
+                                        />
+                                    ) : activeTab === 'Media' ? (
+                                        <UniversalPanel
+                                            title="Media"
+                                            onClose={() => { setActiveTab(null); }}
+                                            items={flatMedia}
+                                            width={480}
+                                            height="100%"
+                                            itemHeight={140}
+                                            searchQuery={mediaSearchQuery}
+                                            onSearchChange={setMediaSearchQuery}
+                                            placeholder="Search assets..."
+                                            isLoading={isMediaLoading}
+                                            isFetchingNextPage={false}
+                                            hasNextPage={false}
+                                            fetchNextPage={undefined}
+                                            getItemId={(el) => el.id}
+                                            getItemLabel={(el) => el.label}
+                                            panelName="Media"
+                                            panelIcon={Video}
+                                            isDark={isDark}
+                                            showCloseButton={true}
+                                            renderItem={(el) => (
+                                                <div
+                                                    onClick={() => {
+                                                        addElement({
+                                                            id: Date.now().toString(),
+                                                            type: 'videoPlaceholder' as any,
+                                                            x: 400 - 280 / 2,
+                                                            y: 225 - 180 / 2,
+                                                            width: 280,
+                                                            height: 180,
+                                                            rotation: 0,
+                                                            scaleX: 1,
+                                                            scaleY: 1,
+                                                            opacity: 1,
+                                                            parentId: null,
+                                                            animations: [],
+                                                            boundingSize: [280, 180],
+                                                            props: { url: el.url, thumbnail: el.thumbnail, label: el.label }
+                                                        });
+                                                        getHistoryControls().archive();
+                                                    }}
+                                                    className={`relative w-full h-[140px] rounded-xl overflow-hidden cursor-pointer border group hover:scale-[1.03] transition-all ${isDark ? 'border-[#2a2d45] bg-[#161625]' : 'border-gray-200 bg-gray-50'}`}
+                                                >
+                                                    <img src={el.thumbnail} alt={el.label} className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" />
+                                                    <div className="absolute inset-0 bg-black/20 group-hover:bg-black/0 transition-colors" />
+                                                    <div className="absolute bottom-2 left-2 right-2 flex items-center justify-between pointer-events-none">
+                                                        <span className="text-[10px] font-bold text-white bg-black/50 px-1.5 py-0.5 rounded backdrop-blur-sm shadow-sm">{el.duration}</span>
+                                                    </div>
+                                                    <div className="absolute top-2 left-2 pointer-events-none">
+                                                        <span className="text-[10px] font-bold text-white bg-[#7c3aed]/80 px-1.5 py-0.5 rounded backdrop-blur-sm shadow-sm">VIDEO</span>
+                                                    </div>
+                                                    <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                                        <div className="bg-white/20 backdrop-blur-md p-2 rounded-full shadow-lg">
+                                                            <Play size={20} className="text-white fill-current" />
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            )}
+                                        />
+                                    ) : activeTab === 'Position' ? (
+                                        <UniversalPanel
+                                            title="Position"
+                                            onClose={() => { setActiveTab(null); }}
+                                            items={positionSubTab === 'Arrange' ? flatPositions : [...Array.from(elements.values()).reverse(), { id: 'canvas-background', type: 'background', label: 'Background' }]}
+                                            width={480}
+                                            height="100%"
+                                            itemHeight={positionSubTab === 'Arrange' ? 140 : 70}
+                                            columnCount={positionSubTab === 'Arrange' ? 3 : 1}
+                                            searchQuery={positionSearchQuery}
+                                            onSearchChange={setPositionSearchQuery}
+                                            placeholder="Search..."
+                                            isLoading={isPositionsLoading}
+                                            isFetchingNextPage={false}
+                                            hasNextPage={false}
+                                            fetchNextPage={undefined}
+                                            getItemId={(el) => (el as any).id}
+                                            getItemLabel={(el) => (el as any).label || (el as any).type || ''}
+                                            panelName="Positions"
+                                            panelIcon={Move}
+                                            isDark={isDark}
+                                            showCloseButton={true}
+                                            showSearch={false}
+                                            showSubtitle={false}
+                                            onReorder={(oldIdx, newIdx) => {
+                                                // Since the list is reversed, we need to convert indices back to original
+                                                const total = Array.from(elements.values()).length;
+                                                reorderElements(total - 1 - oldIdx, total - 1 - newIdx);
+                                            }}
+                                            customHeaderContent={
+                                                <div className={`flex p-1 mb-4 rounded-xl ${isDark ? 'bg-[#161625] border border-[#2a2d45]' : 'bg-gray-100'}`}>
+                                                    {['Arrange', 'Layers'].map((tab) => {
+                                                        const isActive = positionSubTab === tab;
+                                                        return (
+                                                            <button
+                                                                key={tab}
+                                                                onClick={() => setPositionSubTab(tab as any)}
+                                                                className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all cursor-pointer ${isActive
+                                                                    ? 'bg-[#7c3aed] text-white shadow-md'
+                                                                    : isDark ? 'text-gray-400 hover:text-white' : 'text-gray-500 hover:text-gray-700'}`}
+                                                            >
+                                                                {tab}
+                                                            </button>
+                                                        );
+                                                    })}
+                                                </div>
+                                            }
+                                            renderItem={(el: any, _index: number) => positionSubTab === 'Arrange' ? (
+                                                <div
+                                                    onClick={() => {
+                                                        if (selectedId && canvasRef.current) {
+                                                            const rect = canvasRef.current.getBoundingClientRect();
+                                                            const targetEl = elements.get(selectedId);
+                                                            const [baseW, baseH] = targetEl?.boundingSize ?? [200, 60];
+                                                            updateElement(selectedId, {
+                                                                x: (el.x / 100) * rect.width - baseW / 2,
+                                                                y: (el.y / 100) * rect.height - baseH / 2,
+                                                                rotation: 0,
+                                                                scaleX: 1,
+                                                                scaleY: 1,
+                                                            });
+                                                            getHistoryControls().archive();
+                                                            window.dispatchEvent(new CustomEvent('history-updated'));
+                                                        }
+                                                    }}
+                                                    className={`w-full h-[140px] flex flex-col items-center justify-center border rounded-xl hover:scale-[1.03] transition-all cursor-pointer shadow-sm group ${isDark ? 'bg-[#1e2235] border-[#2a2d45] text-white hover:border-[#7c3aed] hover:bg-[#2d1f5e]' : 'bg-white border-gray-200 text-gray-800 hover:border-[#7c3aed] hover:bg-[#ede9fe]'}`}
+                                                >
+                                                    <div className={`p-4 rounded-full mb-3 transition-colors ${isDark ? 'bg-[#252840] group-hover:bg-[#4c1d95]' : 'bg-gray-50 group-hover:bg-[#ddd6fe]'}`}>
+                                                        <el.icon size={28} className={`transition-colors ${isDark ? 'text-gray-400 group-hover:text-white' : 'text-gray-500 group-hover:text-[#7c3aed]'}`} />
+                                                    </div>
+                                                    <span className="font-semibold text-[14px]">{el.label}</span>
+                                                </div>
+                                            ) : el.id === 'canvas-background' ? (
+                                                <div
+                                                    onClick={() => setSelectedId('canvas-background')}
+                                                    className={`mx-2 mb-1.5 h-[64px] flex items-center transition-all cursor-pointer group select-none border rounded-xl overflow-hidden ${selectedId === 'canvas-background'
+                                                        ? isDark ? 'bg-[#2d1f5e] border-[#7c3aed] shadow-[0_0_15px_rgba(124,58,237,0.15)]' : 'bg-[#ede9fe] border-[#7c3aed] shadow-[0_0_15px_rgba(124,58,237,0.1)]'
+                                                        : isDark ? 'bg-[#2a2a35] border-[#3a3a45] hover:border-[#7c3aed]/50' : 'bg-gray-100/80 border-gray-200 hover:border-[#7c3aed]/30 hover:shadow-sm'}`}
+                                                >
+                                                    <div className="flex-1 flex items-center justify-between min-w-0 px-3 pr-4">
+                                                        <div className="flex-1 flex items-center gap-3 min-w-0">
+                                                            <div className={`flex-1 h-8 rounded-lg flex items-center justify-center transition-colors flex-shrink-0 ${isDark ? 'bg-white/10' : 'bg-white shadow-inner border border-gray-200/50'}`}>
+                                                                <div className="w-full h-full rounded-lg overflow-hidden" style={{ backgroundColor: 'white' }} />
+                                                            </div>
+                                                        </div>
+
+                                                        <div className="ml-4 flex-shrink-0">
+                                                            <div
+                                                                className={`w-8 h-8 rounded-lg border transition-colors flex items-center justify-center relative overflow-hidden ${isDark ? 'bg-gray-800 border-gray-700' : 'bg-gray-50 border-gray-200'}`}
+                                                                title="Background"
+                                                            >
+                                                                <div
+                                                                    className="absolute inset-0 opacity-40"
+                                                                    style={{
+                                                                        backgroundImage: 'repeating-linear-gradient(45deg, currentColor 0, currentColor 1px, transparent 0, transparent 4px)',
+                                                                        color: isDark ? '#9ca3af' : '#6b7280'
+                                                                    }}
+                                                                />
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            ) : (
+                                                <div
+                                                    onClick={() => setSelectedId(el.id)}
+                                                    className={`mx-2 mb-1.5 h-[64px] flex items-center cursor-grab active:cursor-grabbing group select-none border rounded-xl overflow-hidden touch-none ${selectedId === el.id
+                                                        ? isDark ? 'bg-[#2d1f5e] border-[#7c3aed] shadow-[0_0_15px_rgba(124,58,237,0.15)]' : 'bg-[#ede9fe] border-[#7c3aed] shadow-[0_0_15px_rgba(124,58,237,0.1)]'
+                                                        : isDark ? 'bg-[#2a2a35] border-[#3a3a45] hover:border-[#7c3aed]/50' : 'bg-gray-100/80 border-gray-200 hover:border-[#7c3aed]/30 hover:shadow-sm'}`}
+                                                >
+                                                    <div
+                                                        className={`flex items-center justify-center w-10 h-full flex-shrink-0 transition-colors ${isDark ? 'text-gray-600 group-hover:text-gray-400' : 'text-gray-300 group-hover:text-gray-500'}`}
+                                                    >
+                                                        <GripVertical size={22} strokeWidth={3} />
+                                                    </div>
+
+                                                    <div className="flex-1 flex items-center justify-center min-w-0 pr-4 relative overflow-hidden">
+                                                        {/* Element Preview in Middle */}
+                                                        {(() => {
+                                                            const ElementComponent = getElementComponent(el.type) as unknown as React.ElementType<any>;
+                                                            if (!ElementComponent) return null;
+
+                                                            // Extract base size for proportions
+                                                            const [baseW, baseH] = el.boundingSize ?? [200, 60];
+                                                            const ratio = baseH / baseW;
+
+                                                            return (
+                                                                <div className="flex items-center justify-center pointer-events-none select-none opacity-90 transition-transform duration-200" style={{ transform: 'scale(0.28)', transformOrigin: 'center center' }}>
+                                                                    <Suspense fallback={null}>
+                                                                        <ElementComponent
+                                                                            isDark={isDark}
+                                                                            style={{
+                                                                                width: 140,
+                                                                                height: 140 * ratio,
+                                                                            }}
+                                                                            {...(el.props ?? {})}
+                                                                        />
+                                                                    </Suspense>
+                                                                </div>
+                                                            );
+                                                        })()}
+                                                    </div>
+
+                                                    <div className="pr-3 flex-shrink-0 relative">
+                                                        <button
+                                                            onClick={(e) => { e.stopPropagation(); setActiveMenuId(activeMenuId === el.id ? null : el.id); }}
+                                                            className={`p-1.5 rounded-md hover:bg-black/5 dark:hover:bg-white/10 transition-all ${isDark ? 'text-gray-400' : 'text-gray-500'}`}
+                                                            title="More Actions"
+                                                        >
+                                                            <MoreVertical size={20} />
+                                                        </button>
+
+                                                        {activeMenuId === el.id && (
+                                                            <>
+                                                                <div className="fixed inset-0 z-10" onClick={(e) => { e.stopPropagation(); setActiveMenuId(null); }} />
+                                                                <div className={`absolute right-0 top-full mt-1 w-32 py-1.5 z-20 rounded-lg shadow-xl border animate-in fade-in zoom-in duration-100 origin-top-right ${isDark ? 'bg-[#1e2235] border-[#2a2d45]' : 'bg-white border-gray-100'}`}>
+                                                                    <button
+                                                                        onClick={(e) => {
+                                                                            e.stopPropagation();
+                                                                            removeElement(el.id);
+                                                                            getHistoryControls().archive();
+                                                                            window.dispatchEvent(new CustomEvent('history-updated'));
+                                                                            setActiveMenuId(null);
+                                                                        }}
+                                                                        className={`w-full px-3 py-1.5 text-left text-sm font-bold flex items-center gap-2 transition-colors ${isDark ? 'text-red-400 hover:bg-red-400/10' : 'text-red-500 hover:bg-red-50'}`}
+                                                                    >
+                                                                        <X size={14} />
+                                                                        Delete
+                                                                    </button>
+                                                                </div>
+                                                            </>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            )}
+                                        />
+                                    ) : (
+                                        <div className={`text-sm font-medium px-4 pt-4 ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+                                            {activeTab} content here
+                                        </div>
+                                    )}
+                                </div>
+                            </>
+                        )}
+                    </div>
+
+                    {/* 5. Center Canvas area (droppable) */}
+                    <CanvasDropZone
+                        canvasRef={canvasRef}
+                        isDark={isDark}
+                        setSelectedId={setSelectedId}
+                    >
+                        {/* 2D HTML Canvas Surface */}
+                        <div
+                            style={{ position: 'relative', width: '100%', height: '100%', overflow: 'hidden' }}
+                            onClick={(e) => {
+                                if (e.target === e.currentTarget) setSelectedId(null);
+                            }}
+                        >
+                            {elementIds.map((id, idx) => {
+                                const el = elements.get(id);
+
+                                if (!el) return null;
+                                const isSelected = el.id === selectedId;
+
                                 return (
-                                    <button
-                                        key={tab.id}
-                                        onClick={() => {
-                                            const newTab = isActive ? null : tab.id;
-                                            setActiveTab(newTab);
-                                            // Close right panel when any left panel opens
-                                            if (newTab) setIsRightPanelAnimationOpen(false);
-                                        }}
-                                        className={`w-10 h-10 flex items-center justify-center rounded-xl transition-colors cursor-pointer ${isActive
-                                            ? isDark
-                                                ? 'bg-[#4c1d95] text-[#a78bfa]'
-                                                : 'bg-[#ede9fe] text-[#7c3aed]'
-                                            : isDark
-                                                ? 'bg-transparent text-gray-400 hover:text-white hover:bg-[#252840]'
-                                                : 'bg-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-100'
-                                            }`}
-                                        title={tab.label}
-                                    >
-                                        <tab.icon size={20} />
-                                    </button>
+                                    <SceneElement
+                                        key={el.id}
+                                        el={{ ...el, zIndex: idx + 1 }}
+                                        isDark={isDark}
+                                        isSelected={isSelected}
+                                        updateElement={updateElement}
+                                        setSelectedId={setSelectedId}
+                                        containerRef={canvasRef}
+                                    />
                                 );
                             })}
                         </div>
+                    </CanvasDropZone>
 
-                        {/* Floating Panel Backdrop - pointer-events-none during drag so canvas can receive drop */}
-                        {activeTab && (
-                            <div
-                                className={`absolute inset-0 z-30 bg-transparent ${isDraggingElement ? 'pointer-events-none' : ''}`}
-                                onClick={() => setActiveTab(null)}
-                            />
-                        )}
-
-                        {/* Floating Panel (Absolute position) */}
+                    {/* 6. Right panel Backdrop */}
+                    {isRightPanelAnimationOpen && (
                         <div
-                            className={`absolute top-0 left-[62px] bottom-0 rounded-xl overflow-hidden z-40 flex flex-col transition-all duration-300 ease-in-out ${activeTab ? 'translate-x-0 shadow-xl opacity-100' : '-translate-x-12 opacity-0 pointer-events-none'
-                                } ${isDark ? 'bg-[#1e2235] border border-[#2a2d45]' : 'bg-white border border-gray-100'}`}
-                            style={{ width: '480px' }}
-                        >
-                            {activeTab && (
-                                <>
-                                    <div className="flex-1 min-h-0 flex flex-col">
-                                        {activeTab === 'Elements' && !selectedCategory && !searchQuery ? (
-                                            <UniversalPanel
-                                                title="Elements"
-                                                onClose={() => { setActiveTab(null); }}
-                                                items={ELEMENT_CATEGORIES}
-                                                width={480}
-                                                height="100%"
-                                                itemHeight={140}
-                                                searchQuery={searchQuery}
-                                                onSearchChange={setSearchQuery}
-                                                placeholder="Search elements..."
-                                                getItemId={(cat) => cat.id}
-                                                getItemLabel={(cat) => cat.label}
-                                                panelName="Categories"
-                                                panelIcon={Layers}
-                                                isDark={isDark}
-                                                showCloseButton={true}
-                                                renderItem={(cat) => (
-                                                    <div 
-                                                        onClick={() => setSelectedCategory(cat.id)} 
-                                                        className={`cursor-pointer w-full h-[140px] flex flex-col items-center justify-center border rounded-xl hover:scale-[1.03] transition-transform select-none ${isDark ? 'bg-[#1e2235] border-[#2a2d45] text-white shadow-md' : 'bg-white border-gray-200 text-gray-800 shadow-sm'}`}
-                                                    >
-                                                        <span className="text-[40px] mb-3">{cat.emoji}</span>
-                                                        <span className="font-semibold text-[15px]">{cat.label}</span>
-                                                    </div>
-                                                )}
-                                            />
-                                        ) : activeTab === 'Elements' ? (
-                                            <UniversalPanel
-                                                title={selectedCategory ? (
-                                                    <div className="flex items-center gap-2">
-                                                        <button 
-                                                            onClick={(e) => { e.stopPropagation(); setSelectedCategory(null); }}
-                                                            className={`flex items-center justify-center p-1.5 rounded-md transition-colors ${isDark ? 'hover:bg-gray-800 text-gray-400 hover:text-white' : 'hover:bg-gray-100 text-gray-500 hover:text-gray-900'}`}
-                                                        >
-                                                            <ArrowLeft size={18} />
-                                                        </button>
-                                                        <span>{ELEMENT_CATEGORIES.find(c => c.id === selectedCategory)?.label || "Elements"}</span>
-                                                    </div>
-                                                ) : "Elements"}
-                                                onClose={() => { setActiveTab(null); setSelectedCategory(null); setSearchQuery(''); }}
-                                                items={flatElements}
-                                                pageSize={elementsPageSize}
-                                                firstPageParam={elementsData?.pageParams?.[0] as number ?? 0}
-                                                width={480}
-                                                height="100%"
-                                                itemHeight={140}
-                                                searchQuery={searchQuery}
-                                                onSearchChange={setSearchQuery}
-                                                placeholder="Search elements..."
-                                                isLoading={isElementsLoading}
-                                                isFetchingNextPage={isFetchingNextPage}
-                                                hasNextPage={hasNextPage}
-                                                fetchNextPage={fetchNextPage}
-                                                isFetchingPreviousPage={isFetchingPreviousPage}
-                                                hasPreviousPage={hasPreviousPage}
-                                                fetchPreviousPage={fetchPreviousPage}
-                                                getItemId={(el) => el.type}
-                                                getItemLabel={(el) => el.label}
-                                                panelName={selectedCategory ? ELEMENT_CATEGORIES.find(c => c.id === selectedCategory)?.label || "Elements" : "Elements"}
-                                                panelIcon={Layers}
-                                                isDark={isDark}
-                                                showCloseButton={true}
-                                                renderItem={(el) => (
-                                                    <DraggableElementCard
-                                                        element={el}
-                                                        isDark={isDark}
-                                                    />
-                                                )}
-                                            />
-                                        ) : activeTab === 'Templates' ? (
-                                            <UniversalPanel
-                                                title="Templates"
-                                                onClose={() => { setActiveTab(null); }}
-                                                items={flatTemplates}
-                                                width={480}
-                                                height="100%"
-                                                itemHeight={140}
-                                                searchQuery={templateSearchQuery}
-                                                onSearchChange={setTemplateSearchQuery}
-                                                placeholder="Search templates..."
-                                                isLoading={isTemplatesLoading}
-                                                isFetchingNextPage={false}
-                                                hasNextPage={false}
-                                                fetchNextPage={undefined}
-                                                getItemId={(el) => el.id}
-                                                getItemLabel={(el) => el.label}
-                                                panelName="Templates"
-                                                panelIcon={LayoutTemplate}
-                                                isDark={isDark}
-                                                showCloseButton={true}
-                                                renderItem={(el) => (
-                                                    <DraggableCard
-                                                        elementId={el.id}
-                                                        icon={el.icon}
-                                                        label={el.label}
-                                                        isDark={isDark}
-                                                    />
-                                                )}
-                                            />
-                                        ) : activeTab === 'Media' ? (
-                                            <UniversalPanel
-                                                title="Media"
-                                                onClose={() => { setActiveTab(null); }}
-                                                items={flatMedia}
-                                                width={480}
-                                                height="100%"
-                                                itemHeight={140}
-                                                searchQuery={mediaSearchQuery}
-                                                onSearchChange={setMediaSearchQuery}
-                                                placeholder="Search assets..."
-                                                isLoading={isMediaLoading}
-                                                isFetchingNextPage={false}
-                                                hasNextPage={false}
-                                                fetchNextPage={undefined}
-                                                getItemId={(el) => el.id}
-                                                getItemLabel={(el) => el.label}
-                                                panelName="Media"
-                                                panelIcon={Video}
-                                                isDark={isDark}
-                                                showCloseButton={true}
-                                                renderItem={(el) => (
-                                                    <div 
-                                                        onClick={() => {
-                                                            addElement({
-                                                                id: Date.now().toString(),
-                                                                type: 'videoPlaceholder' as any,
-                                                                transform: `translate(${400 - 280 / 2}px, ${225 - 180 / 2}px) rotate(0deg) scale(1, 1)`,
-                                                                boundingSize: [280, 180],
-                                                                props: { url: el.url, thumbnail: el.thumbnail, label: el.label }
-                                                            });
-                                                            getHistoryControls().archive();
-                                                        }}
-                                                        className={`relative w-full h-[140px] rounded-xl overflow-hidden cursor-pointer border group hover:scale-[1.03] transition-all ${isDark ? 'border-[#2a2d45] bg-[#161625]' : 'border-gray-200 bg-gray-50'}`}
-                                                    >
-                                                        <img src={el.thumbnail} alt={el.label} className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" />
-                                                        <div className="absolute inset-0 bg-black/20 group-hover:bg-black/0 transition-colors" />
-                                                        <div className="absolute bottom-2 left-2 right-2 flex items-center justify-between pointer-events-none">
-                                                            <span className="text-[10px] font-bold text-white bg-black/50 px-1.5 py-0.5 rounded backdrop-blur-sm shadow-sm">{el.duration}</span>
-                                                        </div>
-                                                        <div className="absolute top-2 left-2 pointer-events-none">
-                                                            <span className="text-[10px] font-bold text-white bg-[#7c3aed]/80 px-1.5 py-0.5 rounded backdrop-blur-sm shadow-sm">VIDEO</span>
-                                                        </div>
-                                                        <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                                                            <div className="bg-white/20 backdrop-blur-md p-2 rounded-full shadow-lg">
-                                                                <Play size={20} className="text-white fill-current" />
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                )}
-                                            />
-                                        ) : activeTab === 'Position' ? (
-                                            <UniversalPanel
-                                                title="Position"
-                                                onClose={() => { setActiveTab(null); }}
-                                                items={positionSubTab === 'Arrange' ? flatPositions : [...Array.from(elements.values()).reverse(), { id: 'canvas-background', type: 'background', label: 'Background' }]}
-                                                width={480}
-                                                height="100%"
-                                                itemHeight={positionSubTab === 'Arrange' ? 140 : 70}
-                                                columnCount={positionSubTab === 'Arrange' ? 3 : 1}
-                                                searchQuery={positionSearchQuery}
-                                                onSearchChange={setPositionSearchQuery}
-                                                placeholder="Search..."
-                                                isLoading={isPositionsLoading}
-                                                isFetchingNextPage={false}
-                                                hasNextPage={false}
-                                                fetchNextPage={undefined}
-                                                getItemId={(el) => (el as any).id}
-                                                getItemLabel={(el) => (el as any).label || (el as any).type || ''}
-                                                panelName="Positions"
-                                                panelIcon={Move}
-                                                isDark={isDark}
-                                                showCloseButton={true}
-                                                showSearch={false}
-                                                showSubtitle={false}
-                                                onReorder={(oldIdx, newIdx) => {
-                                                    // Since the list is reversed, we need to convert indices back to original
-                                                    const total = Array.from(elements.values()).length;
-                                                    reorderElements(total - 1 - oldIdx, total - 1 - newIdx);
-                                                }}
-                                                customHeaderContent={
-                                                    <div className={`flex p-1 mb-4 rounded-xl ${isDark ? 'bg-[#161625] border border-[#2a2d45]' : 'bg-gray-100'}`}>
-                                                        {['Arrange', 'Layers'].map((tab) => {
-                                                            const isActive = positionSubTab === tab;
-                                                            return (
-                                                                <button
-                                                                    key={tab}
-                                                                    onClick={() => setPositionSubTab(tab as any)}
-                                                                    className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all cursor-pointer ${isActive 
-                                                                        ? 'bg-[#7c3aed] text-white shadow-md' 
-                                                                        : isDark ? 'text-gray-400 hover:text-white' : 'text-gray-500 hover:text-gray-700'}`}
-                                                                >
-                                                                    {tab}
-                                                                </button>
-                                                            );
-                                                        })}
-                                                    </div>
-                                                }
-                                                renderItem={(el: any, _index: number) => positionSubTab === 'Arrange' ? (
-                                                    <div 
-                                                        onClick={() => {
-                                                            if (selectedId && canvasRef.current) {
-                                                                const rect = canvasRef.current.getBoundingClientRect();
-                                                                const targetEl = elements.get(selectedId);
-                                                                const [baseW, baseH] = targetEl?.boundingSize ?? [200, 60];
-                                                                updateElement(selectedId, {
-                                                                    transform: `translate(${(el.x / 100) * rect.width - baseW / 2}px, ${(el.y / 100) * rect.height - baseH / 2}px) rotate(0deg) scale(1, 1)`
-                                                                });
-                                                                getHistoryControls().archive();
-                                                                window.dispatchEvent(new CustomEvent('history-updated'));
-                                                            }
-                                                        }}
-                                                        className={`w-full h-[140px] flex flex-col items-center justify-center border rounded-xl hover:scale-[1.03] transition-all cursor-pointer shadow-sm group ${isDark ? 'bg-[#1e2235] border-[#2a2d45] text-white hover:border-[#7c3aed] hover:bg-[#2d1f5e]' : 'bg-white border-gray-200 text-gray-800 hover:border-[#7c3aed] hover:bg-[#ede9fe]'}`}
-                                                    >
-                                                        <div className={`p-4 rounded-full mb-3 transition-colors ${isDark ? 'bg-[#252840] group-hover:bg-[#4c1d95]' : 'bg-gray-50 group-hover:bg-[#ddd6fe]'}`}>
-                                                            <el.icon size={28} className={`transition-colors ${isDark ? 'text-gray-400 group-hover:text-white' : 'text-gray-500 group-hover:text-[#7c3aed]'}`} />
-                                                        </div>
-                                                        <span className="font-semibold text-[14px]">{el.label}</span>
-                                                    </div>
-                                                ) : el.id === 'canvas-background' ? (
-                                                    <div 
-                                                        onClick={() => setSelectedId('canvas-background')}
-                                                        className={`mx-2 mb-1.5 h-[64px] flex items-center transition-all cursor-pointer group select-none border rounded-xl overflow-hidden ${selectedId === 'canvas-background' 
-                                                            ? isDark ? 'bg-[#2d1f5e] border-[#7c3aed] shadow-[0_0_15px_rgba(124,58,237,0.15)]' : 'bg-[#ede9fe] border-[#7c3aed] shadow-[0_0_15px_rgba(124,58,237,0.1)]'
-                                                            : isDark ? 'bg-[#2a2a35] border-[#3a3a45] hover:border-[#7c3aed]/50' : 'bg-gray-100/80 border-gray-200 hover:border-[#7c3aed]/30 hover:shadow-sm'}`}
-                                                    >
-                                                        <div className="flex-1 flex items-center justify-between min-w-0 px-3 pr-4">
-                                                            <div className="flex-1 flex items-center gap-3 min-w-0">
-                                                                <div className={`flex-1 h-8 rounded-lg flex items-center justify-center transition-colors flex-shrink-0 ${isDark ? 'bg-white/10' : 'bg-white shadow-inner border border-gray-200/50'}`}>
-                                                                    <div className="w-full h-full rounded-lg overflow-hidden" style={{ backgroundColor: 'white' }} />
-                                                                </div>
-                                                            </div>
+                            className="absolute inset-0 z-30 bg-transparent"
+                            onClick={() => setIsRightPanelAnimationOpen(false)}
+                        />
+                    )}
 
-                                                            <div className="ml-4 flex-shrink-0">
-                                                                <div 
-                                                                    className={`w-8 h-8 rounded-lg border transition-colors flex items-center justify-center relative overflow-hidden ${isDark ? 'bg-gray-800 border-gray-700' : 'bg-gray-50 border-gray-200'}`}
-                                                                    title="Background"
-                                                                >
-                                                                    <div 
-                                                                        className="absolute inset-0 opacity-40" 
-                                                                        style={{ 
-                                                                            backgroundImage: 'repeating-linear-gradient(45deg, currentColor 0, currentColor 1px, transparent 0, transparent 4px)',
-                                                                            color: isDark ? '#9ca3af' : '#6b7280'
-                                                                        }} 
-                                                                    />
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                ) : (
-                                                    <div 
-                                                        onClick={() => setSelectedId(el.id)}
-                                                        className={`mx-2 mb-1.5 h-[64px] flex items-center cursor-grab active:cursor-grabbing group select-none border rounded-xl overflow-hidden touch-none ${selectedId === el.id 
-                                                            ? isDark ? 'bg-[#2d1f5e] border-[#7c3aed] shadow-[0_0_15px_rgba(124,58,237,0.15)]' : 'bg-[#ede9fe] border-[#7c3aed] shadow-[0_0_15px_rgba(124,58,237,0.1)]'
-                                                            : isDark ? 'bg-[#2a2a35] border-[#3a3a45] hover:border-[#7c3aed]/50' : 'bg-gray-100/80 border-gray-200 hover:border-[#7c3aed]/30 hover:shadow-sm'}`}
-                                                    >
-                                                        <div 
-                                                            className={`flex items-center justify-center w-10 h-full flex-shrink-0 transition-colors ${isDark ? 'text-gray-600 group-hover:text-gray-400' : 'text-gray-300 group-hover:text-gray-500'}`}
-                                                        >
-                                                            <GripVertical size={22} strokeWidth={3} />
-                                                        </div>
-
-                                                        <div className="flex-1 flex items-center justify-center min-w-0 pr-4 relative overflow-hidden">
-                                                            {/* Element Preview in Middle */}
-                                                            {(() => {
-                                                                const ElementComponent = getElementComponent(el.type) as React.ElementType;
-                                                                if (!ElementComponent) return null;
-                                                                
-                                                                // Extract base size for proportions
-                                                                const [baseW, baseH] = el.boundingSize ?? [200, 60];
-                                                                const ratio = baseH / baseW;
-                                                                
-                                                                return (
-                                                                    <div className="flex items-center justify-center pointer-events-none select-none opacity-90 transition-transform duration-200" style={{ transform: 'scale(0.28)', transformOrigin: 'center center' }}>
-                                                                        <Suspense fallback={null}>
-                                                                            <ElementComponent 
-                                                                                isDark={isDark} 
-                                                                                style={{ 
-                                                                                    width: 140, 
-                                                                                    height: 140 * ratio,
-                                                                                }} 
-                                                                                {...(el.props ?? {})} 
-                                                                            />
-                                                                        </Suspense>
-                                                                    </div>
-                                                                );
-                                                            })()}
-                                                        </div>
-                                                        
-                                                        <div className="pr-3 flex-shrink-0 relative">
-                                                                <button 
-                                                                    onClick={(e) => { e.stopPropagation(); setActiveMenuId(activeMenuId === el.id ? null : el.id); }}
-                                                                    className={`p-1.5 rounded-md hover:bg-black/5 dark:hover:bg-white/10 transition-all ${isDark ? 'text-gray-400' : 'text-gray-500'}`}
-                                                                    title="More Actions"
-                                                                >
-                                                                    <MoreVertical size={20} />
-                                                                </button>
-
-                                                                {activeMenuId === el.id && (
-                                                                    <>
-                                                                        <div className="fixed inset-0 z-10" onClick={(e) => { e.stopPropagation(); setActiveMenuId(null); }} />
-                                                                        <div className={`absolute right-0 top-full mt-1 w-32 py-1.5 z-20 rounded-lg shadow-xl border animate-in fade-in zoom-in duration-100 origin-top-right ${isDark ? 'bg-[#1e2235] border-[#2a2d45]' : 'bg-white border-gray-100'}`}>
-                                                                            <button 
-                                                                                onClick={(e) => { 
-                                                                                    e.stopPropagation(); 
-                                                                                    removeElement(el.id); 
-                                                                                    getHistoryControls().archive(); 
-                                                                                    window.dispatchEvent(new CustomEvent('history-updated'));
-                                                                                    setActiveMenuId(null);
-                                                                                }}
-                                                                                className={`w-full px-3 py-1.5 text-left text-sm font-bold flex items-center gap-2 transition-colors ${isDark ? 'text-red-400 hover:bg-red-400/10' : 'text-red-500 hover:bg-red-50'}`}
-                                                                            >
-                                                                                <X size={14} />
-                                                                                Delete
-                                                                            </button>
-                                                                        </div>
-                                                                    </>
-                                                                )}
-                                                            </div>
-                                                        </div>
-                                                )}
-                                            />
-                                        ) : (
-                                            <div className={`text-sm font-medium px-4 pt-4 ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
-                                                {activeTab} content here
-                                            </div>
-                                        )}
-                                    </div>
-                                </>
-                            )}
-                        </div>
-
-                        {/* 5. Center Canvas area (droppable) */}
-                        <CanvasDropZone
-                            canvasRef={canvasRef}
-                            isDark={isDark}
-                            setSelectedId={setSelectedId}
-                        >
-                            {/* 2D HTML Canvas Surface */}
-                            <div
-                                style={{ position: 'relative', width: '100%', height: '100%', overflow: 'hidden' }}
-                                onClick={(e) => {
-                                    if (e.target === e.currentTarget) setSelectedId(null);
-                                }}
-                            >
-                                {elementIds.map((id, idx) => {
-                                    const el = elements.get(id);
-
-                                    if (!el) return null;
-                                    const isSelected = el.id === selectedId;
-
-                                    return (
-                                        <SceneElement 
-                                            key={el.id}
-                                            el={{ ...el, zIndex: idx + 1 }}
-                                            isDark={isDark}
-                                            isSelected={isSelected}
-                                            updateElement={updateElement}
-                                            setSelectedId={setSelectedId}
-                                            containerRef={canvasRef}
-                                        />
-                                    );
-                                })}
-                            </div>
-                        </CanvasDropZone>
-
-                        {/* 6. Right panel Backdrop */}
-                        {isRightPanelAnimationOpen && (
-                            <div
-                                className="absolute inset-0 z-30 bg-transparent"
-                                onClick={() => setIsRightPanelAnimationOpen(false)}
+                    {/* 6. Right Floating Panel (Animations) */}
+                    <div
+                        className={`absolute top-0 right-[290px] bottom-0 rounded-xl overflow-hidden z-[45] flex flex-col transition-all duration-300 ease-in-out ${isRightPanelAnimationOpen ? '-translate-x-0 shadow-xl opacity-100' : 'translate-x-12 opacity-0 pointer-events-none'
+                            } ${isDark ? 'bg-[#1e2235] border border-[#2a2d45]' : 'bg-white border border-gray-100'}`}
+                        style={{ width: '480px' }}
+                    >
+                        <div className="flex-1 min-h-0 flex flex-col">
+                            <UniversalPanel
+                                title="Animations"
+                                onClose={() => setIsRightPanelAnimationOpen(false)}
+                                items={flatAnimations}
+                                width={480}
+                                height="100%"
+                                itemHeight={140}
+                                fetchNextPage={undefined}
+                                searchQuery={animationSearchQuery}
+                                onSearchChange={setAnimationSearchQuery}
+                                placeholder="Search animations..."
+                                isLoading={isAnimationsLoading}
+                                isFetchingNextPage={false}
+                                hasNextPage={false}
+                                getItemId={(preset) => preset.id}
+                                getItemLabel={(preset) => preset.label}
+                                panelName="Animations"
+                                panelIcon={Sparkles}
+                                isDark={isDark}
+                                showCloseButton={true}
+                                renderItem={(preset) => (
+                                    <AnimationCard
+                                        preset={preset}
+                                        isDark={isDark}
+                                        isSelected={selectedAnimationId === preset.id}
+                                        onSelect={() => setSelectedAnimationId(preset.id)}
+                                    />
+                                )}
                             />
-                        )}
-
-                        {/* 6. Right Floating Panel (Animations) */}
-                        <div
-                            className={`absolute top-0 right-[290px] bottom-0 rounded-xl overflow-hidden z-40 flex flex-col transition-all duration-300 ease-in-out ${isRightPanelAnimationOpen ? '-translate-x-0 shadow-xl opacity-100' : 'translate-x-12 opacity-0 pointer-events-none'
-                                } ${isDark ? 'bg-[#1e2235] border border-[#2a2d45]' : 'bg-white border border-gray-100'}`}
-                            style={{ width: '480px' }}
-                        >
-                            <div className="flex-1 min-h-0 flex flex-col">
-                                <UniversalPanel
-                                    title="Animations"
-                                    onClose={() => setIsRightPanelAnimationOpen(false)}
-                                    items={flatAnimations}
-                                    width={480}
-                                    height="100%"
-                                    itemHeight={140}
-                                    fetchNextPage={undefined}
-                                    searchQuery={animationSearchQuery}
-                                    onSearchChange={setAnimationSearchQuery}
-                                    placeholder="Search animations..."
-                                    isLoading={isAnimationsLoading}
-                                    isFetchingNextPage={false}
-                                    hasNextPage={false}
-                                    getItemId={(preset) => preset.id}
-                                    getItemLabel={(preset) => preset.label}
-                                    panelName="Animations"
-                                    panelIcon={Sparkles}
-                                    isDark={isDark}
-                                    showCloseButton={true}
-                                    renderItem={(preset) => (
-                                        <AnimationCard
-                                            preset={preset}
-                                            isDark={isDark}
-                                            isSelected={selectedAnimationId === preset.id}
-                                            onSelect={() => setSelectedAnimationId(preset.id)}
-                                        />
-                                    )}
-                                />
-                            </div>
-                        </div>
-
-                        {/* 6. Main Right static panel */}
-                        <div className={`w-[280px] p-4 flex flex-col gap-4 flex-shrink-0 overflow-y-auto rounded-l-xl shadow-sm transition-colors duration-200 z-10 relative -mr-[10px] ${isDark ? 'bg-[#1e2235] border border-[#2a2d45]' : 'bg-white border border-transparent'}`}>
-                            <span className={`font-semibold text-sm ${isDark ? 'text-white' : 'text-gray-800'}`}>
-                                Properties
-                            </span>
-                            <button
-                                onClick={() => {
-                                    const newState = !isRightPanelAnimationOpen;
-                                    setIsRightPanelAnimationOpen(newState);
-                                    // Close left panel when Animations opens
-                                    if (newState) setActiveTab(null);
-                                }}
-                                className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg border transition-colors cursor-pointer group ${isRightPanelAnimationOpen
-                                    ? 'border-[#7c3aed] bg-[#7c3aed] text-white shadow-sm'
-                                    : isDark
-                                        ? 'border-[#2a2d45] hover:border-[#7c3aed] text-gray-300 bg-[#161625]'
-                                        : 'border-gray-200 hover:border-[#7c3aed] hover:bg-[#ede9fe] text-gray-700'
-                                    }`}
-                            >
-                                <div className="flex items-center gap-2">
-                                    <Sparkles size={16} className={isRightPanelAnimationOpen ? "text-white" : isDark ? "text-gray-400 group-hover:text-[#7c3aed]" : "text-gray-400 group-hover:text-[#7c3aed]"} />
-                                    <span className="text-sm font-medium">Animations</span>
-                                </div>
-                                <ChevronDown size={14} className={`transition-transform duration-200 ${isRightPanelAnimationOpen ? "rotate-180" : "-rotate-90"} ${isRightPanelAnimationOpen ? "text-white" : isDark ? "text-gray-500" : "text-gray-400"}`} />
-                            </button>
                         </div>
                     </div>
 
-                    {/* 7. Bottom bar (Timeline) */}
-                    <Timeline
-                        currentTime={currentTime}
-                        setCurrentTime={setCurrentTime}
-                        isPlaying={isPlaying}
-                        setIsPlaying={setIsPlaying}
-                        isDark={isDark}
-                        onOpenMediaPanel={() => setActiveTab('Media')}
-                    />
-
+                    {/* 6. Main Right static panel */}
+                    <div className={`w-[280px] p-4 flex flex-col gap-4 flex-shrink-0 overflow-y-auto rounded-l-xl shadow-sm transition-colors duration-200 z-10 relative -mr-[10px] ${isDark ? 'bg-[#1e2235] border border-[#2a2d45]' : 'bg-white border border-transparent'}`}>
+                        <span className={`font-semibold text-sm ${isDark ? 'text-white' : 'text-gray-800'}`}>
+                            Properties
+                        </span>
+                        <button
+                            onClick={() => {
+                                const newState = !isRightPanelAnimationOpen;
+                                setIsRightPanelAnimationOpen(newState);
+                                // Close left panel when Animations opens
+                                if (newState) setActiveTab(null);
+                            }}
+                            className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg border transition-colors cursor-pointer group ${isRightPanelAnimationOpen
+                                ? 'border-[#7c3aed] bg-[#7c3aed] text-white shadow-sm'
+                                : isDark
+                                    ? 'border-[#2a2d45] hover:border-[#7c3aed] text-gray-300 bg-[#161625]'
+                                    : 'border-gray-200 hover:border-[#7c3aed] hover:bg-[#ede9fe] text-gray-700'
+                                }`}
+                        >
+                            <div className="flex items-center gap-2">
+                                <Sparkles size={16} className={isRightPanelAnimationOpen ? "text-white" : isDark ? "text-gray-400 group-hover:text-[#7c3aed]" : "text-gray-400 group-hover:text-[#7c3aed]"} />
+                                <span className="text-sm font-medium">Animations</span>
+                            </div>
+                            <ChevronDown size={14} className={`transition-transform duration-200 ${isRightPanelAnimationOpen ? "rotate-180" : "-rotate-90"} ${isRightPanelAnimationOpen ? "text-white" : isDark ? "text-gray-500" : "text-gray-400"}`} />
+                        </button>
+                    </div>
                 </div>
+
+                {/* 7. Bottom bar (Timeline) */}
+                <Timeline
+                    currentTime={currentTime}
+                    setCurrentTime={setCurrentTime}
+                    isPlaying={isPlaying}
+                    setIsPlaying={setIsPlaying}
+                    isDark={isDark}
+                    onOpenMediaPanel={() => setActiveTab('Media')}
+                />
+
             </div>
+        </div>
     );
 };
 
