@@ -16,8 +16,8 @@ import {
 import {
     Undo2, Redo2, Play, Download,
     Layers, Video, Sparkles, LayoutTemplate,
-    X, Settings as SettingsIcon, Sun, Moon, Monitor, Type,
-    Move, Smartphone, ChevronDown, ArrowLeft, GripVertical, MoreVertical,
+    X, Settings as SettingsIcon, Sun, Moon, Monitor,
+    Move, Smartphone, ArrowLeft, GripVertical, MoreVertical,
     Box, PieChart, AppWindow, Smile, Triangle
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
@@ -27,7 +27,7 @@ const TABS = [
     { id: 'Elements', icon: Layers, label: 'Elements' },
     { id: 'Media', icon: Video, label: 'Media' },
     { id: 'Position', icon: Move, label: 'Position' },
-    { id: 'Text', icon: Type, label: 'Text' },
+    { id: 'Animations', icon: Sparkles, label: 'Animations' },
     { id: 'Templates', icon: LayoutTemplate, label: 'Templates' },
 ];
 
@@ -704,8 +704,6 @@ const SaasVideoEditor = () => {
     const [theme, setTheme] = useState<'light' | 'dark' | 'system'>('light');
     const [defaultPanelExpanded, setDefaultPanelExpanded] = useState(true);
     const [toolbarShouldCenter, setToolbarShouldCenter] = useState(false);
-    const [isRightPanelAnimationOpen, setIsRightPanelAnimationOpen] = useState(false);
-
     useEffect(() => {
         const checkIfExpanded = () => {
             // Detect maximized window: innerHeight is >= availHeight minus taskbar threshold
@@ -939,8 +937,6 @@ const SaasVideoEditor = () => {
                                     onClick={() => {
                                         const newTab = isActive ? null : tab.id;
                                         setActiveTab(newTab);
-                                        // Close right panel when any left panel opens
-                                        if (newTab) setIsRightPanelAnimationOpen(false);
                                     }}
                                     className={`w-10 h-10 flex items-center justify-center rounded-xl transition-colors cursor-pointer ${isActive
                                         ? isDark
@@ -1310,6 +1306,36 @@ const SaasVideoEditor = () => {
                                                 </div>
                                             )}
                                         />
+                                    ) : activeTab === 'Animations' ? (
+                                        <UniversalPanel
+                                            title="Animations"
+                                            onClose={() => { setActiveTab(null); }}
+                                            items={flatAnimations}
+                                            width={480}
+                                            height="100%"
+                                            itemHeight={140}
+                                            fetchNextPage={undefined}
+                                            searchQuery={animationSearchQuery}
+                                            onSearchChange={setAnimationSearchQuery}
+                                            placeholder="Search animations..."
+                                            isLoading={isAnimationsLoading}
+                                            isFetchingNextPage={false}
+                                            hasNextPage={false}
+                                            getItemId={(preset) => preset.id}
+                                            getItemLabel={(preset) => preset.label}
+                                            panelName="Animations"
+                                            panelIcon={Sparkles}
+                                            isDark={isDark}
+                                            showCloseButton={true}
+                                            renderItem={(preset) => (
+                                                <AnimationCard
+                                                    preset={preset}
+                                                    isDark={isDark}
+                                                    isSelected={selectedAnimationId === preset.id}
+                                                    onSelect={() => setSelectedAnimationId(preset.id)}
+                                                />
+                                            )}
+                                        />
                                     ) : (
                                         <div className={`text-sm font-medium px-4 pt-4 ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
                                             {activeTab} content here
@@ -1354,78 +1380,14 @@ const SaasVideoEditor = () => {
                         </div>
                     </CanvasDropZone>
 
-                    {/* 6. Right panel Backdrop */}
-                    {isRightPanelAnimationOpen && (
-                        <div
-                            className="absolute inset-0 z-30 bg-transparent"
-                            onClick={() => setIsRightPanelAnimationOpen(false)}
-                        />
-                    )}
-
-                    {/* 6. Right Floating Panel (Animations) */}
-                    <div
-                        className={`absolute top-0 right-[290px] bottom-0 rounded-xl overflow-hidden z-[45] flex flex-col transition-all duration-300 ease-in-out ${isRightPanelAnimationOpen ? '-translate-x-0 shadow-xl opacity-100' : 'translate-x-12 opacity-0 pointer-events-none'
-                            } ${isDark ? 'bg-[#1e2235] border border-[#2a2d45]' : 'bg-white border border-gray-100'}`}
-                        style={{ width: '480px' }}
-                    >
-                        <div className="flex-1 min-h-0 flex flex-col">
-                            <UniversalPanel
-                                title="Animations"
-                                onClose={() => setIsRightPanelAnimationOpen(false)}
-                                items={flatAnimations}
-                                width={480}
-                                height="100%"
-                                itemHeight={140}
-                                fetchNextPage={undefined}
-                                searchQuery={animationSearchQuery}
-                                onSearchChange={setAnimationSearchQuery}
-                                placeholder="Search animations..."
-                                isLoading={isAnimationsLoading}
-                                isFetchingNextPage={false}
-                                hasNextPage={false}
-                                getItemId={(preset) => preset.id}
-                                getItemLabel={(preset) => preset.label}
-                                panelName="Animations"
-                                panelIcon={Sparkles}
-                                isDark={isDark}
-                                showCloseButton={true}
-                                renderItem={(preset) => (
-                                    <AnimationCard
-                                        preset={preset}
-                                        isDark={isDark}
-                                        isSelected={selectedAnimationId === preset.id}
-                                        onSelect={() => setSelectedAnimationId(preset.id)}
-                                    />
-                                )}
-                            />
-                        </div>
-                    </div>
-
                     {/* 6. Main Right static panel */}
                     <div className={`w-[280px] p-4 flex flex-col gap-4 flex-shrink-0 overflow-y-auto rounded-l-xl shadow-sm transition-colors duration-200 z-10 relative -mr-[10px] ${isDark ? 'bg-[#1e2235] border border-[#2a2d45]' : 'bg-white border border-transparent'}`}>
                         <span className={`font-semibold text-sm ${isDark ? 'text-white' : 'text-gray-800'}`}>
                             Properties
                         </span>
-                        <button
-                            onClick={() => {
-                                const newState = !isRightPanelAnimationOpen;
-                                setIsRightPanelAnimationOpen(newState);
-                                // Close left panel when Animations opens
-                                if (newState) setActiveTab(null);
-                            }}
-                            className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg border transition-colors cursor-pointer group ${isRightPanelAnimationOpen
-                                ? 'border-[#7c3aed] bg-[#7c3aed] text-white shadow-sm'
-                                : isDark
-                                    ? 'border-[#2a2d45] hover:border-[#7c3aed] text-gray-300 bg-[#161625]'
-                                    : 'border-gray-200 hover:border-[#7c3aed] hover:bg-[#ede9fe] text-gray-700'
-                                }`}
-                        >
-                            <div className="flex items-center gap-2">
-                                <Sparkles size={16} className={isRightPanelAnimationOpen ? "text-white" : isDark ? "text-gray-400 group-hover:text-[#7c3aed]" : "text-gray-400 group-hover:text-[#7c3aed]"} />
-                                <span className="text-sm font-medium">Animations</span>
-                            </div>
-                            <ChevronDown size={14} className={`transition-transform duration-200 ${isRightPanelAnimationOpen ? "rotate-180" : "-rotate-90"} ${isRightPanelAnimationOpen ? "text-white" : isDark ? "text-gray-500" : "text-gray-400"}`} />
-                        </button>
+                        <div className={`text-sm ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+                            Select an element to view its properties.
+                        </div>
                     </div>
                 </div>
 
