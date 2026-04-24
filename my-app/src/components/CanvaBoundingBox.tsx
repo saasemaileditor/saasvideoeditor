@@ -45,11 +45,38 @@ export function CanvaBoundingBox({ el, updateElement, containerRef, targetRef }:
         if (moveableRef.current) {
             moveableRef.current.updateRect();
         }
+        if (target) {
+            updateRotationPosition(target.getBoundingClientRect());
+        }
     }, [target]);
 
     const pendingUpdatesRef = useRef<Partial<CanvasElement> | null>(null);
     // Tracks the raw transform string during drag for live DOM update
     const liveTransformRef = useRef<string>('');
+    const [rotationPos, setRotationPos] = React.useState<"top" | "bottom" | "left" | "right">("right");
+    const rotPosRef = React.useRef(rotationPos);
+
+    const updateRotationPosition = (rect: DOMRect) => {
+        const container = containerRef.current?.getBoundingClientRect();
+        if (!container) return;
+        const padding = 50; // Space needed for the rotation circle outside the element
+        let newPos: "top" | "bottom" | "left" | "right" = "right";
+        
+        if (container.right - rect.right < padding) {
+            if (rect.left - container.left > padding) {
+                newPos = "left";
+            } else if (container.bottom - rect.bottom > padding) {
+                newPos = "bottom";
+            } else {
+                newPos = "top";
+            }
+        }
+        
+        if (rotPosRef.current !== newPos) {
+            rotPosRef.current = newPos;
+            setRotationPos(newPos);
+        }
+    };
 
     const handleDragStart = () => {
         lockCursor('move');
@@ -84,6 +111,7 @@ export function CanvaBoundingBox({ el, updateElement, containerRef, targetRef }:
             x: parsed.x,
             y: parsed.y,
         };
+        updateRotationPosition(e.target.getBoundingClientRect());
     };
 
     const handleScale = (e: OnScale) => {
@@ -99,6 +127,7 @@ export function CanvaBoundingBox({ el, updateElement, containerRef, targetRef }:
             scaleX: parsed.scaleX,
             scaleY: parsed.scaleY,
         };
+        updateRotationPosition(e.target.getBoundingClientRect());
     };
 
     const handleRotate = (e: OnRotate) => {
@@ -234,7 +263,7 @@ export function CanvaBoundingBox({ el, updateElement, containerRef, targetRef }:
                 // Rotating
                 rotatable={true}
                 throttleRotate={0}
-                rotationPosition="right"
+                rotationPosition={rotationPos}
                 onRotateStart={handleRotateStart}
                 onRotate={handleRotate}
                 onRotateEnd={handleEnd}
