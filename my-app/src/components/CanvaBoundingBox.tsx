@@ -19,6 +19,23 @@ export interface CanvaBoundingBoxProps {
     targetRef: React.RefObject<HTMLElement | null>;
 }
 
+const lockCursor = (cursorStyle: string) => {
+    document.body.style.setProperty('cursor', cursorStyle, 'important');
+    let styleEl = document.getElementById('canva-cursor-lock');
+    if (!styleEl) {
+        styleEl = document.createElement('style');
+        styleEl.id = 'canva-cursor-lock';
+        document.head.appendChild(styleEl);
+    }
+    styleEl.innerHTML = `* { cursor: ${cursorStyle} !important; }`;
+};
+
+const unlockCursor = () => {
+    document.body.style.removeProperty('cursor');
+    const styleEl = document.getElementById('canva-cursor-lock');
+    if (styleEl) styleEl.remove();
+};
+
 export function CanvaBoundingBox({ el, updateElement, containerRef, targetRef }: CanvaBoundingBoxProps) {
     const target = targetRef?.current;
     const moveableRef = useRef<any>(null);
@@ -34,7 +51,25 @@ export function CanvaBoundingBox({ el, updateElement, containerRef, targetRef }:
     // Tracks the raw transform string during drag for live DOM update
     const liveTransformRef = useRef<string>('');
 
-    const handleStart = () => {
+    const handleDragStart = () => {
+        lockCursor('move');
+        pendingUpdatesRef.current = null;
+    };
+
+    const handleScaleStart = (e: any) => {
+        let cursor = 'nwse-resize';
+        const [dx, dy] = e.direction;
+        if (dx === 0 && dy !== 0) cursor = 'ns-resize';
+        else if (dx !== 0 && dy === 0) cursor = 'ew-resize';
+        else if ((dx === 1 && dy === -1) || (dx === -1 && dy === 1)) cursor = 'nesw-resize';
+        else cursor = 'nwse-resize';
+
+        lockCursor(cursor);
+        pendingUpdatesRef.current = null;
+    };
+
+    const handleRotateStart = () => {
+        lockCursor('grabbing');
         pendingUpdatesRef.current = null;
     };
 
@@ -81,6 +116,7 @@ export function CanvaBoundingBox({ el, updateElement, containerRef, targetRef }:
     };
 
     const handleEnd = () => {
+        unlockCursor();
         if (pendingUpdatesRef.current) {
             updateElement(el.id, pendingUpdatesRef.current);
             pendingUpdatesRef.current = null;
@@ -182,7 +218,7 @@ export function CanvaBoundingBox({ el, updateElement, containerRef, targetRef }:
                 // Dragging
                 draggable={true}
                 throttleDrag={0}
-                onDragStart={handleStart}
+                onDragStart={handleDragStart}
                 onDrag={handleDrag}
                 onDragEnd={handleEnd}
 
@@ -191,7 +227,7 @@ export function CanvaBoundingBox({ el, updateElement, containerRef, targetRef }:
                 throttleScale={0}
                 // All 8 directions based on Canva request
                 renderDirections={["nw", "ne", "sw", "se", "w", "e", "n", "s"]}
-                onScaleStart={handleStart}
+                onScaleStart={handleScaleStart}
                 onScale={handleScale}
                 onScaleEnd={handleEnd}
 
@@ -199,7 +235,7 @@ export function CanvaBoundingBox({ el, updateElement, containerRef, targetRef }:
                 rotatable={true}
                 throttleRotate={0}
                 rotationPosition="right"
-                onRotateStart={handleStart}
+                onRotateStart={handleRotateStart}
                 onRotate={handleRotate}
                 onRotateEnd={handleEnd}
 
