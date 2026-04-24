@@ -10,22 +10,97 @@ export type TimelineScene = {
     leadingGap?: number;
 };
 
+// ─── Keyframe type ────────────────────────────────────────────────────────────
+
+export type EasingType = 'linear' | 'ease-in' | 'ease-out' | 'ease-in-out' | 'spring';
+
+export type Keyframe = {
+    frame: number;
+    value: number;
+    easing?: EasingType;
+};
+
+export type AnimatedProperty = {
+    property: 'x' | 'y' | 'opacity' | 'rotation' | 'scaleX' | 'scaleY' | 'width' | 'height';
+    keyframes: Keyframe[];
+};
+
 // ─── Element type ────────────────────────────────────────────────────────────
 
 export type CanvasElement = {
     id: string;
+
+    // Element category type — extend this union as you add more element types
     type: 'text' | 'device' | 'card' | '3d' | 'chart' | 'counter' | 'button' | 'icon' | 'shape' | 'list' | 'searchBar' | 'notification';
-    transform: string;
+
+    // ─── Transform (raw numbers, NOT css strings) ─────────────────────────
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+    rotation: number;      // degrees
+    scaleX: number;        // 1 = normal
+    scaleY: number;        // 1 = normal
+    opacity: number;       // 0 to 1
+
+    // ─── Stacking ─────────────────────────────────────────────────────────
     zIndex?: number;
-    content?: string; // Holds the text string, or a URL for an image/video
-    /**
-     * Base bounding size in world units *before* scale is applied — [width, height].
-     * Used by CanvaBoundingBox to draw a correctly-sized selection outline.
-     * Omit for text elements; the bounding box falls back to [3, 0.4].
-     */
+
+    // ─── Parenting system ─────────────────────────────────────────────────
+    // If parentId is set, this element's final x/y is calculated as:
+    // finalX = this.x + parent.x
+    // finalY = this.y + parent.y
+    parentId: string | null;
+
+    // ─── Schema-driven props ──────────────────────────────────────────────
+    // Stores element-specific visual properties defined by schema.json
+    // Example: { backgroundColor: '#fff', borderRadius: 12, shadow: true }
+    props: Record<string, any>;
+
+    // ─── Keyframe animations ──────────────────────────────────────────────
+    // Each AnimatedProperty holds keyframes for one animatable property
+    // Example: opacity goes from 0 at frame 0 to 1 at frame 30
+    animations: AnimatedProperty[];
+
+    // ─── Content ──────────────────────────────────────────────────────────
+    content?: string; // text string or URL for image/video
+
+    // ─── Bounding size ────────────────────────────────────────────────────
+    // Used by CanvaBoundingBox for selection outline before scale is applied
     boundingSize?: [number, number];
-    props?: Record<string, any>; // Store element-specific properties
 };
+
+// ─── CSS Matrix Parser ────────────────────────────────────────────────────────
+
+/**
+ * Parses a CSS transform string from react-moveable into raw numbers.
+ * react-moveable outputs strings like: "translate(150px, 200px) rotate(45deg) scale(1.2, 1)"
+ * or matrix format: "matrix(a, b, c, d, tx, ty)"
+ * We extract raw x, y, rotation, scaleX, scaleY numbers for Zustand storage.
+ */
+export function parseTransformToNumbers(transform: string): {
+    x: number;
+    y: number;
+    rotation: number;
+    scaleX: number;
+    scaleY: number;
+} {
+    try {
+        const matrix = new DOMMatrix(transform);
+        const scaleX = Math.sqrt(matrix.a * matrix.a + matrix.b * matrix.b);
+        const scaleY = Math.sqrt(matrix.c * matrix.c + matrix.d * matrix.d);
+        const rotation = Math.atan2(matrix.b, matrix.a) * (180 / Math.PI);
+        return {
+            x: matrix.m41,
+            y: matrix.m42,
+            rotation,
+            scaleX,
+            scaleY,
+        };
+    } catch {
+        return { x: 0, y: 0, rotation: 0, scaleX: 1, scaleY: 1 };
+    }
+}
 
 // ─── UI State Store (Non-Undoable) ──────────────────────────────────────────
 

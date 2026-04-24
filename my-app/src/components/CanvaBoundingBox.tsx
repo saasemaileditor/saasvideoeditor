@@ -2,7 +2,7 @@ import React, { useEffect, useRef } from 'react';
 import Moveable from 'react-moveable';
 import type { OnDrag, OnScale, OnRotate } from 'react-moveable';
 import type { CanvasElement } from '../store/useEditorStore';
-import { getHistoryControls } from '../store/useEditorStore';
+import { getHistoryControls, parseTransformToNumbers } from '../store/useEditorStore';
 // Raw SVG import — zero React overhead, pure CSS injection for canvas performance
 import refreshCwRaw from 'lucide-static/icons/refresh-cw.svg?raw';
 
@@ -31,43 +31,56 @@ export function CanvaBoundingBox({ el, updateElement, containerRef, targetRef }:
     }, [target]);
 
     const pendingUpdatesRef = useRef<Partial<CanvasElement> | null>(null);
+    // Tracks the raw transform string during drag for live DOM update
+    const liveTransformRef = useRef<string>('');
 
     const handleStart = () => {
         pendingUpdatesRef.current = null;
     };
 
     const handleDrag = (e: OnDrag) => {
-        // Direct DOM update to bypass React state cycle
+        // Live DOM update — bypasses React for 60fps smoothness
         e.target.style.transform = e.transform;
+        liveTransformRef.current = e.transform;
 
+        const parsed = parseTransformToNumbers(e.transform);
         pendingUpdatesRef.current = {
             ...pendingUpdatesRef.current,
-            transform: e.transform
+            x: parsed.x,
+            y: parsed.y,
         };
     };
 
     const handleScale = (e: OnScale) => {
-        // Direct DOM Update for jitter-free 60FPS scale
+        // Live DOM update
         e.target.style.transform = e.drag.transform;
+        liveTransformRef.current = e.drag.transform;
 
+        const parsed = parseTransformToNumbers(e.drag.transform);
         pendingUpdatesRef.current = {
             ...pendingUpdatesRef.current,
-            transform: e.drag.transform
+            x: parsed.x,
+            y: parsed.y,
+            scaleX: parsed.scaleX,
+            scaleY: parsed.scaleY,
         };
     };
 
     const handleRotate = (e: OnRotate) => {
-        // Direct DOM Update
+        // Live DOM update
         e.target.style.transform = e.drag.transform;
+        liveTransformRef.current = e.drag.transform;
 
+        const parsed = parseTransformToNumbers(e.drag.transform);
         pendingUpdatesRef.current = {
             ...pendingUpdatesRef.current,
-            transform: e.drag.transform
+            x: parsed.x,
+            y: parsed.y,
+            rotation: parsed.rotation,
         };
     };
 
     const handleEnd = () => {
-        // "Write to the heavy notebook" ONLY when the mouse releases
         if (pendingUpdatesRef.current) {
             updateElement(el.id, pendingUpdatesRef.current);
             pendingUpdatesRef.current = null;
@@ -158,7 +171,8 @@ export function CanvaBoundingBox({ el, updateElement, containerRef, targetRef }:
             <Moveable
                 ref={moveableRef}
                 target={target}
-                container={containerRef.current}
+                container={null}
+                getContainer={() => containerRef.current as HTMLElement}
 
                 // Styles
                 className="canva-moveable-style"
@@ -192,7 +206,7 @@ export function CanvaBoundingBox({ el, updateElement, containerRef, targetRef }:
                 // Snapping & Guidelines (Pink Lines)
                 snappable={true}
                 snapDirections={{ "top": true, "center": true, "bottom": true, "left": true, "middle": true, "right": true }}
-                elementGuidelines={[{ element: containerRef.current, className: 'canvas' }]}
+                elementGuidelines={[]}
                 snapThreshold={5}
                 isDisplaySnapDigit={true}
                 snapGap={true}
