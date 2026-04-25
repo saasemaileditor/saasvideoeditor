@@ -1,8 +1,9 @@
 import React, { useRef, useEffect, useState, useMemo, useCallback } from 'react';
 import ReactDOM from 'react-dom';
-import { Play, Pause, Plus, LayoutGrid, Music, Maximize, CloudUpload, RectangleHorizontal, StepForward, Scissors, Copy, Trash2 } from 'lucide-react';
+import { Play, Pause, Plus, LayoutGrid, Music, Maximize, CloudUpload, StepForward, Scissors, Copy, Trash2, RectangleHorizontal } from 'lucide-react';
 import { useFloating, shift, offset, autoUpdate } from '@floating-ui/react';
 import { useEditorStore, getHistoryControls } from '../store/useEditorStore';
+import { CustomTimelineIcon } from './CustomTimelineIcon';
 
 interface TimelineProps {
     currentTime: number;
@@ -1281,6 +1282,11 @@ export const Timeline = ({
                     <div className="flex items-center gap-4 text-xs font-medium">
                         {/* Zoom Slider */}
                         <div className="flex items-center gap-3">
+                            <div className="w-4 flex justify-center">
+                                <button className={`flex-shrink-0 flex items-center justify-center w-6 h-6 rounded-md -mt-[3px] transition-colors cursor-pointer ${isDark ? 'text-gray-400 hover:text-white hover:bg-gray-800' : 'text-gray-500 hover:text-gray-900 hover:bg-gray-100'}`}>
+                                    <CustomTimelineIcon />
+                                </button>
+                            </div>
                             <div className="relative flex items-center group">
                                 <input
                                     type="range"
