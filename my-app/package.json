@@ -16,6 +16,7 @@
     "@floating-ui/react": "^0.27.19",
     "@remotion/player": "^4.0.441",
     "@remotion/web-renderer": "^4.0.443",
+    "@supabase/supabase-js": "^2.104.1",
     "@tailwindcss/vite": "^4.2.2",
     "@tanstack/react-query": "^5.96.2",
     "@tanstack/react-virtual": "^3.13.23",

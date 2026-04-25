@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Sparkles, Zap, Monitor, Smartphone, Square } from 'lucide-react';
+import { supabase } from '../lib/supabase';
 
 const RATIOS = [
     {
@@ -42,10 +43,41 @@ const RATIOS = [
 
 export default function Home() {
     const [hovered, setHovered] = useState<string | null>(null);
+    const [isCreating, setIsCreating] = useState(false);
 
-    const handleSelect = (ratio: typeof RATIOS[0]) => {
-        const url = `/editor?w=${ratio.width}&h=${ratio.height}&ratio=${encodeURIComponent(ratio.id)}`;
-        window.open(url, '_blank');
+    const handleSelect = async (ratio: typeof RATIOS[0]) => {
+        if (isCreating) return;
+        setIsCreating(true);
+
+        try {
+            // 0. Get the current user
+            const { data: { user }, error: userError } = await supabase.auth.getUser();
+            if (userError || !user) throw new Error("You must be logged in to create a project.");
+
+            // 1. Create the project in the database
+            const { data, error } = await supabase
+                .from('projects')
+                .insert({
+                    width: ratio.width,
+                    height: ratio.height,
+                    aspect_ratio: ratio.id,
+                    title: 'Untitled Project',
+                    user_id: user.id
+                })
+                .select('id')
+                .single();
+
+            if (error) throw error;
+
+            // 2. Open the editor with the new database ID (Canva/Figma style)
+            const url = `/editor/${data.id}`;
+            window.open(url, '_blank');
+        } catch (error) {
+            console.error("Failed to create project:", error);
+            alert("Failed to create project. Check console for details.");
+        } finally {
+            setIsCreating(false);
+        }
     };
 
     return (

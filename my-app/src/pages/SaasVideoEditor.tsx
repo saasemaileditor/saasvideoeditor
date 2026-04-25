@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef, useCallback, memo, Suspense } from 'react';
+import { useParams } from 'react-router-dom';
 import { useInfiniteQuery } from '@tanstack/react-query';
+import { supabase } from '../lib/supabase';
 import { motion, AnimatePresence } from 'motion/react';
 import { CanvaBoundingBox } from '../components/CanvaBoundingBox';
 import { UniversalPanel } from '../components/UniversalPanel';
@@ -433,11 +435,13 @@ const DraggableCard = ({ elementId, icon: Icon, label, isDark }: {
 
 
 /* ─── Canvas drop zone (uses Pragmatic Drag and Drop) ─── */
-const CanvasDropZone = ({ canvasRef, isDark, setSelectedId, children }: {
+const CanvasDropZone = ({ canvasRef, isDark, setSelectedId, children, className = '', style = {} }: {
     canvasRef: React.RefObject<HTMLDivElement | null>;
     isDark: boolean;
     setSelectedId: (id: string | null) => void;
     children: React.ReactNode;
+    className?: string;
+    style?: React.CSSProperties;
 }) => {
     const localRef = useRef<HTMLDivElement>(null);
     const [isOver, setIsOver] = useState(false);
@@ -475,14 +479,15 @@ const CanvasDropZone = ({ canvasRef, isDark, setSelectedId, children }: {
                     setSelectedId(null);
                 }
             }}
-            className={`flex-1 min-w-0 min-h-0 overflow-hidden z-10 rounded-xl relative transition-all duration-200 border ${isOver
+            className={`relative transition-all duration-200 border ${className} ${isOver
                 ? isDark
                     ? 'bg-[#2d1f5e]/40 border-[#7c3aed] shadow-[inset_0_0_20px_rgba(124,58,237,0.3)]'
                     : 'bg-[#f3e8ff] border-[#7c3aed] shadow-[inset_0_0_20px_rgba(124,58,237,0.3)]'
                 : isDark
-                    ? 'bg-[#161625] border-[#2a2d45] shadow-sm'
-                    : 'bg-white border-gray-200 shadow-sm'
+                    ? 'bg-black border-[#2a2d45] shadow-lg'
+                    : 'bg-white border-gray-200 shadow-md'
                 }`}
+            style={style}
         >
             {isOver && (
                 <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-20">
@@ -562,6 +567,9 @@ const SceneElement = memo(({ el, isDark, isSelected, updateElement, setSelectedI
 });
 
 const SaasVideoEditor = () => {
+    const { projectId } = useParams();
+    const [isProjectLoading, setIsProjectLoading] = useState(true);
+
     const [activeTab, setActiveTab] = useState<string | null>(null);
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
@@ -615,7 +623,36 @@ const SaasVideoEditor = () => {
         selectedId, setSelectedId,
         isPlaying, setIsPlaying,
         currentTime, setCurrentTime,
+        canvasFormat, setCanvasFormat
     } = useUIStore();
+
+    useEffect(() => {
+        const fetchProject = async () => {
+            if (!projectId) return;
+            try {
+                const { data, error } = await supabase
+                    .from('projects')
+                    .select('*')
+                    .eq('id', projectId)
+                    .single();
+
+                if (error) throw error;
+                
+                setCanvasFormat({
+                    width: data.width,
+                    height: data.height,
+                    ratio: data.aspect_ratio
+                });
+                // TODO: Load elements and scenes into useEditorStore here later
+            } catch (err) {
+                console.error("Failed to load project:", err);
+            } finally {
+                setIsProjectLoading(false);
+            }
+        };
+
+        fetchProject();
+    }, [projectId, setCanvasFormat]);
 
     useEffect(() => {
         if (selectedId) {
@@ -1347,38 +1384,54 @@ const SaasVideoEditor = () => {
                     </div>
 
                     {/* 5. Center Canvas area (droppable) */}
-                    <CanvasDropZone
-                        canvasRef={canvasRef}
-                        isDark={isDark}
-                        setSelectedId={setSelectedId}
-                    >
-                        {/* 2D HTML Canvas Surface */}
-                        <div
-                            style={{ position: 'relative', width: '100%', height: '100%', overflow: 'hidden' }}
-                            onClick={(e) => {
-                                if (e.target === e.currentTarget) setSelectedId(null);
-                            }}
-                        >
-                            {elementIds.map((id, idx) => {
-                                const el = elements.get(id);
+                    <div className="flex-1 min-w-0 min-h-0 flex items-center justify-center p-8 lg:p-16 relative">
+                        {isProjectLoading ? (
+                            <div className="flex flex-col items-center justify-center text-gray-500">
+                                <div className="w-8 h-8 border-4 border-t-[#7c3aed] border-[#e2e8f0] rounded-full animate-spin mb-4"></div>
+                                Loading project...
+                            </div>
+                        ) : (
+                            <CanvasDropZone
+                                canvasRef={canvasRef}
+                                isDark={isDark}
+                                setSelectedId={setSelectedId}
+                                className="rounded-sm overflow-hidden flex-shrink-0"
+                                style={{
+                                    aspectRatio: canvasFormat ? canvasFormat.ratio.replace(':', '/') : '16/9',
+                                    height: '100%',
+                                    maxHeight: '100%',
+                                    maxWidth: '100%'
+                                }}
+                            >
+                                {/* 2D HTML Canvas Surface */}
+                                <div
+                                    style={{ position: 'relative', width: '100%', height: '100%', overflow: 'hidden' }}
+                                    onClick={(e) => {
+                                        if (e.target === e.currentTarget) setSelectedId(null);
+                                    }}
+                                >
+                                    {elementIds.map((id, idx) => {
+                                        const el = elements.get(id);
 
-                                if (!el) return null;
-                                const isSelected = el.id === selectedId;
+                                        if (!el) return null;
+                                        const isSelected = el.id === selectedId;
 
-                                return (
-                                    <SceneElement
-                                        key={el.id}
-                                        el={{ ...el, zIndex: idx + 1 }}
-                                        isDark={isDark}
-                                        isSelected={isSelected}
-                                        updateElement={updateElement}
-                                        setSelectedId={setSelectedId}
-                                        containerRef={canvasRef}
-                                    />
-                                );
-                            })}
-                        </div>
-                    </CanvasDropZone>
+                                        return (
+                                            <SceneElement
+                                                key={el.id}
+                                                el={{ ...el, zIndex: idx + 1 }}
+                                                isDark={isDark}
+                                                isSelected={isSelected}
+                                                updateElement={updateElement}
+                                                setSelectedId={setSelectedId}
+                                                containerRef={canvasRef}
+                                            />
+                                        );
+                                    })}
+                                </div>
+                            </CanvasDropZone>
+                        )}
+                    </div>
 
                     {/* 6. Main Right static panel */}
                     <div className={`w-[280px] p-4 flex flex-col gap-4 flex-shrink-0 overflow-y-auto rounded-l-xl shadow-sm transition-colors duration-200 z-10 relative -mr-[10px] ${isDark ? 'bg-[#1e2235] border border-[#2a2d45]' : 'bg-white border border-transparent'}`}>

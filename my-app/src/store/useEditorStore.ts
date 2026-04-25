@@ -114,6 +114,9 @@ interface UIState {
     currentTime: number;
     setCurrentTime: (time: number | ((prev: number) => number)) => void;
 
+    // Canvas Settings
+    canvasFormat: { width: number; height: number; ratio: string } | null;
+    setCanvasFormat: (format: { width: number; height: number; ratio: string }) => void;
 }
 
 export const useUIStore = create<UIState>((set) => ({
@@ -127,6 +130,8 @@ export const useUIStore = create<UIState>((set) => ({
         currentTime: typeof time === 'function' ? time(state.currentTime) : time 
     })),
 
+    canvasFormat: null,
+    setCanvasFormat: (format) => set({ canvasFormat: format }),
 }));
 
 // ─── Document State Store (Undoable) ──────────────────────────────────────────
