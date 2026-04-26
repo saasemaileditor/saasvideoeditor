@@ -687,7 +687,7 @@ const SaasVideoEditor = () => {
     useEffect(() => {
         if (selectedId) {
             // Check existence imperatively, not as dependency
-            const exists = useEditorStore.getState().elements.has(selectedId);
+            const exists = useEditorStore.getState().elements[selectedId] !== undefined;
             if (!exists) setSelectedId(null);
         }
     }, [selectedId, setSelectedId]);
@@ -1215,7 +1215,7 @@ const SaasVideoEditor = () => {
                                         <UniversalPanel
                                             title="Position"
                                             onClose={() => { setActiveTab(null); }}
-                                            items={positionSubTab === 'Arrange' ? flatPositions : [...Array.from(elements.values()).reverse(), { id: 'canvas-background', type: 'background', label: 'Background' }]}
+                                            items={positionSubTab === 'Arrange' ? flatPositions : [...Object.values(elements).reverse(), { id: 'canvas-background', type: 'background', label: 'Background' }]}
                                             width={480}
                                             height="100%"
                                             itemHeight={positionSubTab === 'Arrange' ? 140 : 70}
@@ -1237,7 +1237,7 @@ const SaasVideoEditor = () => {
                                             showSubtitle={false}
                                             onReorder={(oldIdx, newIdx) => {
                                                 // Since the list is reversed, we need to convert indices back to original
-                                                const total = Array.from(elements.values()).length;
+                                                const total = Object.values(elements).length;
                                                 reorderElements(total - 1 - oldIdx, total - 1 - newIdx);
                                             }}
                                             customHeaderContent={
@@ -1263,7 +1263,7 @@ const SaasVideoEditor = () => {
                                                     onClick={() => {
                                                         if (selectedId && canvasRef.current) {
                                                             const rect = canvasRef.current.getBoundingClientRect();
-                                                            const targetEl = elements.get(selectedId);
+                                                            const targetEl = elements[selectedId];
                                                             const [baseW, baseH] = targetEl?.boundingSize ?? [200, 60];
                                                             updateElement(selectedId, {
                                                                 x: (el.x / 100) * rect.width - baseW / 2,
@@ -1327,12 +1327,10 @@ const SaasVideoEditor = () => {
                                                     </div>
 
                                                     <div className="flex-1 flex items-center justify-center min-w-0 pr-4 relative overflow-hidden">
-                                                        {/* Element Preview in Middle */}
                                                         {(() => {
                                                             const ElementComponent = getElementComponent(el.type) as unknown as React.ElementType<any>;
                                                             if (!ElementComponent) return null;
 
-                                                            // Extract base size for proportions
                                                             const [baseW, baseH] = el.boundingSize ?? [200, 60];
                                                             const ratio = baseH / baseW;
 
@@ -1426,7 +1424,6 @@ const SaasVideoEditor = () => {
                         )}
                     </div>
 
-                    {/* 5. Center Canvas area */}
                     <div className="flex-1 min-w-0 min-h-0 flex items-center justify-center p-8 relative z-0">
                         {isProjectLoading ? (
                             <div className="flex flex-col items-center justify-center text-gray-500">
@@ -1446,7 +1443,6 @@ const SaasVideoEditor = () => {
                                     maxWidth: '100%',
                                 }}
                             >
-                                {/* 2D HTML Canvas Surface */}
                                 <div
                                     style={{ position: 'relative', width: '100%', height: '100%', overflow: 'hidden' }}
                                     onClick={(e) => {
@@ -1454,7 +1450,7 @@ const SaasVideoEditor = () => {
                                     }}
                                 >
                                     {elementIds.map((id, idx) => {
-                                        const el = elements.get(id);
+                                        const el = elements[id];
 
                                         if (!el) return null;
                                         const isSelected = el.id === selectedId;

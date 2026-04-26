@@ -33,13 +33,13 @@ export const ExportStudio = () => {
 
 
   const handleExport = useCallback(async () => {
-    if (elements.size === 0) {
+    if (Object.keys(elements).length === 0) {
       alert('Add some elements first!');
       return;
     }
 
     // Check if too many elements
-    if (elements.size > 1000 && hardware.recommendation === 'low') {
+    if (Object.keys(elements).length > 1000 && hardware.recommendation === 'low') {
       const proceed = window.confirm(
         'You have many elements and a low-end device. ' +
         'Export may crash. Consider reducing elements or using Draft quality. ' +
@@ -149,7 +149,7 @@ export const ExportStudio = () => {
         {/* Preview */}
         <div className="bg-black rounded-lg overflow-hidden mb-6 aspect-video">
           <p className="text-center text-gray-500 pt-20">
-            Preview: {elements.size} elements
+            Preview: {Object.keys(elements).length} elements
           </p>
         </div>
 
@@ -214,10 +214,10 @@ export const ExportStudio = () => {
         {!isExporting && (
           <button
             onClick={handleExport}
-            disabled={elements.size === 0}
+            disabled={Object.keys(elements).length === 0}
             className="w-full py-4 bg-purple-600 rounded-lg font-semibold text-lg hover:bg-purple-700 disabled:bg-gray-600 disabled:cursor-not-allowed"
           >
-            {elements.size === 0 ? 'Add elements to export' : 'Start Export'}
+            {Object.keys(elements).length === 0 ? 'Add elements to export' : 'Start Export'}
           </button>
         )}
       </div>

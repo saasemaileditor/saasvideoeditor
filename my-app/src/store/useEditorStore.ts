@@ -25,6 +25,18 @@ export type AnimatedProperty = {
     keyframes: Keyframe[];
 };
 
+// ─── Serializable value type ─────────────────────────────────────────────────
+// Enforces compile-time safety: only plain JSON-compatible values are allowed
+// inside element props. Prevents functions, DOM nodes, and class instances
+// from accidentally entering Zustand state and breaking database saves.
+export type SerializableValue =
+    | string
+    | number
+    | boolean
+    | null
+    | SerializableValue[]
+    | { [key: string]: SerializableValue };
+
 // ─── Element type ────────────────────────────────────────────────────────────
 
 export type CanvasElement = {
@@ -53,9 +65,10 @@ export type CanvasElement = {
     parentId: string | null;
 
     // ─── Schema-driven props ──────────────────────────────────────────────
-    // Stores element-specific visual properties defined by schema.json
-    // Example: { backgroundColor: '#fff', borderRadius: 12, shadow: true }
-    props: Record<string, any>;
+    // Tightened from Record<string, any> to Record<string, SerializableValue>.
+    // This enforces compile-time safety — functions and class instances are
+    // rejected by TypeScript before they can reach Zustand.
+    props: Record<string, SerializableValue>;
 
     // ─── Keyframe animations ──────────────────────────────────────────────
     // Each AnimatedProperty holds keyframes for one animatable property
@@ -137,8 +150,10 @@ export const useUIStore = create<UIState>((set) => ({
 // ─── Document State Store (Undoable) ──────────────────────────────────────────
 
 interface EditorState {
-    // UNDOABLE — stored as Map for O(1) lookups + insertion-ordered id list
-    elements: Map<string, CanvasElement>;
+    // UNDOABLE — stored as plain Record for 100% JSON serializability.
+    // Record<id, element> gives identical O(1) lookups as Map in modern V8.
+    // Unlike Map, JSON.stringify(Record) works correctly for database saves.
+    elements: Record<string, CanvasElement>;
     elementIds: string[];
 
     // UNDOABLE — timeline scenes (shared undo/redo with elements)
@@ -162,26 +177,27 @@ interface EditorState {
 export const useEditorStore = create<EditorState>()(
     travel(
         (set) => ({
-            // Undoable state
-            elements: new Map<string, CanvasElement>(),
+            // Undoable state — plain Record, not Map, for JSON serializability
+            elements: {} as Record<string, CanvasElement>,
             elementIds: [] as string[],
             scenes: [] as TimelineScene[],
 
-            // Adds a new item to the canvas and selects it
-            addElement: (element) =>
+            // Adds a new item to the canvas
+            addElement: (element) => {
                 set((state) => ({
-                    elements: new Map([...state.elements, [element.id, element]]),
+                    elements: { ...state.elements, [element.id]: element },
                     elementIds: [...state.elementIds, element.id],
                     scenes: state.scenes,
-                })),
+                }));
+            },
 
             // Updates an item's fields (position/rotation/scale/etc.)
             updateElement: (id, data) =>
                 set((state) => {
-                    const el = state.elements.get(id);
+                    const el = state.elements[id];
                     if (!el) return state;
                     return {
-                        elements: new Map([...state.elements, [id, { ...el, ...data }]]),
+                        elements: { ...state.elements, [id]: { ...el, ...data } },
                         elementIds: state.elementIds,
                         scenes: state.scenes,
                     };
@@ -190,10 +206,9 @@ export const useEditorStore = create<EditorState>()(
             // Removes an element from the canvas
             removeElement: (id) =>
                 set((state) => {
-                    const newElements = new Map(state.elements);
-                    newElements.delete(id);
+                    const { [id]: removed, ...rest } = state.elements;
                     return {
-                        elements: newElements,
+                        elements: rest,
                         elementIds: state.elementIds.filter((eid) => eid !== id),
                         scenes: state.scenes,
                     };
@@ -206,11 +221,11 @@ export const useEditorStore = create<EditorState>()(
                     const [movedId] = ids.splice(oldIndex, 1);
                     ids.splice(newIndex, 0, movedId);
 
-                    // Reconstruct the Map to reflect the new order
-                    const newElements = new Map<string, CanvasElement>();
+                    // Reconstruct the Record to reflect the new order
+                    const newElements: Record<string, CanvasElement> = {};
                     ids.forEach(id => {
-                        const el = state.elements.get(id);
-                        if (el) newElements.set(id, el);
+                        const el = state.elements[id];
+                        if (el) newElements[id] = el;
                     });
 
                     return {
@@ -281,3 +296,68 @@ export function getHistoryControls(): ManualTravelsControls<EditorState, false> 
     // Double-cast via unknown because the middleware wraps state in StoreApi<T>.
     return useEditorStore.getControls!() as unknown as ManualTravelsControls<EditorState, false>;
 }
+
+// ─── Trap 2: Serialization Debugger ──────────────────────────────────────────
+// Subscribes to the store and verifies the entire elements object is 100% pure JSON.
+// Now also does a full-state JSON.stringify to catch the Map->empty-object bug.
+useEditorStore.subscribe((state) => {
+    const count = Object.keys(state.elements).length;
+    if (count === 0) return;
+
+    let allClean = true;
+
+    Object.entries(state.elements).forEach(([id, element]) => {
+        const scanForNonSerializable = (obj: unknown, path: string): boolean => {
+            if (obj === null || obj === undefined) return true;
+            const type = typeof obj;
+            if (type === 'function') {
+                console.error(`TRAP 2 DETECTED: Non-serializable data found in element: ${id} — path: ${path} — type: function`);
+                return false;
+            }
+            if (type === 'object') {
+                if (obj instanceof Element || obj instanceof Node) {
+                    console.error(`TRAP 2 DETECTED: Non-serializable data found in element: ${id} — path: ${path} — type: DOM Node`);
+                    return false;
+                }
+                const proto = Object.getPrototypeOf(obj);
+                if (proto !== Object.prototype && proto !== Array.prototype && proto !== null) {
+                    console.error(`TRAP 2 DETECTED: Non-serializable data found in element: ${id} — path: ${path} — type: class instance (${proto?.constructor?.name})`);
+                    return false;
+                }
+                for (const [key, val] of Object.entries(obj as Record<string, unknown>)) {
+                    if (!scanForNonSerializable(val, `${path}.${key}`)) return false;
+                }
+            }
+            return true;
+        };
+
+        try {
+            JSON.stringify(element);
+        } catch {
+            console.error(`TRAP 2 DETECTED: JSON.stringify failed on element: ${id}`);
+            allClean = false;
+            return;
+        }
+
+        const clean = scanForNonSerializable(element, `elements[${id}]`);
+        if (!clean) allClean = false;
+    });
+
+    // Full-state round-trip: proves the entire elements Record stringifies correctly
+    try {
+        const fullJson = JSON.stringify(state.elements);
+        const parsed = JSON.parse(fullJson);
+        if (Object.keys(parsed).length !== count) {
+            console.error(`TRAP 2 DETECTED: elements lost data during JSON round-trip (Map serialization bug)`);
+            allClean = false;
+        }
+    } catch {
+        console.error(`TRAP 2 DETECTED: Full elements JSON.stringify failed`);
+        allClean = false;
+    }
+
+    if (allClean) {
+        console.log(`STATE CHECK: elements are 100% serializable JSON (${count} element(s) verified — full round-trip passed)`);
+    }
+});
+

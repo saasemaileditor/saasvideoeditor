@@ -14,7 +14,7 @@ const ELEMENT_REGISTRY: Record<string, React.FC<any>> = {
 // This is what makes parenting work without HTML nesting.
 function getWorldPosition(
     element: CanvasElement,
-    allElements: Map<string, CanvasElement>
+    allElements: Record<string, CanvasElement>
 ): { x: number; y: number } {
     let x = element.x;
     let y = element.y;
@@ -23,7 +23,7 @@ function getWorldPosition(
     // Walk up parent chain — max 10 levels to prevent infinite loops
     let safety = 0;
     while (current.parentId && safety < 10) {
-        const parent = allElements.get(current.parentId);
+        const parent = allElements[current.parentId];
         if (!parent) break;
         x += parent.x;
         y += parent.y;
@@ -41,7 +41,7 @@ function CanvasElementRenderer({
     containerRef,
 }: {
     element: CanvasElement;
-    allElements: Map<string, CanvasElement>;
+    allElements: Record<string, CanvasElement>;
     containerRef: React.RefObject<HTMLDivElement | null>;
 }) {
     const targetRef = useRef<HTMLDivElement>(null);
@@ -121,8 +121,8 @@ export function CanvasRenderer() {
                 background: '#1a1a1a',
             }}
         >
-            {elementIds.map((id) => {
-                const element = elements.get(id);
+            {elementIds.map(id => {
+                const element = elements[id];
                 if (!element) return null;
                 return (
                     <CanvasElementRenderer

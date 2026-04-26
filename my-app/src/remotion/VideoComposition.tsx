@@ -8,7 +8,7 @@ export const VideoComposition = () => {
   return (
     <div style={{ width: '100%', height: '100%', backgroundColor: '#000' }}>
       {/* Render all elements at current time */}
-      {Array.from(elements.values()).map((el) => (
+      {Object.values(elements).map((el) => (
         <div
           key={el.id}
           style={{
@@ -17,7 +17,7 @@ export const VideoComposition = () => {
             top: 0,
             width: el.boundingSize?.[0] ?? 200,
             height: el.boundingSize?.[1] ?? 60,
-            transform: el.transform,
+            transform: `translate(${el.x ?? 0}px, ${el.y ?? 0}px) rotate(${el.rotation ?? 0}deg) scale(${el.scaleX ?? 1}, ${el.scaleY ?? 1})`,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
