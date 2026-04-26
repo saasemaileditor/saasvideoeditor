@@ -106,7 +106,6 @@ function CanvasElementRenderer({
 
 // ─── Main Canvas Renderer ─────────────────────────────────────────────────────
 export function CanvasRenderer() {
-    console.log('RENDER: Canvas updated');
     const { elements, elementIds } = useEditorStore();
     const containerRef = useRef<HTMLDivElement>(null);
 
