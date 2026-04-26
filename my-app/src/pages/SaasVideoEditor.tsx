@@ -488,9 +488,9 @@ const CanvasDropZone = ({ canvasRef, isDark, setSelectedId, children, className 
         return dropTargetForElements({
             element: el,
             getData: () => ({ id: 'canvas-dropzone' }),
-            onDragEnter: () => { console.log('EVENT: Drag Entered Canvas'); applyOver(true); },
-            onDragLeave: () => { console.log('EVENT: Drag Left Canvas'); applyOver(false); },
-            onDrop: () => { console.log('EVENT: Dropped!'); applyOver(false); },
+            onDragEnter: () => applyOver(true),
+            onDragLeave: () => applyOver(false),
+            onDrop: () => applyOver(false),
         });
     }, [isDark]);
 
@@ -812,7 +812,6 @@ const SaasVideoEditor = () => {
                 const type = source.data.type as string;
                 if (!type) return;
 
-                console.log('EVENT: Drag Started — type:', type);
                 // Write to refs — NO React state update, NO re-render
                 activeDragItemRef.current = `sidebar-${type}`;
                 savedActiveTabRef.current = stateRef.current.activeTab;
@@ -824,7 +823,6 @@ const SaasVideoEditor = () => {
                 });
             },
             onDrop({ source, location }) {
-                console.log('EVENT: Dropped!');
                 activeDragItemRef.current = null;
                 setIsDraggingElement(false);
 
