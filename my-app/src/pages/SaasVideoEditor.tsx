@@ -686,43 +686,8 @@ const SaasVideoEditor = () => {
     const [activeDragItem, setActiveDragItem] = useState<string | null>(null);
     const [savedActiveTab, setSavedActiveTab] = useState<string | null>(null);
     const canvasRef = useRef<HTMLDivElement>(null);
-    const viewportRef = useRef<HTMLDivElement>(null);
-    const [canvasZoom, setCanvasZoom] = useState(1.0);
     // Derived drag state
     const isDraggingElement = activeDragItem !== null;
-
-    // ─── Auto-fit zoom: calculates the scale that makes the canvas fill the viewport ───
-    useEffect(() => {
-        const el = viewportRef.current;
-        if (!el) return;
-        const compute = () => {
-            if (!canvasFormat) return;
-            const PADDING = 96; // breathing room around canvas (pixels)
-            const fitW = (el.clientWidth - PADDING) / canvasFormat.width;
-            const fitH = (el.clientHeight - PADDING) / canvasFormat.height;
-            setCanvasZoom(Math.max(0.05, Math.min(fitW, fitH)));
-        };
-        compute();
-        const ro = new ResizeObserver(compute);
-        ro.observe(el);
-        return () => ro.disconnect();
-    }, [canvasFormat]);
-
-    // ─── Canvas wheel zoom: Ctrl+scroll / pinch on trackpad zooms canvas, never the page ───
-    useEffect(() => {
-        const el = viewportRef.current;
-        if (!el) return;
-        const handleWheel = (e: WheelEvent) => {
-            if (!e.ctrlKey) return;
-            e.preventDefault();
-            setCanvasZoom(prev => {
-                const factor = e.deltaY < 0 ? 1.1 : 0.9;
-                return Math.max(0.05, Math.min(5, prev * factor));
-            });
-        };
-        el.addEventListener('wheel', handleWheel, { passive: false });
-        return () => el.removeEventListener('wheel', handleWheel);
-    }, []);
 
     // Keyboard shortcuts (undo, redo, delete, escape)
     useEffect(() => {
@@ -1418,16 +1383,10 @@ const SaasVideoEditor = () => {
                         )}
                     </div>
 
-                    {/* 5. Center Canvas area (viewport) — overflow:auto gives scrollbars when canvas is bigger than the window */}
-                    <div
-                        ref={viewportRef}
-                        className="flex-1 min-w-0 min-h-0 relative z-0"
-                        style={{ overflow: 'auto' }}
-                    >
-                        {/* Inner table — must be at least as big as the viewport so margin:auto centres the canvas when small */}
-                        <div style={{ minWidth: '100%', minHeight: '100%', display: 'flex', padding: '48px', boxSizing: 'border-box' }}>
+                    {/* 5. Center Canvas area */}
+                    <div className="flex-1 min-w-0 min-h-0 flex items-center justify-center p-8 relative z-0">
                         {isProjectLoading ? (
-                            <div style={{ margin: 'auto', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#6b7280' }}>
+                            <div className="flex flex-col items-center justify-center text-gray-500">
                                 <div className="w-8 h-8 border-4 border-t-[#7c3aed] border-[#e2e8f0] rounded-full animate-spin mb-4"></div>
                                 Loading project...
                             </div>
@@ -1436,12 +1395,12 @@ const SaasVideoEditor = () => {
                                 canvasRef={canvasRef}
                                 isDark={isDark}
                                 setSelectedId={setSelectedId}
-                                className="rounded-sm overflow-hidden"
+                                className="rounded-sm overflow-hidden flex-shrink-0"
                                 style={{
-                                    width: canvasFormat ? canvasFormat.width * canvasZoom : 0,
-                                    height: canvasFormat ? canvasFormat.height * canvasZoom : 0,
-                                    margin: 'auto',
-                                    flexShrink: 0,
+                                    aspectRatio: canvasFormat ? canvasFormat.ratio.replace(':', '/') : '16/9',
+                                    height: '100%',
+                                    maxHeight: '100%',
+                                    maxWidth: '100%',
                                 }}
                             >
                                 {/* 2D HTML Canvas Surface */}
@@ -1472,7 +1431,6 @@ const SaasVideoEditor = () => {
                                 </div>
                             </CanvasDropZone>
                         )}
-                        </div>
                     </div>
 
                     {/* 6. Main Right static panel */}
