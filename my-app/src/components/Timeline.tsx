@@ -968,6 +968,25 @@ export const Timeline = ({
         };
     }, [pendingResizeClick, pixelsPerSecond, duration, scenes]);
 
+    // ─── Timeline wheel zoom: Ctrl+scroll / pinch on trackpad zooms timeline, never the page ───
+    useEffect(() => {
+        const el = tracksScrollRef.current;
+        if (!el) return;
+        const handleWheel = (e: WheelEvent) => {
+            if (!e.ctrlKey) return;
+            e.preventDefault();
+            setZoom(prev => {
+                const factor = e.deltaY < 0 ? 1.1 : 0.9;
+                return Math.round(Math.max(10, Math.min(1000, prev * factor)));
+            });
+            // Immediately hide ghost scrubber to prevent stale positions while zooming
+            setHoverTime(null);
+            setHoverScrubberPos(null);
+        };
+        el.addEventListener('wheel', handleWheel, { passive: false });
+        return () => el.removeEventListener('wheel', handleWheel);
+    }, []);
+
     return (
         <>
             <div className={`h-[180px] pt-0 pb-2 flex-shrink-0 flex flex-col transition-colors duration-200 overflow-hidden -mx-[10px] -mb-[10px] ${isDark ? 'bg-[#1e1e2e] border-t border-[#2a2d45]' : 'bg-white border-t border-gray-200'}`}>
