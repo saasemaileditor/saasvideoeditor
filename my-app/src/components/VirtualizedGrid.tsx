@@ -16,12 +16,12 @@ export interface VirtualizedGridProps<T> {
   isFetchingNextPage?: boolean;
   isFetchingPreviousPage?: boolean;
   loadOnce?: boolean;
-  
+
   // Page windowing props for sliding window data (maxPages)
   totalCount?: number;
   pageSize?: number;
   firstPageParam?: number;
-  
+
   onResetScroll?: (resetFn: () => void) => void;
   renderSkeleton?: () => React.ReactNode;
 }
@@ -92,31 +92,31 @@ export function VirtualizedGrid<T>({
 
   const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
     const target = e.target as HTMLDivElement;
-    
+
     // Check bottom
     if (onScrollEnd && !isFetchingRef.current && !isFetchingNextPage) {
-        const isNearBottom = target.scrollHeight - target.scrollTop - target.clientHeight < 100;
-        if (isNearBottom && (!loadOnce || !hasScrolledToBottomRef.current)) {
-            hasScrolledToBottomRef.current = true;
-            isFetchingRef.current = true;
-            onScrollEnd();
-            setTimeout(() => { isFetchingRef.current = false; }, 200);
-            return;
-        }
+      const isNearBottom = target.scrollHeight - target.scrollTop - target.clientHeight < 100;
+      if (isNearBottom && (!loadOnce || !hasScrolledToBottomRef.current)) {
+        hasScrolledToBottomRef.current = true;
+        isFetchingRef.current = true;
+        onScrollEnd();
+        setTimeout(() => { isFetchingRef.current = false; }, 200);
+        return;
+      }
     }
 
     // Check top
     if (onScrollStart && !isFetchingRef.current && !isFetchingPreviousPage) {
-        const isNearTop = target.scrollTop < 100;
-        if (isNearTop && firstPageParam > 0) {
-            isFetchingRef.current = true;
-            onScrollStart();
-            setTimeout(() => { isFetchingRef.current = false; }, 200);
-        }
+      const isNearTop = target.scrollTop < 100;
+      if (isNearTop && firstPageParam > 0) {
+        isFetchingRef.current = true;
+        onScrollStart();
+        setTimeout(() => { isFetchingRef.current = false; }, 200);
+      }
     }
 
     if (target.scrollTop > 100) {
-        hasScrolledToBottomRef.current = false;
+      hasScrolledToBottomRef.current = false;
     }
   };
 
@@ -136,7 +136,7 @@ export function VirtualizedGrid<T>({
       >
         {rowVirtualizer.getVirtualItems().map((virtualRow) => {
           const startIndex = virtualRow.index * columnCount;
-          
+
           return (
             <div
               key={virtualRow.index}
@@ -157,11 +157,11 @@ export function VirtualizedGrid<T>({
                 const globalIndex = startIndex + localIndex;
                 const relativeIndex = totalCount ? globalIndex - (firstPageParam * (pageSize ?? 1)) : globalIndex;
                 const item = items[relativeIndex];
-                
+
                 if (!item) {
                   const isPastEnd = totalCount ? globalIndex >= totalCount : globalIndex >= items.length;
                   if (isPastEnd) return <div key={`empty-${globalIndex}`} style={{ width: resolvedItemWidth, height: resolvedItemHeight, flexShrink: 0 }} />;
-                  
+
                   return (
                     <div
                       key={`skeleton-${globalIndex}`}

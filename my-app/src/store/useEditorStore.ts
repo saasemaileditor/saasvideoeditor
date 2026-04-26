@@ -107,7 +107,7 @@ export function parseTransformToNumbers(transform: string): {
 interface UIState {
     selectedId: string | null;
     setSelectedId: (id: string | null) => void;
-    
+
     // Timeline state
     isPlaying: boolean;
     setIsPlaying: (isPlaying: boolean) => void;
@@ -122,12 +122,12 @@ interface UIState {
 export const useUIStore = create<UIState>((set) => ({
     selectedId: null,
     setSelectedId: (id) => set({ selectedId: id }),
-    
+
     isPlaying: false,
     setIsPlaying: (isPlaying) => set({ isPlaying }),
     currentTime: 0,
-    setCurrentTime: (time) => set((state) => ({ 
-        currentTime: typeof time === 'function' ? time(state.currentTime) : time 
+    setCurrentTime: (time) => set((state) => ({
+        currentTime: typeof time === 'function' ? time(state.currentTime) : time
     })),
 
     canvasFormat: null,
@@ -205,7 +205,7 @@ export const useEditorStore = create<EditorState>()(
                     const ids = [...state.elementIds];
                     const [movedId] = ids.splice(oldIndex, 1);
                     ids.splice(newIndex, 0, movedId);
-                    
+
                     // Reconstruct the Map to reflect the new order
                     const newElements = new Map<string, CanvasElement>();
                     ids.forEach(id => {

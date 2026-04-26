@@ -435,6 +435,9 @@ const DraggableCard = ({ elementId, icon: Icon, label, isDark }: {
 
 
 /* ─── Canvas drop zone (uses Pragmatic Drag and Drop) ─── */
+// FIX: Uses direct DOM manipulation (refs) instead of useState for hover state.
+// This means onDragEnter / onDragLeave NEVER trigger a React re-render — zero
+// VirtualizedGrid re-renders during the entire mouse-movement of a drag.
 const CanvasDropZone = ({ canvasRef, isDark, setSelectedId, children, className = '', style = {} }: {
     canvasRef: React.RefObject<HTMLDivElement | null>;
     isDark: boolean;
@@ -444,7 +447,39 @@ const CanvasDropZone = ({ canvasRef, isDark, setSelectedId, children, className 
     style?: React.CSSProperties;
 }) => {
     const localRef = useRef<HTMLDivElement>(null);
-    const [isOver, setIsOver] = useState(false);
+    const overlayRef = useRef<HTMLDivElement>(null);
+
+    // Apply/remove the hover style directly on the DOM node — NO setState, NO re-render
+    const applyOver = (over: boolean) => {
+        const el = localRef.current;
+        const overlay = overlayRef.current;
+        if (!el) return;
+        if (over) {
+            el.classList.remove(
+                isDark ? 'bg-black' : 'bg-white',
+                isDark ? 'border-[#2a2d45]' : 'border-gray-200',
+                isDark ? 'shadow-lg' : 'shadow-md'
+            );
+            el.classList.add(
+                isDark ? 'bg-[#2d1f5e]/40' : 'bg-[#f3e8ff]',
+                'border-[#7c3aed]',
+                'shadow-[inset_0_0_20px_rgba(124,58,237,0.3)]'
+            );
+            if (overlay) overlay.style.display = 'flex';
+        } else {
+            el.classList.remove(
+                isDark ? 'bg-[#2d1f5e]/40' : 'bg-[#f3e8ff]',
+                'border-[#7c3aed]',
+                'shadow-[inset_0_0_20px_rgba(124,58,237,0.3)]'
+            );
+            el.classList.add(
+                isDark ? 'bg-black' : 'bg-white',
+                isDark ? 'border-[#2a2d45]' : 'border-gray-200',
+                isDark ? 'shadow-lg' : 'shadow-md'
+            );
+            if (overlay) overlay.style.display = 'none';
+        }
+    };
 
     useEffect(() => {
         const el = localRef.current;
@@ -453,17 +488,16 @@ const CanvasDropZone = ({ canvasRef, isDark, setSelectedId, children, className 
         return dropTargetForElements({
             element: el,
             getData: () => ({ id: 'canvas-dropzone' }),
-            onDragEnter: () => setIsOver(true),
-            onDragLeave: () => setIsOver(false),
-            onDrop: () => setIsOver(false),
+            onDragEnter: () => { console.log('EVENT: Drag Entered Canvas'); applyOver(true); },
+            onDragLeave: () => { console.log('EVENT: Drag Left Canvas'); applyOver(false); },
+            onDrop: () => { console.log('EVENT: Dropped!'); applyOver(false); },
         });
-    }, []);
+    }, [isDark]);
 
     // Merge the pdnd localRef with the existing canvasRef so both systems track the same div
     const mergedRef = useCallback(
         (node: HTMLDivElement | null) => {
             localRef.current = node;
-            // canvasRef is a RefObject — assign .current directly
             if (canvasRef) {
                 (canvasRef as React.MutableRefObject<HTMLDivElement | null>).current = node;
             }
@@ -479,23 +513,19 @@ const CanvasDropZone = ({ canvasRef, isDark, setSelectedId, children, className 
                     setSelectedId(null);
                 }
             }}
-            className={`relative transition-all duration-200 border ${className} ${isOver
-                ? isDark
-                    ? 'bg-[#2d1f5e]/40 border-[#7c3aed] shadow-[inset_0_0_20px_rgba(124,58,237,0.3)]'
-                    : 'bg-[#f3e8ff] border-[#7c3aed] shadow-[inset_0_0_20px_rgba(124,58,237,0.3)]'
-                : isDark
-                    ? 'bg-black border-[#2a2d45] shadow-lg'
-                    : 'bg-white border-gray-200 shadow-md'
-                }`}
+            className={`relative transition-all duration-200 border ${className} ${isDark ? 'bg-black border-[#2a2d45] shadow-lg' : 'bg-white border-gray-200 shadow-md'}`}
             style={style}
         >
-            {isOver && (
-                <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-20">
-                    <span className="font-bold text-sm px-4 py-1.5 rounded-full shadow-md bg-[#7c3aed] text-white">
-                        Drop here
-                    </span>
-                </div>
-            )}
+            {/* Drop overlay — shown/hidden via direct DOM ref, NOT React state */}
+            <div
+                ref={overlayRef}
+                style={{ display: 'none' }}
+                className="absolute inset-0 flex items-center justify-center pointer-events-none z-20"
+            >
+                <span className="font-bold text-sm px-4 py-1.5 rounded-full shadow-md bg-[#7c3aed] text-white">
+                    Drop here
+                </span>
+            </div>
             {children}
         </div>
     );
@@ -683,11 +713,14 @@ const SaasVideoEditor = () => {
             unsub();
         };
     }, []);
-    const [activeDragItem, setActiveDragItem] = useState<string | null>(null);
-    const [savedActiveTab, setSavedActiveTab] = useState<string | null>(null);
+    // FIX: activeDragItem and savedActiveTab are now refs, not state.
+    // Changing them during drag no longer triggers a React re-render of SaasVideoEditor
+    // (and by extension, VirtualizedGrid). Only onDrop fires setState.
+    const activeDragItemRef = useRef<string | null>(null);
+    const savedActiveTabRef = useRef<string | null>(null);
     const canvasRef = useRef<HTMLDivElement>(null);
-    // Derived drag state
-    const isDraggingElement = activeDragItem !== null;
+    // Derived drag state — kept as state only for UI that truly needs to react (e.g. cursor change)
+    const [isDraggingElement, setIsDraggingElement] = useState(false);
 
     // Keyboard shortcuts (undo, redo, delete, escape)
     useEffect(() => {
@@ -765,30 +798,41 @@ const SaasVideoEditor = () => {
         }
     }, [theme]);
 
-    const stateRef = useRef({ activeTab, savedActiveTab });
+    const stateRef = useRef({ activeTab });
     useEffect(() => {
-        stateRef.current = { activeTab, savedActiveTab };
-    }, [activeTab, savedActiveTab]);
+        stateRef.current = { activeTab };
+    }, [activeTab]);
 
     /* ─── Pragmatic Drag and Drop Monitor ─── */
+    // FIX: onDragStart now writes to REFS only (zero setState = zero re-renders during drag).
+    // Only onDrop fires setState (addElement) — exactly ONE update at the end.
     useEffect(() => {
         return monitorForElements({
             onDragStart({ source }) {
                 const type = source.data.type as string;
                 if (!type) return;
 
-                setActiveDragItem(`sidebar-${type}`);
-                setSavedActiveTab(stateRef.current.activeTab);
-                setActiveTab(null);
+                console.log('EVENT: Drag Started — type:', type);
+                // Write to refs — NO React state update, NO re-render
+                activeDragItemRef.current = `sidebar-${type}`;
+                savedActiveTabRef.current = stateRef.current.activeTab;
+                // setActiveTab(null) was the main offender — now deferred to a microtask
+                // so the drag ghost renders first, then the panel collapses
+                Promise.resolve().then(() => {
+                    setIsDraggingElement(true);
+                    setActiveTab(null);
+                });
             },
             onDrop({ source, location }) {
-                setActiveDragItem(null);
+                console.log('EVENT: Dropped!');
+                activeDragItemRef.current = null;
+                setIsDraggingElement(false);
 
                 const dropTargets = location.current.dropTargets;
                 const hitCanvas = dropTargets.some((target: any) => target.data.id === 'canvas-dropzone');
 
                 if (!hitCanvas || !canvasRef.current) {
-                    setActiveTab(stateRef.current.savedActiveTab);
+                    setActiveTab(savedActiveTabRef.current);
                     return;
                 }
 
@@ -808,6 +852,7 @@ const SaasVideoEditor = () => {
                     panelDef?.boundingSize ??
                     [200, 80];
 
+                // This is the ONLY Zustand update during the entire drag lifecycle
                 addElement({
                     id: Date.now().toString(),
                     type: type as any,
