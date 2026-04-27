@@ -1114,7 +1114,7 @@ const SaasVideoEditor = () => {
                 const factor = normalizedDelta < 0 ? baseFactor : 1 / baseFactor;
 
                 const { zoom: z } = useUIStore.getState();
-                const newZoom = Math.min(10, Math.max(0.1, z * factor));
+                const newZoom = Math.min(5, Math.max(0.1, z * factor));
                 setZoom(newZoom);
 
                 // Re-clamp pan to new zoom bounds

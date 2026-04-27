@@ -1328,12 +1328,12 @@ export const Timeline = ({
                                     <input
                                         type="range"
                                         min="10"
-                                        max="1000"
+                                        max="500"
                                         value={Math.round(canvasZoom * 100)}
                                         onChange={(e) => setCanvasZoom(parseInt(e.target.value) / 100)}
                                         className={`w-48 h-1 rounded-full appearance-none cursor-pointer outline-none transition-colors ${isDark ? 'bg-gray-800' : 'bg-gray-200'}`}
                                         style={{
-                                            backgroundImage: `linear-gradient(to right, #8b5cf6 0%, #8b5cf6 ${((canvasZoom * 100 - 10) / 990) * 100}%, transparent ${((canvasZoom * 100 - 10) / 990) * 100}%, transparent 100%)`,
+                                            backgroundImage: `linear-gradient(to right, #8b5cf6 0%, #8b5cf6 ${((canvasZoom * 100 - 10) / 490) * 100}%, transparent ${((canvasZoom * 100 - 10) / 490) * 100}%, transparent 100%)`,
                                         }}
                                     />
                                 ) : (
