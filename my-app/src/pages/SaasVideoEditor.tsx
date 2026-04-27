@@ -646,9 +646,9 @@ const HorizontalScrollbar = ({ scaledW, workspaceW, panX, setPan, panY, isDark, 
 
     const overflow  = scaledW - workspaceW;
     // Track spans the full workspace width (minus the vertical scrollbar width if visible)
-    const trackWidth  = workspaceW - (showVScrollbar ? 8 : 0);
+    const trackWidth  = workspaceW - (showVScrollbar ? 5 : 0);
     // Thumb travel range uses a small inner margin so thumb doesn't clip the corner
-    const thumbMargin = 4;
+    const thumbMargin = 0;
     const travelWidth = trackWidth - thumbMargin * 2;
     const thumbWidth  = Math.max(40, (workspaceW / scaledW) * travelWidth);
     const maxPan      = overflow > 0 ? overflow / 2 + PAN_PADDING : 0;
@@ -676,8 +676,8 @@ const HorizontalScrollbar = ({ scaledW, workspaceW, panX, setPan, panY, isDark, 
     return (
         <div
             ref={trackRef}
-            className={`absolute bottom-0 left-0 z-10 ${isDark ? 'bg-white/10' : 'bg-gray-200/40'}`}
-            style={{ width: trackWidth, height: 6 }}
+            className={`absolute bottom-0 left-0 z-10 bg-transparent`}
+            style={{ width: trackWidth, height: 5 }}
         >
             <div
                 className={`absolute top-0 rounded-full cursor-pointer transition-colors ${isDark ? 'bg-gray-400/60 hover:bg-gray-300/80' : 'bg-gray-400/60 hover:bg-gray-500/80'}`}
@@ -711,8 +711,8 @@ const VerticalScrollbar = ({ scaledH, workspaceH, panY, setPan, panX, isDark, sh
 
     const overflow     = scaledH - workspaceH;
     // Track spans the full workspace height (minus the horizontal scrollbar height if visible)
-    const trackHeight  = workspaceH - (showHScrollbar ? 8 : 0);
-    const thumbMargin  = 4;
+    const trackHeight  = workspaceH - (showHScrollbar ? 5 : 0);
+    const thumbMargin  = 0;
     const travelHeight = trackHeight - thumbMargin * 2;
     const thumbHeight  = Math.max(40, (workspaceH / scaledH) * travelHeight);
     const maxPan       = overflow > 0 ? overflow / 2 + PAN_PADDING : 0;
@@ -739,8 +739,8 @@ const VerticalScrollbar = ({ scaledH, workspaceH, panY, setPan, panX, isDark, sh
 
     return (
         <div
-            className={`absolute right-0 top-0 z-10 ${isDark ? 'bg-white/10' : 'bg-gray-200/40'}`}
-            style={{ width: 6, height: trackHeight }}
+            className={`absolute right-0 top-0 z-10 bg-transparent`}
+            style={{ width: 5, height: trackHeight }}
         >
             <div
                 className={`absolute left-0 rounded-full cursor-pointer transition-colors ${isDark ? 'bg-gray-400/60 hover:bg-gray-300/80' : 'bg-gray-400/60 hover:bg-gray-500/80'}`}
