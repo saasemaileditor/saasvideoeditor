@@ -438,45 +438,42 @@ const DraggableCard = ({ elementId, icon: Icon, label, isDark }: {
 // FIX: Uses direct DOM manipulation (refs) instead of useState for hover state.
 // This means onDragEnter / onDragLeave NEVER trigger a React re-render — zero
 // VirtualizedGrid re-renders during the entire mouse-movement of a drag.
-const CanvasDropZone = ({ canvasRef, isDark, setSelectedId, children, className = '', style = {} }: {
+const CanvasDropZone = ({ canvasRef, isDark, setSelectedId, children, className = '', style = {}, shadowLayerRef }: {
     canvasRef: React.RefObject<HTMLDivElement | null>;
     isDark: boolean;
     setSelectedId: (id: string | null) => void;
     children: React.ReactNode;
     className?: string;
     style?: React.CSSProperties;
+    shadowLayerRef?: React.RefObject<HTMLDivElement | null>;
 }) => {
     const localRef = useRef<HTMLDivElement>(null);
     const overlayRef = useRef<HTMLDivElement>(null);
 
     // Apply/remove the hover style directly on the DOM node — NO setState, NO re-render
     const applyOver = (over: boolean) => {
-        const el = localRef.current;
+        const el      = localRef.current;
         const overlay = overlayRef.current;
+        const shadow  = shadowLayerRef?.current;
         if (!el) return;
+
         if (over) {
-            el.classList.remove(
-                isDark ? 'bg-black' : 'bg-white',
-                isDark ? 'border-[#2a2d45]' : 'border-gray-200',
-                isDark ? 'shadow-lg' : 'shadow-md'
-            );
-            el.classList.add(
-                isDark ? 'bg-[#2d1f5e]/40' : 'bg-[#f3e8ff]',
-                'border-[#7c3aed]',
-                'shadow-[inset_0_0_20px_rgba(124,58,237,0.3)]'
-            );
+            // Canvas bg — background-color doesn't scale with transform, safe to set directly
+            el.style.backgroundColor = isDark ? 'rgba(45,31,94,0.4)' : '#f3e8ff';
+            // Shadow layer — ring + inset glow
+            if (shadow) {
+                shadow.style.boxShadow = isDark
+                    ? '0 0 0 2px #7c3aed, inset 0 0 20px rgba(124,58,237,0.3), 0 4px 24px rgba(0,0,0,0.5)'
+                    : '0 0 0 2px #7c3aed, inset 0 0 20px rgba(124,58,237,0.15), 0 4px 16px rgba(0,0,0,0.12)';
+            }
             if (overlay) overlay.style.display = 'flex';
         } else {
-            el.classList.remove(
-                isDark ? 'bg-[#2d1f5e]/40' : 'bg-[#f3e8ff]',
-                'border-[#7c3aed]',
-                'shadow-[inset_0_0_20px_rgba(124,58,237,0.3)]'
-            );
-            el.classList.add(
-                isDark ? 'bg-black' : 'bg-white',
-                isDark ? 'border-[#2a2d45]' : 'border-gray-200',
-                isDark ? 'shadow-lg' : 'shadow-md'
-            );
+            el.style.backgroundColor = isDark ? '#000' : '#fff';
+            if (shadow) {
+                shadow.style.boxShadow = isDark
+                    ? '0 0 0 1px #2a2d45, 0 4px 24px rgba(0,0,0,0.5)'
+                    : '0 0 0 1px #e5e7eb, 0 4px 16px rgba(0,0,0,0.12)';
+            }
             if (overlay) overlay.style.display = 'none';
         }
     };
@@ -485,12 +482,18 @@ const CanvasDropZone = ({ canvasRef, isDark, setSelectedId, children, className 
         const el = localRef.current;
         if (!el) return;
 
+        // Initialize shadow layer to default state imperatively on mount
+        // and whenever isDark changes. applyOver is the sole owner of
+        // shadow.style.boxShadow — React never touches it via JSX style prop,
+        // so no re-render can overwrite the purple ring mid-drag.
+        applyOver(false);
+
         return dropTargetForElements({
             element: el,
             getData: () => ({ id: 'canvas-dropzone' }),
             onDragEnter: () => applyOver(true),
             onDragLeave: () => applyOver(false),
-            onDrop: () => applyOver(false),
+            onDrop:      () => applyOver(false),
         });
     }, [isDark]);
 
@@ -513,7 +516,7 @@ const CanvasDropZone = ({ canvasRef, isDark, setSelectedId, children, className 
                     setSelectedId(null);
                 }
             }}
-            className={`relative transition-all duration-200 border ${className} ${isDark ? 'bg-black border-[#2a2d45] shadow-lg' : 'bg-white border-gray-200 shadow-md'}`}
+            className={`relative overflow-hidden ${className} ${isDark ? 'bg-black' : 'bg-white'}`}
             style={style}
         >
             {/* Drop overlay — shown/hidden via direct DOM ref, NOT React state */}
@@ -623,6 +626,9 @@ const SceneElement = memo(({ id, zIndex, isDark, isSelected, zoom, updateElement
     );
 });
 
+/* ─── Pan padding: 20px breathing room around canvas edges (Canva-style) ─── */
+const PAN_PADDING = 20;
+
 /* ─── Custom Horizontal Scrollbar ─── */
 const HorizontalScrollbar = ({ scaledW, workspaceW, panX, setPan, panY, isDark, showVScrollbar }: {
     scaledW: number;
@@ -638,17 +644,15 @@ const HorizontalScrollbar = ({ scaledW, workspaceW, panX, setPan, panY, isDark, 
     const startXRef = useRef(0);
     const startPanXRef = useRef(0);
 
-    // How much total overflow exists
-    const overflow = scaledW - workspaceW;
-    // Track width (minus right gap if vertical scrollbar is shown)
-    const trackPadding = 8;
-    const trackWidth = workspaceW - trackPadding * 2 - (showVScrollbar ? 12 : 0);
-    // Thumb width: ratio of visible to total, clamped min 40px
-    const thumbWidth = Math.max(40, (workspaceW / scaledW) * trackWidth);
-    // Thumb position: panX=0 means centered, so we compute offset
-    // When centered, thumb should be in the middle of the track
-    const maxPan = overflow / 2;
-    const thumbLeft = ((maxPan - panX) / (2 * maxPan)) * (trackWidth - thumbWidth);
+    const overflow  = scaledW - workspaceW;
+    // Track spans the full workspace width (minus the vertical scrollbar width if visible)
+    const trackWidth  = workspaceW - (showVScrollbar ? 8 : 0);
+    // Thumb travel range uses a small inner margin so thumb doesn't clip the corner
+    const thumbMargin = 4;
+    const travelWidth = trackWidth - thumbMargin * 2;
+    const thumbWidth  = Math.max(40, (workspaceW / scaledW) * travelWidth);
+    const maxPan      = overflow > 0 ? overflow / 2 + PAN_PADDING : 0;
+    const thumbLeft   = thumbMargin + ((maxPan - panX) / (2 * maxPan)) * (travelWidth - thumbWidth);
 
     const handlePointerDown = (e: React.PointerEvent) => {
         e.preventDefault();
@@ -662,31 +666,25 @@ const HorizontalScrollbar = ({ scaledW, workspaceW, panX, setPan, panY, isDark, 
     const handlePointerMove = (e: React.PointerEvent) => {
         if (!draggingRef.current) return;
         const dx = e.clientX - startXRef.current;
-        // Reverse map: thumb moves right → panX decreases (canvas slides left)
-        const panDelta = (dx / (trackWidth - thumbWidth)) * (2 * maxPan);
-        setPan(startPanXRef.current - panDelta, panY);
+        const panDelta = (dx / (travelWidth - thumbWidth)) * (2 * maxPan);
+        const newPanX = Math.max(-maxPan, Math.min(maxPan, startPanXRef.current - panDelta));
+        setPan(newPanX, panY);
     };
 
-    const handlePointerUp = () => {
-        draggingRef.current = false;
-    };
+    const handlePointerUp = () => { draggingRef.current = false; };
 
     return (
         <div
             ref={trackRef}
-            className={`absolute bottom-0 z-10 rounded-full ${isDark ? 'bg-white/10' : 'bg-gray-200/40'}`}
-            style={{
-                left: trackPadding,
-                width: trackWidth,
-                height: 6,
-            }}
+            className={`absolute bottom-0 left-0 z-10 ${isDark ? 'bg-white/10' : 'bg-gray-200/40'}`}
+            style={{ width: trackWidth, height: 6 }}
         >
             <div
                 className={`absolute top-0 rounded-full cursor-pointer transition-colors ${isDark ? 'bg-gray-400/60 hover:bg-gray-300/80' : 'bg-gray-400/60 hover:bg-gray-500/80'}`}
                 style={{
                     width: thumbWidth,
                     height: '100%',
-                    left: Math.max(0, Math.min(trackWidth - thumbWidth, thumbLeft)),
+                    left: Math.max(thumbMargin, Math.min(trackWidth - thumbMargin - thumbWidth, thumbLeft)),
                 }}
                 onPointerDown={handlePointerDown}
                 onPointerMove={handlePointerMove}
@@ -707,16 +705,18 @@ const VerticalScrollbar = ({ scaledH, workspaceH, panY, setPan, panX, isDark, sh
     isDark: boolean;
     showHScrollbar: boolean;
 }) => {
-    const draggingRef = useRef(false);
-    const startYRef = useRef(0);
+    const draggingRef  = useRef(false);
+    const startYRef    = useRef(0);
     const startPanYRef = useRef(0);
 
-    const overflow = scaledH - workspaceH;
-    const trackPadding = 8;
-    const trackHeight = workspaceH - trackPadding * 2 - (showHScrollbar ? 12 : 0);
-    const thumbHeight = Math.max(40, (workspaceH / scaledH) * trackHeight);
-    const maxPan = overflow / 2;
-    const thumbTop = ((maxPan - panY) / (2 * maxPan)) * (trackHeight - thumbHeight);
+    const overflow     = scaledH - workspaceH;
+    // Track spans the full workspace height (minus the horizontal scrollbar height if visible)
+    const trackHeight  = workspaceH - (showHScrollbar ? 8 : 0);
+    const thumbMargin  = 4;
+    const travelHeight = trackHeight - thumbMargin * 2;
+    const thumbHeight  = Math.max(40, (workspaceH / scaledH) * travelHeight);
+    const maxPan       = overflow > 0 ? overflow / 2 + PAN_PADDING : 0;
+    const thumbTop     = thumbMargin + ((maxPan - panY) / (2 * maxPan)) * (travelHeight - thumbHeight);
 
     const handlePointerDown = (e: React.PointerEvent) => {
         e.preventDefault();
@@ -730,29 +730,24 @@ const VerticalScrollbar = ({ scaledH, workspaceH, panY, setPan, panX, isDark, sh
     const handlePointerMove = (e: React.PointerEvent) => {
         if (!draggingRef.current) return;
         const dy = e.clientY - startYRef.current;
-        const panDelta = (dy / (trackHeight - thumbHeight)) * (2 * maxPan);
-        setPan(panX, startPanYRef.current - panDelta);
+        const panDelta = (dy / (travelHeight - thumbHeight)) * (2 * maxPan);
+        const newPanY = Math.max(-maxPan, Math.min(maxPan, startPanYRef.current - panDelta));
+        setPan(panX, newPanY);
     };
 
-    const handlePointerUp = () => {
-        draggingRef.current = false;
-    };
+    const handlePointerUp = () => { draggingRef.current = false; };
 
     return (
         <div
-            className={`absolute right-0 z-10 rounded-full ${isDark ? 'bg-white/10' : 'bg-gray-200/40'}`}
-            style={{
-                top: trackPadding,
-                width: 6,
-                height: trackHeight,
-            }}
+            className={`absolute right-0 top-0 z-10 ${isDark ? 'bg-white/10' : 'bg-gray-200/40'}`}
+            style={{ width: 6, height: trackHeight }}
         >
             <div
                 className={`absolute left-0 rounded-full cursor-pointer transition-colors ${isDark ? 'bg-gray-400/60 hover:bg-gray-300/80' : 'bg-gray-400/60 hover:bg-gray-500/80'}`}
                 style={{
                     height: thumbHeight,
                     width: '100%',
-                    top: Math.max(0, Math.min(trackHeight - thumbHeight, thumbTop)),
+                    top: Math.max(thumbMargin, Math.min(trackHeight - thumbMargin - thumbHeight, thumbTop)),
                 }}
                 onPointerDown={handlePointerDown}
                 onPointerMove={handlePointerMove}
@@ -815,8 +810,8 @@ const SaasVideoEditor = () => {
     // entirely.  `elementIds` only changes when elements are added/removed,
     // NOT when an individual element's x/y/etc. is updated during drag.
     // This eliminates the full SaasVideoEditor re-render on every mouse-move.
-    const elementIds    = useEditorStore((s) => s.elementIds);
-    const addElement    = useEditorStore((s) => s.addElement);
+    const elementIds = useEditorStore((s) => s.elementIds);
+    const addElement = useEditorStore((s) => s.addElement);
     const updateElement = useEditorStore((s) => s.updateElement);
     const reorderElements = useEditorStore((s) => s.reorderElements);
     const removeElement = useEditorStore((s) => s.removeElement);
@@ -846,7 +841,7 @@ const SaasVideoEditor = () => {
                     .single();
 
                 if (error) throw error;
-                
+
                 setCanvasFormat({
                     width: data.width,
                     height: data.height,
@@ -897,7 +892,8 @@ const SaasVideoEditor = () => {
     // (and by extension, VirtualizedGrid). Only onDrop fires setState.
     const activeDragItemRef = useRef<string | null>(null);
     const savedActiveTabRef = useRef<string | null>(null);
-    const canvasRef = useRef<HTMLDivElement>(null);
+    const canvasRef             = useRef<HTMLDivElement>(null);
+    const canvasShadowLayerRef  = useRef<HTMLDivElement>(null);
     const workspaceRef = useRef<HTMLDivElement>(null);
     // Derived drag state — kept as state only for UI that truly needs to react (e.g. cursor change)
     const [isDraggingElement, setIsDraggingElement] = useState(false);
@@ -1072,24 +1068,75 @@ const SaasVideoEditor = () => {
     // IMPORTANT: Must use native addEventListener with { passive: false }.
     // React registers onWheel as passive in Chrome 73+, which silently
     // ignores preventDefault() — causing browser zoom to fire simultaneously.
+    //
+    // Refs for values the wheel handler needs without creating stale closures.
+    // The handler is created once; these refs always hold the latest values.
+    const workspaceSizeRef = useRef(workspaceSize);
+    const canvasFormatRef = useRef(canvasFormat);
+    useEffect(() => { workspaceSizeRef.current = workspaceSize; }, [workspaceSize]);
+    useEffect(() => { canvasFormatRef.current = canvasFormat; }, [canvasFormat]);
+
     useEffect(() => {
         const el = workspaceRef.current;
         if (!el) return;
 
+
         const handleWheel = (e: WheelEvent) => {
             e.preventDefault();
+
+            // Normalize deltaY across input modes so our speed curve is consistent:
+            // deltaMode=0 (pixel) — raw value, typical for trackpad pinch
+            // deltaMode=1 (line)  — multiply by 15px/line (CSS default line height)
+            // deltaMode=2 (page)  — multiply by 400px/page
+            const normalizedDelta =
+                e.deltaMode === 1 ? e.deltaY * 15 :
+                    e.deltaMode === 2 ? e.deltaY * 400 :
+                        e.deltaY;
+
+            // Read fresh values from refs — no stale closures, always current
+            const ws = workspaceSizeRef.current;
+            const fmt = canvasFormatRef.current;
+            const cW = fmt?.width ?? 1920;
+            const cH = fmt?.height ?? 1080;
+
             if (e.ctrlKey || e.metaKey) {
-                // Zoom: fixed multiplicative factor per tick (like the timeline).
-                // deltaY sign determines direction; magnitude is IGNORED.
-                // This gives consistent ±6% per tick whether using trackpad or mouse wheel.
-                const factor = e.deltaY < 0 ? 1.03 : 1 / 1.03;
+                // ── Zoom ────────────────────────────────────────────────────────
+                // JITTER FIX: deadzone — when pinch ends, deltaY oscillates around
+                // 0 (0.00, -0.00, 0.01). Without a deadzone, the sign flips every
+                // tick and zoom bounces back/forth → visible jitter. Skip noise.
+                if (Math.abs(normalizedDelta) < 0.5) return;
+
+                // SPEED FIX: scale factor by normalizedDelta magnitude.
+                // Gentle pinch (|delta|<3px) = ~3%, hard scroll (|delta|≥50px) = ~7%.
+                const absDelta = Math.abs(normalizedDelta);
+                const speed = Math.min(absDelta / 50, 1); // 0–1 range
+                const baseFactor = 1.03 + speed * 0.04;        // 1.03 → 1.07
+                const factor = normalizedDelta < 0 ? baseFactor : 1 / baseFactor;
+
                 const { zoom: z } = useUIStore.getState();
                 const newZoom = Math.min(10, Math.max(0.1, z * factor));
                 setZoom(newZoom);
-            } else {
-                // Vertical pan (and horizontal if shift is held)
+
+                // Re-clamp pan to new zoom bounds
                 const { panX: px, panY: py } = useUIStore.getState();
-                setPan(px - e.deltaX, py - e.deltaY);
+                const overflowXz = cW * newZoom - ws.width;
+                const overflowYz = cH * newZoom - ws.height;
+                const maxPanX = overflowXz > 0 ? overflowXz / 2 + PAN_PADDING : 0;
+                const maxPanY = overflowYz > 0 ? overflowYz / 2 + PAN_PADDING : 0;
+                setPan(
+                    Math.max(-maxPanX, Math.min(maxPanX, px)),
+                    Math.max(-maxPanY, Math.min(maxPanY, py))
+                );
+            } else {
+                // ── Pan ─────────────────────────────────────────────────────────
+                const { panX: px, panY: py, zoom: z } = useUIStore.getState();
+                const overflowX = cW * z - ws.width;
+                const overflowY = cH * z - ws.height;
+                const maxPanX = overflowX > 0 ? overflowX / 2 + PAN_PADDING : 0;
+                const maxPanY = overflowY > 0 ? overflowY / 2 + PAN_PADDING : 0;
+                const newPanX = Math.max(-maxPanX, Math.min(maxPanX, px - e.deltaX));
+                const newPanY = Math.max(-maxPanY, Math.min(maxPanY, py - normalizedDelta));
+                setPan(newPanX, newPanY);
             }
         };
 
@@ -1104,6 +1151,22 @@ const SaasVideoEditor = () => {
     const scaledH = canvasH * zoom;
     const showHScrollbar = scaledW > workspaceSize.width;
     const showVScrollbar = scaledH > workspaceSize.height;
+
+    // ─── Clamp pan whenever zoom or workspace size changes (slider zoom path) ──
+    // When zooming out via slider, the canvas may now fit inside the workspace,
+    // so maxPan becomes 0 and pan must be clamped to 0 (centered). Canva-style.
+    useEffect(() => {
+        const overflowX = canvasW * zoom - workspaceSize.width;
+        const overflowY = canvasH * zoom - workspaceSize.height;
+        const maxPanX = overflowX > 0 ? overflowX / 2 + PAN_PADDING : 0;
+        const maxPanY = overflowY > 0 ? overflowY / 2 + PAN_PADDING : 0;
+        const { panX: px, panY: py } = useUIStore.getState();
+        const clampedX = Math.max(-maxPanX, Math.min(maxPanX, px));
+        const clampedY = Math.max(-maxPanY, Math.min(maxPanY, py));
+        if (clampedX !== px || clampedY !== py) {
+            setPan(clampedX, clampedY);
+        }
+    }, [zoom, workspaceSize, canvasW, canvasH, setPan]);
 
     return (
         <div className={`fixed inset-0 flex flex-col p-[10px] gap-[10px] overflow-hidden transition-colors duration-200 ${isDark ? 'dark bg-[#080810] text-white' : 'bg-[#f3f4f6] text-gray-900'}`}>
@@ -1671,20 +1734,53 @@ const SaasVideoEditor = () => {
                             </div>
                         ) : (
                             <>
+                                {/*
+                                 * ── Non-transformed shadow layer ───────────────────────────────
+                                 * This div uses translate-only (NO scale), with pre-multiplied
+                                 * width/height. Border/shadow/radius are always device-pixel sharp.
+                                 * `box-shadow: 0 0 0 1px` renders OUTSIDE the box — visible as a
+                                 * 1px ring around the canvas. `border: 1px` would render INSIDE
+                                 * and be hidden by the canvas sitting on top at zIndex:1.
+                                 */}
+                                <div
+                                    id="canvas-shadow-layer"
+                                    ref={canvasShadowLayerRef}
+                                    aria-hidden="true"
+                                    style={{
+                                        position: 'absolute',
+                                        width: scaledW,
+                                        height: scaledH,
+                                        left: '50%',
+                                        top: '50%',
+                                        transform: `translate(-50%, -50%) translate(${panX}px, ${panY}px)`,
+                                        borderRadius: 4,
+                                        // boxShadow is intentionally NOT set here.
+                                        // applyOver() inside CanvasDropZone is the sole owner of
+                                        // shadow.style.boxShadow. If React controlled it via this
+                                        // style prop, any parent re-render during a drag would
+                                        // overwrite the purple drop-ring back to the default.
+                                        pointerEvents: 'none',
+                                        zIndex: 0,
+                                    }}
+                                />
                                 <CanvasDropZone
                                     canvasRef={canvasRef}
                                     isDark={isDark}
                                     setSelectedId={setSelectedId}
-                                    className="rounded-sm overflow-hidden"
+                                    shadowLayerRef={canvasShadowLayerRef}
+                                    className="overflow-hidden"
                                     style={{
                                         position: 'absolute',
                                         width: canvasW,
                                         height: canvasH,
                                         left: '50%',
                                         top: '50%',
+                                        // NO transition here — transition on transform causes GPU
+                                        // subpixel blur on every wheel tick. At 60fps the steps
+                                        // are already smooth without it.
                                         transform: `translate(-50%, -50%) translate(${panX}px, ${panY}px) scale(${zoom})`,
                                         transformOrigin: '50% 50%',
-                                        transition: 'transform 150ms ease-out',
+                                        zIndex: 1,
                                     }}
                                 >
                                     <div
