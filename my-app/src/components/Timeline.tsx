@@ -351,6 +351,9 @@ export const Timeline = ({
             switch (e.key) {
                 case ' ':
                     e.preventDefault();
+                    if (!isPlaying && currentTime >= duration - 0.05) {
+                        setCurrentTime(0);
+                    }
                     setIsPlaying(!isPlaying);
                     break;
 
@@ -1377,7 +1380,12 @@ export const Timeline = ({
 
                         <div className="flex items-center gap-2">
                             <button
-                                onClick={() => setIsPlaying(!isPlaying)}
+                                onClick={() => {
+                                    if (!isPlaying && currentTime >= duration - 0.05) {
+                                        setCurrentTime(0);
+                                    }
+                                    setIsPlaying(!isPlaying);
+                                }}
                                 className={`w-6 h-6 rounded-full border transition-colors cursor-pointer flex items-center justify-center ${isDark ? 'border-gray-700 hover:bg-gray-800 text-gray-300' : 'border-gray-300 hover:bg-gray-100 text-gray-700'}`}
                             >
                                 {isPlaying ? <Pause size={10} fill="currentColor" /> : <Play size={10} fill="currentColor" className="ml-0.5" />}
