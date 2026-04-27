@@ -531,18 +531,43 @@ const CanvasDropZone = ({ canvasRef, isDark, setSelectedId, children, className 
     );
 };
 
-// Extracted element component — lazy-loads from the element registry
-const SceneElement = memo(({ el, isDark, isSelected, updateElement, setSelectedId, containerRef }: any) => {
+// ─── SceneElement ─────────────────────────────────────────────────────────────
+// FIX: Component now accepts only PRIMITIVE props (id, zIndex) from the parent
+// and self-subscribes to its own element slice via a fine-grained Zustand
+// selector.  When element 'abc' changes, ONLY the SceneElement with id='abc'
+// sees a new selector reference and re-renders.  All other 499 instances
+// receive Object.is(prev, next) === true → React.memo bails out immediately.
+// Cost: O(1) per mouse-move event, regardless of total canvas element count.
+interface SceneElementProps {
+    id: string;
+    zIndex: number;
+    isDark: boolean;
+    isSelected: boolean;
+    updateElement: (id: string, data: Partial<import('../store/useEditorStore').CanvasElement>) => void;
+    setSelectedId: (id: string | null) => void;
+    containerRef: React.RefObject<HTMLDivElement | null>;
+}
+
+const SceneElement = memo(({ id, zIndex, isDark, isSelected, updateElement, setSelectedId, containerRef }: SceneElementProps) => {
+    // Per-element selector: only this component re-renders when its own data changes.
+    const el = useEditorStore((s) => s.elements[id]);
+
     const sceneElementRef = useRef<HTMLDivElement>(null);
 
     const handlePointerDown = useCallback((e: React.PointerEvent) => {
         e.stopPropagation();
-        setSelectedId(el.id);
-    }, [el.id, setSelectedId]);
+        setSelectedId(id);
+    }, [id, setSelectedId]);
+
+    // Guard: element may have been removed from the store while this component
+    // is still in the reconciler queue.  Return null to unmount gracefully.
+    if (!el) return null;
 
     const [BASE_W, BASE_H] = el.boundingSize ?? [200, 60];
-
     const ElementComponent = getElementComponent(el.type) as unknown as React.ElementType<any>;
+    // zIndex comes from the parent map (idx + 1) as a plain number prop.
+    // If this element is selected, bump it to 1000 so it floats above siblings.
+    const resolvedZIndex = isSelected ? 1000 : zIndex;
 
     return (
         <>
@@ -562,7 +587,7 @@ const SceneElement = memo(({ el, isDark, isSelected, updateElement, setSelectedI
                     justifyContent: 'center',
                     cursor: 'pointer',
                     userSelect: 'none',
-                    zIndex: isSelected ? 1000 : (el.zIndex ?? 1),
+                    zIndex: resolvedZIndex,
                     pointerEvents: 'auto',
                     overflow: 'visible',
                     transform: `translate(${el.x ?? 0}px, ${el.y ?? 0}px) rotate(${el.rotation ?? 0}deg) scale(${el.scaleX ?? 1}, ${el.scaleY ?? 1})`,
@@ -640,15 +665,25 @@ const SaasVideoEditor = () => {
     const { data: animationsData, isLoading: isAnimationsLoading } = useAnimations(animationSearchQuery);
     const flatAnimations = animationsData?.pages.flatMap((page) => page.data) ?? [];
 
-    // Canvas States (global store)
-    const {
-        elements,
-        elementIds,
-        addElement,
-        updateElement,
-        reorderElements,
-        removeElement,
-    } = useEditorStore();
+    // ─── Canvas store — granular selectors ───────────────────────────────────
+    // FIX: We subscribe ONLY to elementIds (an array of strings) and the
+    // stable action references.  We do NOT subscribe to the `elements` Record
+    // here.  Because actions are functions defined once at store creation, their
+    // references never change — Zustand skips re-renders for those selectors
+    // entirely.  `elementIds` only changes when elements are added/removed,
+    // NOT when an individual element's x/y/etc. is updated during drag.
+    // This eliminates the full SaasVideoEditor re-render on every mouse-move.
+    const elementIds    = useEditorStore((s) => s.elementIds);
+    const addElement    = useEditorStore((s) => s.addElement);
+    const updateElement = useEditorStore((s) => s.updateElement);
+    const reorderElements = useEditorStore((s) => s.reorderElements);
+    const removeElement = useEditorStore((s) => s.removeElement);
+    // The Layers panel (Position tab) needs the full elements map, but ONLY
+    // while the Position tab is open. We keep a separate subscription for it
+    // so the canvas map() loop is never affected.
+    const layersElements = useEditorStore((s) =>
+        activeTab === 'Position' && positionSubTab === 'Layers' ? s.elements : null
+    );
     const {
         selectedId, setSelectedId,
         isPlaying, setIsPlaying,
@@ -1215,7 +1250,7 @@ const SaasVideoEditor = () => {
                                         <UniversalPanel
                                             title="Position"
                                             onClose={() => { setActiveTab(null); }}
-                                            items={positionSubTab === 'Arrange' ? flatPositions : [...Object.values(elements).reverse(), { id: 'canvas-background', type: 'background', label: 'Background' }]}
+                                            items={positionSubTab === 'Arrange' ? flatPositions : [...Object.values(layersElements ?? useEditorStore.getState().elements).reverse(), { id: 'canvas-background', type: 'background', label: 'Background' }]}
                                             width={480}
                                             height="100%"
                                             itemHeight={positionSubTab === 'Arrange' ? 140 : 70}
@@ -1237,7 +1272,8 @@ const SaasVideoEditor = () => {
                                             showSubtitle={false}
                                             onReorder={(oldIdx, newIdx) => {
                                                 // Since the list is reversed, we need to convert indices back to original
-                                                const total = Object.values(elements).length;
+                                                // Imperative read — no subscription needed for a one-shot click handler
+                                                const total = useEditorStore.getState().elementIds.length;
                                                 reorderElements(total - 1 - oldIdx, total - 1 - newIdx);
                                             }}
                                             customHeaderContent={
@@ -1263,7 +1299,8 @@ const SaasVideoEditor = () => {
                                                     onClick={() => {
                                                         if (selectedId && canvasRef.current) {
                                                             const rect = canvasRef.current.getBoundingClientRect();
-                                                            const targetEl = elements[selectedId];
+                                                            // Imperative read — fires on click, not during drag. No subscription needed.
+                                                            const targetEl = useEditorStore.getState().elements[selectedId];
                                                             const [baseW, baseH] = targetEl?.boundingSize ?? [200, 60];
                                                             updateElement(selectedId, {
                                                                 x: (el.x / 100) * rect.width - baseW / 2,
@@ -1449,24 +1486,21 @@ const SaasVideoEditor = () => {
                                         if (e.target === e.currentTarget) setSelectedId(null);
                                     }}
                                 >
-                                    {elementIds.map((id, idx) => {
-                                        const el = elements[id];
-
-                                        if (!el) return null;
-                                        const isSelected = el.id === selectedId;
-
-                                        return (
-                                            <SceneElement
-                                                key={el.id}
-                                                el={{ ...el, zIndex: idx + 1 }}
-                                                isDark={isDark}
-                                                isSelected={isSelected}
-                                                updateElement={updateElement}
-                                                setSelectedId={setSelectedId}
-                                                containerRef={canvasRef}
-                                            />
-                                        );
-                                    })}
+                                    {/* FIX: Pass only primitive props (id, zIndex) so React.memo's
+                                         Object.is check can actually bail out for unchanged elements.
+                                         SceneElement reads its own data from the store internally. */}
+                                    {elementIds.map((id, idx) => (
+                                        <SceneElement
+                                            key={id}
+                                            id={id}
+                                            zIndex={idx + 1}
+                                            isDark={isDark}
+                                            isSelected={id === selectedId}
+                                            updateElement={updateElement}
+                                            setSelectedId={setSelectedId}
+                                            containerRef={canvasRef}
+                                        />
+                                    ))}
                                 </div>
                             </CanvasDropZone>
                         )}
