@@ -543,12 +543,13 @@ interface SceneElementProps {
     zIndex: number;
     isDark: boolean;
     isSelected: boolean;
+    zoom: number;
     updateElement: (id: string, data: Partial<import('../store/useEditorStore').CanvasElement>) => void;
     setSelectedId: (id: string | null) => void;
     containerRef: React.RefObject<HTMLDivElement | null>;
 }
 
-const SceneElement = memo(({ id, zIndex, isDark, isSelected, updateElement, setSelectedId, containerRef }: SceneElementProps) => {
+const SceneElement = memo(({ id, zIndex, isDark, isSelected, zoom, updateElement, setSelectedId, containerRef }: SceneElementProps) => {
     // Per-element selector: only this component re-renders when its own data changes.
     const el = useEditorStore((s) => s.elements[id]);
 
@@ -615,11 +616,152 @@ const SceneElement = memo(({ id, zIndex, isDark, isSelected, updateElement, setS
                     updateElement={updateElement}
                     containerRef={containerRef}
                     targetRef={sceneElementRef}
+                    zoom={zoom}
                 />
             )}
         </>
     );
 });
+
+/* ─── Custom Horizontal Scrollbar ─── */
+const HorizontalScrollbar = ({ scaledW, workspaceW, panX, setPan, panY, isDark, showVScrollbar }: {
+    scaledW: number;
+    workspaceW: number;
+    panX: number;
+    setPan: (x: number, y: number) => void;
+    panY: number;
+    isDark: boolean;
+    showVScrollbar: boolean;
+}) => {
+    const trackRef = useRef<HTMLDivElement>(null);
+    const draggingRef = useRef(false);
+    const startXRef = useRef(0);
+    const startPanXRef = useRef(0);
+
+    // How much total overflow exists
+    const overflow = scaledW - workspaceW;
+    // Track width (minus right gap if vertical scrollbar is shown)
+    const trackPadding = 8;
+    const trackWidth = workspaceW - trackPadding * 2 - (showVScrollbar ? 12 : 0);
+    // Thumb width: ratio of visible to total, clamped min 40px
+    const thumbWidth = Math.max(40, (workspaceW / scaledW) * trackWidth);
+    // Thumb position: panX=0 means centered, so we compute offset
+    // When centered, thumb should be in the middle of the track
+    const maxPan = overflow / 2;
+    const thumbLeft = ((maxPan - panX) / (2 * maxPan)) * (trackWidth - thumbWidth);
+
+    const handlePointerDown = (e: React.PointerEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        draggingRef.current = true;
+        startXRef.current = e.clientX;
+        startPanXRef.current = panX;
+        (e.target as HTMLElement).setPointerCapture(e.pointerId);
+    };
+
+    const handlePointerMove = (e: React.PointerEvent) => {
+        if (!draggingRef.current) return;
+        const dx = e.clientX - startXRef.current;
+        // Reverse map: thumb moves right → panX decreases (canvas slides left)
+        const panDelta = (dx / (trackWidth - thumbWidth)) * (2 * maxPan);
+        setPan(startPanXRef.current - panDelta, panY);
+    };
+
+    const handlePointerUp = () => {
+        draggingRef.current = false;
+    };
+
+    return (
+        <div
+            ref={trackRef}
+            className={`absolute bottom-0 z-10 rounded-full ${isDark ? 'bg-white/10' : 'bg-gray-200/40'}`}
+            style={{
+                left: trackPadding,
+                width: trackWidth,
+                height: 6,
+            }}
+        >
+            <div
+                className={`absolute top-0 rounded-full cursor-pointer transition-colors ${isDark ? 'bg-gray-400/60 hover:bg-gray-300/80' : 'bg-gray-400/60 hover:bg-gray-500/80'}`}
+                style={{
+                    width: thumbWidth,
+                    height: '100%',
+                    left: Math.max(0, Math.min(trackWidth - thumbWidth, thumbLeft)),
+                }}
+                onPointerDown={handlePointerDown}
+                onPointerMove={handlePointerMove}
+                onPointerUp={handlePointerUp}
+                onPointerCancel={handlePointerUp}
+            />
+        </div>
+    );
+};
+
+/* ─── Custom Vertical Scrollbar ─── */
+const VerticalScrollbar = ({ scaledH, workspaceH, panY, setPan, panX, isDark, showHScrollbar }: {
+    scaledH: number;
+    workspaceH: number;
+    panY: number;
+    setPan: (x: number, y: number) => void;
+    panX: number;
+    isDark: boolean;
+    showHScrollbar: boolean;
+}) => {
+    const draggingRef = useRef(false);
+    const startYRef = useRef(0);
+    const startPanYRef = useRef(0);
+
+    const overflow = scaledH - workspaceH;
+    const trackPadding = 8;
+    const trackHeight = workspaceH - trackPadding * 2 - (showHScrollbar ? 12 : 0);
+    const thumbHeight = Math.max(40, (workspaceH / scaledH) * trackHeight);
+    const maxPan = overflow / 2;
+    const thumbTop = ((maxPan - panY) / (2 * maxPan)) * (trackHeight - thumbHeight);
+
+    const handlePointerDown = (e: React.PointerEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        draggingRef.current = true;
+        startYRef.current = e.clientY;
+        startPanYRef.current = panY;
+        (e.target as HTMLElement).setPointerCapture(e.pointerId);
+    };
+
+    const handlePointerMove = (e: React.PointerEvent) => {
+        if (!draggingRef.current) return;
+        const dy = e.clientY - startYRef.current;
+        const panDelta = (dy / (trackHeight - thumbHeight)) * (2 * maxPan);
+        setPan(panX, startPanYRef.current - panDelta);
+    };
+
+    const handlePointerUp = () => {
+        draggingRef.current = false;
+    };
+
+    return (
+        <div
+            className={`absolute right-0 z-10 rounded-full ${isDark ? 'bg-white/10' : 'bg-gray-200/40'}`}
+            style={{
+                top: trackPadding,
+                width: 6,
+                height: trackHeight,
+            }}
+        >
+            <div
+                className={`absolute left-0 rounded-full cursor-pointer transition-colors ${isDark ? 'bg-gray-400/60 hover:bg-gray-300/80' : 'bg-gray-400/60 hover:bg-gray-500/80'}`}
+                style={{
+                    height: thumbHeight,
+                    width: '100%',
+                    top: Math.max(0, Math.min(trackHeight - thumbHeight, thumbTop)),
+                }}
+                onPointerDown={handlePointerDown}
+                onPointerMove={handlePointerMove}
+                onPointerUp={handlePointerUp}
+                onPointerCancel={handlePointerUp}
+            />
+        </div>
+    );
+};
 
 const SaasVideoEditor = () => {
     const { projectId } = useParams();
@@ -688,7 +830,9 @@ const SaasVideoEditor = () => {
         selectedId, setSelectedId,
         isPlaying, setIsPlaying,
         currentTime, setCurrentTime,
-        canvasFormat, setCanvasFormat
+        canvasFormat, setCanvasFormat,
+        zoom, panX, panY, setZoom, setPan,
+        zoomTarget, setZoomTarget
     } = useUIStore();
 
     useEffect(() => {
@@ -754,6 +898,7 @@ const SaasVideoEditor = () => {
     const activeDragItemRef = useRef<string | null>(null);
     const savedActiveTabRef = useRef<string | null>(null);
     const canvasRef = useRef<HTMLDivElement>(null);
+    const workspaceRef = useRef<HTMLDivElement>(null);
     // Derived drag state — kept as state only for UI that truly needs to react (e.g. cursor change)
     const [isDraggingElement, setIsDraggingElement] = useState(false);
 
@@ -876,8 +1021,10 @@ const SaasVideoEditor = () => {
                 const clientX = location.current.input.clientX;
                 const clientY = location.current.input.clientY;
 
-                const dropX = clientX - canvasRect.left;
-                const dropY = clientY - canvasRect.top;
+                // Divide by zoom so drop position maps to canvas-local coordinates
+                const currentZoom = useUIStore.getState().zoom;
+                const dropX = (clientX - canvasRect.left) / currentZoom;
+                const dropY = (clientY - canvasRect.top) / currentZoom;
 
                 const panelDef = PANEL_ELEMENTS.find((el: any) => el.type === type);
                 const resolvedBoundingSize: [number, number] =
@@ -907,6 +1054,56 @@ const SaasVideoEditor = () => {
             }
         });
     }, [addElement]);
+
+    // ─── Workspace size tracking (for scrollbar calculations) ────────────────
+    const [workspaceSize, setWorkspaceSize] = useState({ width: 0, height: 0 });
+    useEffect(() => {
+        const el = workspaceRef.current;
+        if (!el) return;
+        const ro = new ResizeObserver(([entry]) => {
+            const { width, height } = entry.contentRect;
+            setWorkspaceSize({ width, height });
+        });
+        ro.observe(el);
+        return () => ro.disconnect();
+    }, []);
+
+    // ─── Wheel handler: ctrl/meta + wheel = zoom, plain wheel = vertical pan ─
+    // IMPORTANT: Must use native addEventListener with { passive: false }.
+    // React registers onWheel as passive in Chrome 73+, which silently
+    // ignores preventDefault() — causing browser zoom to fire simultaneously.
+    useEffect(() => {
+        const el = workspaceRef.current;
+        if (!el) return;
+
+        const handleWheel = (e: WheelEvent) => {
+            e.preventDefault();
+            if (e.ctrlKey || e.metaKey) {
+                // Zoom: fixed multiplicative factor per tick (like the timeline).
+                // deltaY sign determines direction; magnitude is IGNORED.
+                // This gives consistent ±6% per tick whether using trackpad or mouse wheel.
+                const factor = e.deltaY < 0 ? 1.03 : 1 / 1.03;
+                const { zoom: z } = useUIStore.getState();
+                const newZoom = Math.min(10, Math.max(0.1, z * factor));
+                setZoom(newZoom);
+            } else {
+                // Vertical pan (and horizontal if shift is held)
+                const { panX: px, panY: py } = useUIStore.getState();
+                setPan(px - e.deltaX, py - e.deltaY);
+            }
+        };
+
+        el.addEventListener('wheel', handleWheel, { passive: false });
+        return () => el.removeEventListener('wheel', handleWheel);
+    }, [setZoom, setPan]);
+
+    // Canvas pixel dimensions from format
+    const canvasW = canvasFormat?.width ?? 1920;
+    const canvasH = canvasFormat?.height ?? 1080;
+    const scaledW = canvasW * zoom;
+    const scaledH = canvasH * zoom;
+    const showHScrollbar = scaledW > workspaceSize.width;
+    const showVScrollbar = scaledH > workspaceSize.height;
 
     return (
         <div className={`fixed inset-0 flex flex-col p-[10px] gap-[10px] overflow-hidden transition-colors duration-200 ${isDark ? 'dark bg-[#080810] text-white' : 'bg-[#f3f4f6] text-gray-900'}`}>
@@ -1461,48 +1658,88 @@ const SaasVideoEditor = () => {
                         )}
                     </div>
 
-                    <div className="flex-1 min-w-0 min-h-0 flex items-center justify-center p-8 relative z-0">
+                    {/* ─── Canvas Workspace ─── */}
+                    <div
+                        ref={workspaceRef}
+                        className="flex-1 min-w-0 min-h-0 relative z-0"
+                        style={{ overflow: 'hidden' }}
+                    >
                         {isProjectLoading ? (
-                            <div className="flex flex-col items-center justify-center text-gray-500">
+                            <div className="absolute inset-0 flex flex-col items-center justify-center text-gray-500">
                                 <div className="w-8 h-8 border-4 border-t-[#7c3aed] border-[#e2e8f0] rounded-full animate-spin mb-4"></div>
                                 Loading project...
                             </div>
                         ) : (
-                            <CanvasDropZone
-                                canvasRef={canvasRef}
-                                isDark={isDark}
-                                setSelectedId={setSelectedId}
-                                className="rounded-sm overflow-hidden flex-shrink-0"
-                                style={{
-                                    aspectRatio: canvasFormat ? canvasFormat.ratio.replace(':', '/') : '16/9',
-                                    height: '100%',
-                                    maxHeight: '100%',
-                                    maxWidth: '100%',
-                                }}
-                            >
-                                <div
-                                    style={{ position: 'relative', width: '100%', height: '100%', overflow: 'hidden' }}
-                                    onClick={(e) => {
-                                        if (e.target === e.currentTarget) setSelectedId(null);
+                            <>
+                                <CanvasDropZone
+                                    canvasRef={canvasRef}
+                                    isDark={isDark}
+                                    setSelectedId={setSelectedId}
+                                    className="rounded-sm overflow-hidden"
+                                    style={{
+                                        position: 'absolute',
+                                        width: canvasW,
+                                        height: canvasH,
+                                        left: '50%',
+                                        top: '50%',
+                                        transform: `translate(-50%, -50%) translate(${panX}px, ${panY}px) scale(${zoom})`,
+                                        transformOrigin: '50% 50%',
+                                        transition: 'transform 150ms ease-out',
                                     }}
                                 >
-                                    {/* FIX: Pass only primitive props (id, zIndex) so React.memo's
-                                         Object.is check can actually bail out for unchanged elements.
-                                         SceneElement reads its own data from the store internally. */}
-                                    {elementIds.map((id, idx) => (
-                                        <SceneElement
-                                            key={id}
-                                            id={id}
-                                            zIndex={idx + 1}
-                                            isDark={isDark}
-                                            isSelected={id === selectedId}
-                                            updateElement={updateElement}
-                                            setSelectedId={setSelectedId}
-                                            containerRef={canvasRef}
-                                        />
-                                    ))}
-                                </div>
-                            </CanvasDropZone>
+                                    <div
+                                        style={{ position: 'relative', width: '100%', height: '100%', overflow: 'hidden' }}
+                                        onClick={(e) => {
+                                            if (e.target === e.currentTarget) setSelectedId(null);
+                                        }}
+                                    >
+                                        {/* FIX: Pass only primitive props (id, zIndex) so React.memo's
+                                             Object.is check can actually bail out for unchanged elements.
+                                             SceneElement reads its own data from the store internally. */}
+                                        {elementIds.map((id, idx) => (
+                                            <SceneElement
+                                                key={id}
+                                                id={id}
+                                                zIndex={idx + 1}
+                                                isDark={isDark}
+                                                isSelected={id === selectedId}
+                                                zoom={zoom}
+                                                updateElement={updateElement}
+                                                setSelectedId={setSelectedId}
+                                                containerRef={canvasRef}
+                                            />
+                                        ))}
+                                    </div>
+                                </CanvasDropZone>
+
+
+
+                                {/* ─── Custom Horizontal Scrollbar ─── */}
+                                {showHScrollbar && (
+                                    <HorizontalScrollbar
+                                        scaledW={scaledW}
+                                        workspaceW={workspaceSize.width}
+                                        panX={panX}
+                                        setPan={setPan}
+                                        panY={panY}
+                                        isDark={isDark}
+                                        showVScrollbar={showVScrollbar}
+                                    />
+                                )}
+
+                                {/* ─── Custom Vertical Scrollbar ─── */}
+                                {showVScrollbar && (
+                                    <VerticalScrollbar
+                                        scaledH={scaledH}
+                                        workspaceH={workspaceSize.height}
+                                        panY={panY}
+                                        setPan={setPan}
+                                        panX={panX}
+                                        isDark={isDark}
+                                        showHScrollbar={showHScrollbar}
+                                    />
+                                )}
+                            </>
                         )}
                     </div>
 
@@ -1525,6 +1762,10 @@ const SaasVideoEditor = () => {
                     setIsPlaying={setIsPlaying}
                     isDark={isDark}
                     onOpenMediaPanel={() => setActiveTab('Media')}
+                    canvasZoom={zoom}
+                    setCanvasZoom={setZoom}
+                    zoomTarget={zoomTarget}
+                    setZoomTarget={setZoomTarget}
                 />
 
             </div>

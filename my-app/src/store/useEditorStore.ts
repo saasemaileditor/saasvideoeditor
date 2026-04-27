@@ -130,6 +130,17 @@ interface UIState {
     // Canvas Settings
     canvasFormat: { width: number; height: number; ratio: string } | null;
     setCanvasFormat: (format: { width: number; height: number; ratio: string }) => void;
+
+    // Canvas zoom & pan
+    zoom: number;
+    panX: number;
+    panY: number;
+    setZoom: (z: number) => void;
+    setPan: (x: number, y: number) => void;
+
+    // Zoom slider target toggle (bottom bar slider controls this target)
+    zoomTarget: 'canvas' | 'timeline';
+    setZoomTarget: (target: 'canvas' | 'timeline') => void;
 }
 
 export const useUIStore = create<UIState>((set) => ({
@@ -145,6 +156,17 @@ export const useUIStore = create<UIState>((set) => ({
 
     canvasFormat: null,
     setCanvasFormat: (format) => set({ canvasFormat: format }),
+
+    // Canvas zoom & pan
+    zoom: 1,
+    panX: 0,
+    panY: 0,
+    setZoom: (z) => set({ zoom: z }),
+    setPan: (x, y) => set({ panX: x, panY: y }),
+
+    // Zoom slider target toggle
+    zoomTarget: 'canvas',
+    setZoomTarget: (target) => set({ zoomTarget: target }),
 }));
 
 // ─── Document State Store (Undoable) ──────────────────────────────────────────

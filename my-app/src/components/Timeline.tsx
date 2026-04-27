@@ -12,6 +12,10 @@ interface TimelineProps {
     setIsPlaying: (playing: boolean) => void;
     isDark: boolean;
     onOpenMediaPanel: () => void;
+    canvasZoom: number;
+    setCanvasZoom: (z: number) => void;
+    zoomTarget: 'canvas' | 'timeline';
+    setZoomTarget: (target: 'canvas' | 'timeline') => void;
 }
 
 const PROJECT_FPS = 30; // Default FPS for timecode display
@@ -23,6 +27,10 @@ export const Timeline = ({
     setIsPlaying,
     isDark,
     onOpenMediaPanel,
+    canvasZoom,
+    setCanvasZoom,
+    zoomTarget,
+    setZoomTarget,
 }: TimelineProps) => {
     const formatTime = (seconds: number) => {
         const mins = Math.floor(seconds / 60);
@@ -1299,25 +1307,48 @@ export const Timeline = ({
 
                     {/* Right Side: Canva style controls */}
                     <div className="flex items-center gap-4 text-xs font-medium">
-                        {/* Zoom Slider */}
+                        {/* Zoom Slider — toggles between canvas and timeline zoom */}
                         <div className="flex items-center gap-3">
+                            {/* Canvas zoom icon (rectangle = canvas) */}
                             <div className="w-4 flex justify-center">
-                                <button className={`flex-shrink-0 flex items-center justify-center w-6 h-6 rounded-md -mt-[3px] transition-colors cursor-pointer ${isDark ? 'text-gray-400 hover:text-white hover:bg-gray-800' : 'text-gray-500 hover:text-gray-900 hover:bg-gray-100'}`}>
-                                    <CustomTimelineIcon />
+                                <button
+                                    onClick={() => setZoomTarget(zoomTarget === 'canvas' ? 'timeline' : 'canvas')}
+                                    className={`flex-shrink-0 flex items-center justify-center w-6 h-6 rounded-md -mt-[3px] transition-colors cursor-pointer ${
+                                        isDark
+                                            ? 'hover:bg-gray-800'
+                                            : 'hover:bg-gray-100'
+                                    }`}
+                                    title={zoomTarget === 'canvas' ? 'Switch to Timeline zoom' : 'Switch to Canvas zoom'}
+                                >
+                                    <CustomTimelineIcon activeTarget={zoomTarget} isDark={isDark} />
                                 </button>
                             </div>
                             <div className="relative flex items-center group">
-                                <input
-                                    type="range"
-                                    min="10"
-                                    max="1000"
-                                    value={zoom}
-                                    onChange={(e) => setZoom(parseInt(e.target.value))}
-                                    className={`w-48 h-1 rounded-full appearance-none cursor-pointer outline-none transition-colors ${isDark ? 'bg-gray-800' : 'bg-gray-200'}`}
-                                    style={{
-                                        backgroundImage: `linear-gradient(to right, #8b5cf6 0%, #8b5cf6 ${(zoom / 1000) * 100}%, transparent ${(zoom / 1000) * 100}%, transparent 100%)`,
-                                    }}
-                                />
+                                {zoomTarget === 'canvas' ? (
+                                    <input
+                                        type="range"
+                                        min="10"
+                                        max="1000"
+                                        value={Math.round(canvasZoom * 100)}
+                                        onChange={(e) => setCanvasZoom(parseInt(e.target.value) / 100)}
+                                        className={`w-48 h-1 rounded-full appearance-none cursor-pointer outline-none transition-colors ${isDark ? 'bg-gray-800' : 'bg-gray-200'}`}
+                                        style={{
+                                            backgroundImage: `linear-gradient(to right, #8b5cf6 0%, #8b5cf6 ${((canvasZoom * 100 - 10) / 990) * 100}%, transparent ${((canvasZoom * 100 - 10) / 990) * 100}%, transparent 100%)`,
+                                        }}
+                                    />
+                                ) : (
+                                    <input
+                                        type="range"
+                                        min="10"
+                                        max="1000"
+                                        value={zoom}
+                                        onChange={(e) => setZoom(parseInt(e.target.value))}
+                                        className={`w-48 h-1 rounded-full appearance-none cursor-pointer outline-none transition-colors ${isDark ? 'bg-gray-800' : 'bg-gray-200'}`}
+                                        style={{
+                                            backgroundImage: `linear-gradient(to right, #8b5cf6 0%, #8b5cf6 ${(zoom / 1000) * 100}%, transparent ${(zoom / 1000) * 100}%, transparent 100%)`,
+                                        }}
+                                    />
+                                )}
                                 <style>{`
                                 input[type='range']::-webkit-slider-thumb {
                                     -webkit-appearance: none;
@@ -1340,7 +1371,7 @@ export const Timeline = ({
                             `}</style>
                             </div>
                             <span className={`text-[11px] font-medium w-10 text-center ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
-                                {zoom}%
+                                {zoomTarget === 'canvas' ? `${Math.round(canvasZoom * 100)}%` : `${zoom}%`}
                             </span>
                         </div>
 

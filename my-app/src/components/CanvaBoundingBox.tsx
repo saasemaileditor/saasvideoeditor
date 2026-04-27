@@ -17,6 +17,7 @@ export interface CanvaBoundingBoxProps {
     updateElement: (id: string, data: Partial<CanvasElement>) => void;
     containerRef: React.RefObject<HTMLElement | null>;
     targetRef: React.RefObject<HTMLElement | null>;
+    zoom?: number;
 }
 
 const lockCursor = (cursorStyle: string) => {
@@ -36,7 +37,7 @@ const unlockCursor = () => {
     if (styleEl) styleEl.remove();
 };
 
-export function CanvaBoundingBox({ el, updateElement, containerRef, targetRef }: CanvaBoundingBoxProps) {
+export function CanvaBoundingBox({ el, updateElement, containerRef, targetRef, zoom = 1 }: CanvaBoundingBoxProps) {
     const target = targetRef?.current;
     const moveableRef = useRef<any>(null);
 
@@ -61,11 +62,16 @@ export function CanvaBoundingBox({ el, updateElement, containerRef, targetRef }:
         if (!container) return;
         const padding = 50; // Space needed for the rotation circle outside the element
         let newPos: "top" | "bottom" | "left" | "right" = "right";
-        
-        if (container.right - rect.right < padding) {
-            if (rect.left - container.left > padding) {
+
+        // Divide the screen-space offsets by zoom so they map to canvas-local space
+        const rightSpace = (container.right - rect.right) / zoom;
+        const leftSpace = (rect.left - container.left) / zoom;
+        const bottomSpace = (container.bottom - rect.bottom) / zoom;
+
+        if (rightSpace < padding) {
+            if (leftSpace > padding) {
                 newPos = "left";
-            } else if (container.bottom - rect.bottom > padding) {
+            } else if (bottomSpace > padding) {
                 newPos = "bottom";
             } else {
                 newPos = "top";
