@@ -1309,9 +1309,9 @@ export const Timeline = ({
                 <div className="flex-shrink-0 flex items-center justify-end mt-1 pl-3 pr-3">
 
                     {/* Right Side: Canva style controls */}
-                    <div className="flex items-center gap-4 text-xs font-medium">
+                    <div className="flex items-center gap-3 text-xs font-medium">
                         {/* Zoom Slider — toggles between canvas and timeline zoom */}
-                        <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-2">
                             {/* Canvas zoom icon (rectangle = canvas) */}
                             <div className="w-4 flex justify-center">
                                 <button
@@ -1334,7 +1334,7 @@ export const Timeline = ({
                                         max="500"
                                         value={Math.round(canvasZoom * 100)}
                                         onChange={(e) => setCanvasZoom(parseInt(e.target.value) / 100)}
-                                        className={`w-48 h-1 rounded-full appearance-none cursor-pointer outline-none transition-colors ${isDark ? 'bg-gray-800' : 'bg-gray-200'}`}
+                                        className={`w-40 h-1 rounded-full appearance-none cursor-pointer outline-none transition-colors ${isDark ? 'bg-gray-800' : 'bg-gray-200'}`}
                                         style={{
                                             backgroundImage: `linear-gradient(to right, #8b5cf6 0%, #8b5cf6 ${((canvasZoom * 100 - 10) / 490) * 100}%, transparent ${((canvasZoom * 100 - 10) / 490) * 100}%, transparent 100%)`,
                                         }}
@@ -1346,7 +1346,7 @@ export const Timeline = ({
                                         max="1000"
                                         value={zoom}
                                         onChange={(e) => setZoom(parseInt(e.target.value))}
-                                        className={`w-48 h-1 rounded-full appearance-none cursor-pointer outline-none transition-colors ${isDark ? 'bg-gray-800' : 'bg-gray-200'}`}
+                                        className={`w-40 h-1 rounded-full appearance-none cursor-pointer outline-none transition-colors ${isDark ? 'bg-gray-800' : 'bg-gray-200'}`}
                                         style={{
                                             backgroundImage: `linear-gradient(to right, #8b5cf6 0%, #8b5cf6 ${(zoom / 1000) * 100}%, transparent ${(zoom / 1000) * 100}%, transparent 100%)`,
                                         }}
@@ -1373,12 +1373,12 @@ export const Timeline = ({
                                 }
                             `}</style>
                             </div>
-                            <span className={`text-[11px] font-medium w-10 text-center ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+                            <span className={`text-[11px] font-medium w-8 text-right ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
                                 {zoomTarget === 'canvas' ? `${Math.round(canvasZoom * 100)}%` : `${zoom}%`}
                             </span>
                         </div>
 
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-1.5">
                             <button
                                 onClick={() => {
                                     if (!isPlaying && currentTime >= duration - 0.05) {
@@ -1390,7 +1390,8 @@ export const Timeline = ({
                             >
                                 {isPlaying ? <Pause size={10} fill="currentColor" /> : <Play size={10} fill="currentColor" className="ml-0.5" />}
                             </button>
-                            <span className={`text-[11px] font-medium tracking-[0.02em] ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+                            {/* Industry Standard Fix: tabular-nums forces digits to be equal width, w-[82px] acts as a tight fixed lock, text-left brings it flush to the button */}
+                            <span className={`text-[11px] font-medium tracking-[0.02em] inline-block w-[82px] text-left tabular-nums flex-shrink-0 ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
                                 {`${formatTime(currentTime)} / ${formatTime(duration)}`}
                             </span>
                         </div>
