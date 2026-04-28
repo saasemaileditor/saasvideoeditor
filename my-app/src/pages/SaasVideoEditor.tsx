@@ -438,14 +438,13 @@ const DraggableCard = ({ elementId, icon: Icon, label, isDark }: {
 // FIX: Uses direct DOM manipulation (refs) instead of useState for hover state.
 // This means onDragEnter / onDragLeave NEVER trigger a React re-render — zero
 // VirtualizedGrid re-renders during the entire mouse-movement of a drag.
-const CanvasDropZone = ({ canvasRef, isDark, setSelectedId, children, className = '', style = {}, shadowLayerRef }: {
+const CanvasDropZone = ({ canvasRef, isDark, setSelectedId, children, className = '', style = {} }: {
     canvasRef: React.RefObject<HTMLDivElement | null>;
     isDark: boolean;
     setSelectedId: (id: string | null) => void;
     children: React.ReactNode;
     className?: string;
     style?: React.CSSProperties;
-    shadowLayerRef?: React.RefObject<HTMLDivElement | null>;
 }) => {
     const localRef = useRef<HTMLDivElement>(null);
     const overlayRef = useRef<HTMLDivElement>(null);
@@ -454,26 +453,22 @@ const CanvasDropZone = ({ canvasRef, isDark, setSelectedId, children, className 
     const applyOver = (over: boolean) => {
         const el      = localRef.current;
         const overlay = overlayRef.current;
-        const shadow  = shadowLayerRef?.current;
         if (!el) return;
 
         if (over) {
             // Canvas bg — background-color doesn't scale with transform, safe to set directly
             el.style.backgroundColor = isDark ? 'rgba(45,31,94,0.4)' : '#f3e8ff';
-            // Shadow layer — ring + inset glow
-            if (shadow) {
-                shadow.style.boxShadow = isDark
-                    ? '0 0 0 2px #7c3aed, inset 0 0 20px rgba(124,58,237,0.3), 0 4px 24px rgba(0,0,0,0.5)'
-                    : '0 0 0 2px #7c3aed, inset 0 0 20px rgba(124,58,237,0.15), 0 4px 16px rgba(0,0,0,0.12)';
-            }
+            // Apply drag ring and shadow directly to the canvas
+            el.style.boxShadow = isDark
+                ? '0 0 0 2px #7c3aed, inset 0 0 20px rgba(124,58,237,0.3), 0 4px 24px rgba(0,0,0,0.5)'
+                : '0 0 0 2px #7c3aed, inset 0 0 20px rgba(124,58,237,0.15), 0 4px 16px rgba(0,0,0,0.12)';
             if (overlay) overlay.style.display = 'flex';
         } else {
             el.style.backgroundColor = isDark ? '#000' : '#fff';
-            if (shadow) {
-                shadow.style.boxShadow = isDark
-                    ? '0 0 0 1px #2a2d45, 0 4px 24px rgba(0,0,0,0.5)'
-                    : '0 0 0 1px #e5e7eb, 0 4px 16px rgba(0,0,0,0.12)';
-            }
+            // Default flat border directly on canvas
+            el.style.boxShadow = isDark
+                ? '0 0 0 1px #2a2d45, 0 4px 24px rgba(0,0,0,0.5)'
+                : '0 0 0 1px #e5e7eb, 0 4px 16px rgba(0,0,0,0.12)';
             if (overlay) overlay.style.display = 'none';
         }
     };
@@ -893,7 +888,6 @@ const SaasVideoEditor = () => {
     const activeDragItemRef = useRef<string | null>(null);
     const savedActiveTabRef = useRef<string | null>(null);
     const canvasRef             = useRef<HTMLDivElement>(null);
-    const canvasShadowLayerRef  = useRef<HTMLDivElement>(null);
     const workspaceRef = useRef<HTMLDivElement>(null);
     // Derived drag state — kept as state only for UI that truly needs to react (e.g. cursor change)
     const [isDraggingElement, setIsDraggingElement] = useState(false);
@@ -1760,40 +1754,10 @@ const SaasVideoEditor = () => {
                             </div>
                         ) : (
                             <>
-                                {/*
-                                 * ── Non-transformed shadow layer ───────────────────────────────
-                                 * This div uses translate-only (NO scale), with pre-multiplied
-                                 * width/height. Border/shadow/radius are always device-pixel sharp.
-                                 * `box-shadow: 0 0 0 1px` renders OUTSIDE the box — visible as a
-                                 * 1px ring around the canvas. `border: 1px` would render INSIDE
-                                 * and be hidden by the canvas sitting on top at zIndex:1.
-                                 */}
-                                <div
-                                    id="canvas-shadow-layer"
-                                    ref={canvasShadowLayerRef}
-                                    aria-hidden="true"
-                                    style={{
-                                        position: 'absolute',
-                                        width: scaledW,
-                                        height: scaledH,
-                                        left: '50%',
-                                        top: '50%',
-                                        transform: `translate(-50%, -50%) translate(${panX}px, ${panY}px)`,
-                                        borderRadius: 4,
-                                        // boxShadow is intentionally NOT set here.
-                                        // applyOver() inside CanvasDropZone is the sole owner of
-                                        // shadow.style.boxShadow. If React controlled it via this
-                                        // style prop, any parent re-render during a drag would
-                                        // overwrite the purple drop-ring back to the default.
-                                        pointerEvents: 'none',
-                                        zIndex: 0,
-                                    }}
-                                />
                                 <CanvasDropZone
                                     canvasRef={canvasRef}
                                     isDark={isDark}
                                     setSelectedId={setSelectedId}
-                                    shadowLayerRef={canvasShadowLayerRef}
                                     className="overflow-hidden"
                                     style={{
                                         position: 'absolute',
