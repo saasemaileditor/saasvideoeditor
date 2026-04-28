@@ -49,3 +49,39 @@
 .animate-shimmer {
   animation: shimmer 1.5s infinite;
 }
+
+/* --- Timeline specific scrollbars --- */
+/* Hidden by default */
+.timeline-scroll-area::-webkit-scrollbar-thumb {
+  background-color: transparent !important;
+}
+.timeline-scroll-area {
+  scrollbar-color: transparent transparent !important;
+}
+
+/* Light mode reveal on hover */
+.timeline-hover-container:hover .timeline-scroll-area::-webkit-scrollbar-thumb {
+  background-color: #d1d5db !important;
+}
+.timeline-hover-container:hover .timeline-scroll-area {
+  scrollbar-color: #d1d5db transparent !important;
+}
+
+/* Light mode thumb active/hover interaction */
+.timeline-hover-container:hover .timeline-scroll-area::-webkit-scrollbar-thumb:hover {
+  background-color: #9ca3af !important;
+}
+
+/* Dark mode reveal on hover */
+.dark .timeline-hover-container:hover .timeline-scroll-area::-webkit-scrollbar-thumb,
+[data-theme="dark"] .timeline-hover-container:hover .timeline-scroll-area::-webkit-scrollbar-thumb {
+  background-color: rgba(255, 255, 255, 0.2) !important;
+}
+.dark .timeline-hover-container:hover .timeline-scroll-area::-webkit-scrollbar-thumb:hover,
+[data-theme="dark"] .timeline-hover-container:hover .timeline-scroll-area::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(255, 255, 255, 0.35) !important;
+}
+.dark .timeline-hover-container:hover .timeline-scroll-area,
+[data-theme="dark"] .timeline-hover-container:hover .timeline-scroll-area {
+  scrollbar-color: rgba(255, 255, 255, 0.2) transparent !important;
+}

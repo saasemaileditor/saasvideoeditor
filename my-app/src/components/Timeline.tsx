@@ -1004,11 +1004,11 @@ export const Timeline = ({
 
 
                 {/* Main Timeline Area — single unified scroll container */}
-                <div className="flex-1 flex flex-col overflow-hidden">
+                <div className="flex-1 flex flex-col overflow-hidden timeline-hover-container">
 
                     <div
                         ref={tracksScrollRef}
-                        className={`flex-1 overflow-x-auto overflow-y-auto custom-scrollbar relative ${isDark ? 'bg-[#14141d]' : 'bg-white'}`}
+                        className={`flex-1 overflow-x-auto overflow-y-auto custom-scrollbar timeline-scroll-area relative ${isDark ? 'bg-[#14141d]' : 'bg-white'}`}
                     >
                         <div
                             className="relative transition-all duration-300 ease-out px-1"
