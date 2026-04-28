@@ -1064,6 +1064,32 @@ const SaasVideoEditor = () => {
         return () => ro.disconnect();
     }, []);
 
+    // ─── Auto-Fit Canvas on Load (Industry Standard) ─────────────────────────
+    const [hasInitialFit, setHasInitialFit] = useState(false);
+    useEffect(() => {
+        // Only run once when we have both the canvas dimensions and the workspace container size
+        if (hasInitialFit || !canvasFormat || workspaceSize.width === 0 || workspaceSize.height === 0) return;
+
+        // The Bounding Box Scaling Algorithm (Math.min)
+        // 1. Calculate the scale factor needed to fit the width
+        const scaleX = workspaceSize.width / canvasFormat.width;
+        // 2. Calculate the scale factor needed to fit the height
+        const scaleY = workspaceSize.height / canvasFormat.height;
+        
+        // 3. Take the absolute minimum of the two to guarantee it fits without scrollbars.
+        // Multiply by 0.95 to provide a tighter 5% breathing room (padding) around the canvas.
+        const fitZoom = Math.min(scaleX, scaleY) * 0.95;
+        
+        // Apply the exact calculated percentage
+        setZoom(fitZoom);
+        
+        // Reset pan to perfectly center the canvas
+        setPan(0, 0);
+
+        // Mark as fitted so we don't accidentally override the user if they manually zoom later
+        setHasInitialFit(true);
+    }, [canvasFormat, workspaceSize, hasInitialFit, setZoom, setPan]);
+
     // ─── Wheel handler: ctrl/meta + wheel = zoom, plain wheel = vertical pan ─
     // IMPORTANT: Must use native addEventListener with { passive: false }.
     // React registers onWheel as passive in Chrome 73+, which silently
