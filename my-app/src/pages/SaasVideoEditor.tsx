@@ -934,6 +934,21 @@ const SaasVideoEditor = () => {
             if (e.key === 'Escape') {
                 setSelectedId(null);
             }
+
+            // Fit to Screen: Ctrl+0 or Cmd+0
+            if ((e.ctrlKey || e.metaKey) && e.key === '0') {
+                e.preventDefault();
+                const ws = workspaceRef.current;
+                const fmt = useUIStore.getState().canvasFormat;
+                if (ws && fmt) {
+                    const rect = ws.getBoundingClientRect();
+                    const scaleX = rect.width / fmt.width;
+                    const scaleY = rect.height / fmt.height;
+                    const fitZoom = Math.min(scaleX, scaleY) * 0.95;
+                    useUIStore.getState().setZoom(fitZoom);
+                    useUIStore.getState().setPan(0, 0);
+                }
+            }
         };
 
         window.addEventListener('keydown', handleKeyDown);
